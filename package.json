@@ -1,0 +1,48 @@
+{
+  "name": "bohoch-store",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "node scripts/with-env.mjs prisma generate",
+    "dev": "node scripts/with-env.mjs next dev",
+    "build": "prisma generate && next build",
+    "start": "node scripts/with-env.mjs next start",
+    "test": "vitest run",
+    "db:generate": "node scripts/with-env.mjs prisma generate",
+    "migrate": "node scripts/with-env.mjs prisma migrate deploy",
+    "migrate:dev": "node scripts/with-env.mjs prisma migrate dev",
+    "migrate:status": "node scripts/with-env.mjs prisma migrate status",
+    "migrate:rollback": "node scripts/with-env.mjs rollback",
+    "db:seed": "node scripts/with-env.mjs seed",
+    "db:seed:mac-khen": "node scripts/with-env.mjs seedMacKhen",
+    "admin:promote": "node scripts/promote-admin.js",
+    "admin:bootstrap": "node scripts/bootstrap-admin.js",
+    "emulators:start": "docker compose up -d",
+    "emulators:stop": "docker compose down"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@payos/node": "^2.0.5",
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.4.7",
+    "lucide-react": "^0.468.0",
+    "next": "14.2.15",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.15",
+    "jsdom": "^24.1.0",
+    "prisma": "^6.19.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

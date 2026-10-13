@@ -1,0 +1,15 @@
+{
+  "cartId": 1,
+  "customer": {
+    "name": "Test User",
+    "phone": "0900000000",
+    "email": "test@example.com",
+    "address": "123 Example Street",
+    "city": "Hồ Chí Minh",
+    "district": "Quận 1",
+    "ward": "Phường Bến Nghé",
+    "postalCode": "700000"
+  },
+  "shippingMethod": "standard",
+  "paymentMethod": "payos"
+}

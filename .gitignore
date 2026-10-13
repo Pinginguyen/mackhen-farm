@@ -1,0 +1,14 @@
+node_modules
+generated/prisma
+.next
+.next-verify
+*.tsbuildinfo
+out
+coverage
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+.vercel
+.azure/.preview-temp/
