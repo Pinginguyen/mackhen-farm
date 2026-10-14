@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { calculateVoucherDiscount } from '@/lib/vouchers';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import { getErrorMessage } from '@/lib/error-message';
 import VietnamAddressFields from './vietnam-address-fields';
 
 type CheckoutItem = { productId: string; variantId: string | null; quantity: number };
 
 type InitialCustomer = { name: string; email: string; phone: string; address: string };
 
-export default function CheckoutForm({ items, initialCustomer, subtotal, shipping }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number }) {
+export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, allowDemoFallback = false }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; allowDemoFallback?: boolean }) {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [voucher, setVoucher] = useState('');
@@ -23,7 +24,15 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
     setSubmitting(true);
     setMessage('');
     const form = new FormData(event.currentTarget);
-    let result: { orderId?: string; orderCode?: string; total?: number; error?: { message?: string } };
+    let result: {
+      orderId?: string;
+      orderCode?: string;
+      total?: number;
+      success?: boolean;
+      redirectUrl?: string;
+      order?: { code?: string; total?: number; paymentMethod?: string };
+      error?: unknown;
+    };
     let response: Response;
     try {
       response = await fetch('/api/checkout', {
@@ -35,6 +44,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
           paymentMethod,
           note: form.get('notes'),
           voucherCode: normalizedVoucher || (freeShippingApplied ? 'FREESHIP169' : ''),
+          fallbackTotal: Math.max(0, Math.round(subtotal + shipping - (discount ?? 0))),
         }),
       });
       result = await response.json() as typeof result;
@@ -44,8 +54,22 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       return;
     }
     setSubmitting(false);
+
+    const resultOrderCode = result.order?.code ?? result.orderCode ?? result.orderId ?? '';
+    if (result.success === true || result.redirectUrl) {
+      if (paymentMethod === 'COD') {
+        window.location.assign(`/cam-on${resultOrderCode ? `?orderCode=${encodeURIComponent(resultOrderCode)}` : ''}`);
+        return;
+      }
+
+      const destination = result.redirectUrl
+        ?? `/checkout/vietqr/${encodeURIComponent(resultOrderCode)}?demo=1&amount=${result.order?.total ?? result.total ?? 0}`;
+      window.location.assign(destination);
+      return;
+    }
+
     if (!response.ok || !result.orderId) {
-      setMessage(result.error?.message ?? 'Không thể tạo đơn hàng.');
+      setMessage(getErrorMessage(result.error, 'Không thể tạo đơn hàng.'));
       return;
     }
 
@@ -90,7 +114,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         <label className={paymentMethod === 'MOMO' ? 'is-selected' : ''}><input type="radio" name="method" value="MOMO" checked={paymentMethod === 'MOMO'} onChange={() => setPaymentMethod('MOMO')} /><span><strong>MoMo Sandbox</strong><small>Mô phỏng thanh toán để kiểm thử</small></span></label>
       </fieldset>
       <div className="field"><label htmlFor="notes">Ghi chú</label><textarea id="notes" name="notes" rows={4} /></div>
-      <button className="primary-action" type="submit" disabled={!items.length || submitting}>{submitting ? 'Đang xử lý...' : 'Xác nhận đơn hàng'}</button>
+      <button className="primary-action" type="submit" disabled={(!items.length && !allowDemoFallback) || submitting}>{submitting ? 'Đang xử lý...' : 'Xác nhận đơn hàng'}</button>
       {message && <p role="status">{message}</p>}
     </form>
   );

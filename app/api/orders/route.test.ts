@@ -67,6 +67,30 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).not.toHaveBeenCalled();
   });
 
+  it('returns a demo VietQR order when Prisma is unavailable', async () => {
+    const databaseError = new Error('Environment variable not found: DATABASE_URL');
+    databaseError.name = 'PrismaClientInitializationError';
+    cartFindUnique.mockRejectedValueOnce(databaseError);
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'VIETQR',
+        fallbackTotal: 169000,
+      }),
+    }));
+    const result = await response.json() as { success: boolean; order: { code: string; total: number; paymentMethod: string }; redirectUrl: string };
+
+    expect(response.status).toBe(200);
+    expect(result.success).toBe(true);
+    expect(result.order).toMatchObject({ total: 169000, paymentMethod: 'VIETQR' });
+    expect(result.order.code).toMatch(/^MKF-\d{6}$/);
+    expect(result.redirectUrl).toBe(`/checkout/vietqr/${result.order.code}?demo=1&amount=169000`);
+  });
+
   it.each(['COD', 'VIETQR'])('creates a %s order without requiring a payment provider', async (paymentMethod) => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',

@@ -15,6 +15,7 @@ const issueTypes = [
 ] as const;
 
 const returnStatuses: ReturnRequestStatus[] = ['PENDING', 'REPLACEMENT_APPROVED', 'REFUNDED', 'REJECTED'];
+const maxEvidenceBytes = 2 * 1024 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,11 +49,21 @@ export async function POST(request: Request) {
   }
 
   if (imageUrl) {
-    try {
-      const parsedUrl = new URL(imageUrl);
-      if (!['http:', 'https:'].includes(parsedUrl.protocol) || imageUrl.length > 2048) throw new Error('Invalid image URL');
-    } catch {
-      return NextResponse.json({ error: 'Link ảnh minh chứng phải là địa chỉ HTTP hoặc HTTPS hợp lệ.' }, { status: 400 });
+    if (imageUrl.startsWith('data:')) {
+      const dataUrlMatch = imageUrl.match(/^data:image\/(jpeg|png|webp|gif|avif);base64,([A-Za-z0-9+/]+={0,2})$/i);
+      const encodedImage = dataUrlMatch?.[2];
+      const padding = encodedImage?.endsWith('==') ? 2 : encodedImage?.endsWith('=') ? 1 : 0;
+      const imageBytes = encodedImage ? Math.floor(encodedImage.length * 3 / 4) - padding : Infinity;
+      if (!encodedImage || encodedImage.length % 4 !== 0 || imageBytes > maxEvidenceBytes) {
+        return NextResponse.json({ error: 'Ảnh minh chứng không hợp lệ hoặc vượt quá 2MB.' }, { status: 400 });
+      }
+    } else {
+      try {
+        const parsedUrl = new URL(imageUrl);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol) || imageUrl.length > 2048) throw new Error('Invalid image URL');
+      } catch {
+        return NextResponse.json({ error: 'Link ảnh minh chứng phải là địa chỉ HTTP hoặc HTTPS hợp lệ.' }, { status: 400 });
+      }
     }
   }
 

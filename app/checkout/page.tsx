@@ -11,7 +11,14 @@ import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 export default async function CheckoutPage() {
   const { data: cart, unavailable } = await fetchApiWithFallback('/api/cart', { items: [] as { productId: string; productSlug: string; variantId: string | null; name: string; quantity: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
-  const profile = session ? await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true } }) : null;
+  let profile = null;
+  if (session) {
+    try {
+      profile = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true } });
+    } catch {
+      profile = null;
+    }
+  }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
   const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
   return (
@@ -28,8 +35,8 @@ export default async function CheckoutPage() {
 
         <div className="checkout-layout">
           <div>
-            {unavailable && <p className="empty-state" role="status">Không thể tải giỏ hàng vì cơ sở dữ liệu hiện không khả dụng.</p>}
-            <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} />
+            {unavailable && <p className="checkout-demo-notice" role="status">Database đang tạm thời không khả dụng. Bạn vẫn có thể thử luồng demo; đơn chỉ được lưu khi kết nối database hoạt động.</p>}
+            <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} allowDemoFallback={unavailable} />
           </div>
 
           <aside className="summary-card">

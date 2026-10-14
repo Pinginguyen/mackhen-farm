@@ -79,6 +79,22 @@ describe('/api/returns', () => {
     expect(unsafeUrl.status).toBe(400);
   });
 
+  it('stores a valid Base64 image data URL', async () => {
+    const imageUrl = 'data:image/png;base64,aGVsbG8=';
+    const response = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl }));
+
+    expect(response.status).toBe(201);
+    expect(returnCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ imageUrl }) });
+  });
+
+  it('rejects unsupported or malformed Base64 data URLs', async () => {
+    const unsupportedType = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: 'data:image/svg+xml;base64,PHN2Zy8+' }));
+    const malformedData = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: 'data:image/png;base64,not base64' }));
+
+    expect(unsupportedType.status).toBe(400);
+    expect(malformedData.status).toBe(400);
+  });
+
   it('rejects malformed values without throwing', async () => {
     const response = await POST(makeRequest('POST', { ...validReturnRequest, orderCode: { trim: 'nope' } }));
 
