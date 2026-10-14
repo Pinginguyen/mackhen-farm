@@ -1,0 +1,1 @@
+ALTER TYPE "ShippingCarrier" ADD VALUE 'VIETTEL_POST';

@@ -1,0 +1,1 @@
+ALTER TYPE "CheckoutPaymentMethod" ADD VALUE 'MOMO';

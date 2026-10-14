@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const phone = body.customer?.phone?.trim();
   const address = body.delivery?.address?.trim();
   const paymentMethod = body.paymentMethod?.toUpperCase();
-  if (!name || !phone || !address || !['COD', 'VIETQR'].includes(paymentMethod ?? '')) {
+  if (!name || !phone || !address || !['COD', 'VIETQR', 'MOMO'].includes(paymentMethod ?? '')) {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
   }
   const voucherCode = body.voucherCode?.trim().toUpperCase() ?? '';
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
           customerName: name,
           phone,
           address,
-          paymentMethod: paymentMethod as 'COD' | 'VIETQR',
+          paymentMethod: paymentMethod as 'COD' | 'VIETQR' | 'MOMO',
           paymentStatus: 'PENDING',
           orderStatus: 'PENDING',
           subtotal,
@@ -102,6 +102,6 @@ export async function POST(request: Request) {
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
     await prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } });
     return NextResponse.json({ orderId: order.id, orderCode: order.orderCode, numericCode: order.numericCode, status: order.orderStatus.toLowerCase(), total: order.totalAmount }, { status: 201 });
-  });
+  }, 'Lỗi đặt hàng:');
 }
 

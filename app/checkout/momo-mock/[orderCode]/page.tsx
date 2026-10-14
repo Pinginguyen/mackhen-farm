@@ -1,0 +1,1 @@
+export { dynamic, default } from '../../momo/[orderCode]/page';

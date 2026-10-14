@@ -16,13 +16,17 @@ export function GET(request: Request) {
   const cartId = cartIdFrom(request);
   const cart = await prisma.cart.findUnique({
     where: { id: cartId.id },
-    include: { items: { include: { product: true, variant: true } } },
+    include: { items: { include: { product: { include: { variants: true } }, variant: true } } },
   });
   const items = (cart?.items ?? []).map((item) => ({
     id: item.id,
     productId: item.productId,
     productSlug: item.product.slug,
+    image: item.product.image,
     variantId: item.productVariantId,
+    variantLabel: item.variant?.label ?? null,
+    variants: item.product.variants.map(({ id, label, price, weight, stock }) => ({ id, label, price, weight, stock })),
+    stock: item.variant?.stock ?? item.product.stock,
     name: item.productName,
     quantity: item.quantity,
     unitPrice: item.unitPrice,

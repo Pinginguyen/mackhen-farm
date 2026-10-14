@@ -8,11 +8,13 @@ export default function PaymentConfirmation({
   orderCode,
   expiresAt,
   alreadyConfirmed,
+  paymentMethod,
 }: {
   orderId: string;
   orderCode: string;
   expiresAt: string;
   alreadyConfirmed: boolean;
+  paymentMethod?: 'VIETQR' | 'MOMO';
 }) {
   const router = useRouter();
   const [secondsLeft, setSecondsLeft] = useState(900);
@@ -38,7 +40,7 @@ export default function PaymentConfirmation({
         return;
       }
       setConfirmed(true);
-      setMessage('Đơn hàng đã được chuyển sang trạng thái chờ xử lý.');
+      setMessage('Thanh toán đã được ghi nhận; đơn hàng chuyển sang trạng thái đang xử lý.');
       router.push(`/cam-on?orderCode=${encodeURIComponent(orderCode)}`);
     } catch {
       setMessage('Không thể kết nối. Vui lòng thử lại.');
@@ -56,7 +58,7 @@ export default function PaymentConfirmation({
         {secondsLeft ? `Mã QR hết hạn sau ${minutes}:${seconds}` : 'Mã QR đã hết hạn'}
       </p>
       <button className="primary-action" type="button" onClick={confirmTransfer} disabled={submitting || confirmed || secondsLeft === 0}>
-        {confirmed ? 'Đã xác nhận thanh toán' : submitting ? 'Đang xác nhận...' : 'Tôi đã chuyển khoản thành công'}
+        {confirmed ? 'Đã xác nhận thanh toán' : submitting ? 'Đang xác nhận...' : paymentMethod === 'MOMO' ? 'Thanh toán MoMo thành công (Test)' : 'Tôi đã chuyển khoản'}
       </button>
       {message && <p role="status">{message}</p>}
     </div>

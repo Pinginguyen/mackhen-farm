@@ -5,29 +5,18 @@ import { fetchApiWithFallback } from '@/lib/server-api';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import CheckoutForm from './checkout-form';
+import Header from '@/components/layout/Header';
+import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 export default async function CheckoutPage() {
   const { data: cart, unavailable } = await fetchApiWithFallback('/api/cart', { items: [] as { productId: string; productSlug: string; variantId: string | null; name: string; quantity: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   const profile = session ? await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true } }) : null;
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
+  const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
   return (
     <main className="page-shell">
-      <header className="topbar">
-        <div className="brand-wrap">
-          <span className="brand-badge">M</span>
-          <div>
-            <p className="eyebrow">Mắc Khén Farm - Nông sản sấy vị Tây Bắc</p>
-            <h1>Mắc Khén Farm</h1>
-          </div>
-        </div>
-        <nav className="main-nav" aria-label="Menu chính">
-          <Link href="/">Trang chủ</Link>
-          <Link href="/products">Sản phẩm</Link>
-          <Link href="/cart">Giỏ hàng</Link>
-          <Link href="/checkout">Thanh toán</Link>
-        </nav>
-      </header>
+      <Header />
 
       <section className="page-card">
         <div className="page-title">
@@ -49,14 +38,15 @@ export default async function CheckoutPage() {
               {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId}`}><span>{item.name} x{item.quantity}</span><strong>{item.total.toLocaleString('vi-VN')}đ</strong></div>)}
               <div className="item">
                 <span>Vận chuyển</span>
-                <strong>{cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
+                <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
               </div>
               <div className="item">
                 <span>Thành tiền</span>
                 <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
               </div>
             </div>
-            {cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+            {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+            {!freeShippingApplied && cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
             <div className="cart-footer">
               <Link href="/cart" className="secondary-action">
                 Quay lại giỏ hàng

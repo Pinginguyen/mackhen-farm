@@ -16,7 +16,7 @@ export type Product = {
   originalPrice?: number | null;
   unit?: string | null;
   weight?: number | null;
-  protein?: number | null;
+  protein?: string | null;
   calories?: number | null;
   images?: string[];
   rating: number;

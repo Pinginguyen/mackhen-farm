@@ -5,32 +5,52 @@ function decodeBase64Url(value: string): ArrayBuffer {
   return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)).buffer as ArrayBuffer;
 }
 
-async function isAdminSession(token: string | undefined, secret: string | undefined): Promise<boolean> {
-  if (!token || !secret || secret.length < 32) return false;
+type MiddlewareSession = { userId?: string; role?: string; expiresAt?: number };
+
+async function readSession(token: string | undefined, secret: string | undefined): Promise<MiddlewareSession | null> {
+  if (!token || !secret || secret.length < 32) return null;
   const [encoded, signature, extra] = token.split('.');
-  if (!encoded || !signature || extra) return false;
+  if (!encoded || !signature || extra) return null;
 
   try {
     const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
     const valid = await crypto.subtle.verify('HMAC', key, decodeBase64Url(signature), new TextEncoder().encode(encoded));
-    if (!valid) return false;
-    const session = JSON.parse(new TextDecoder().decode(decodeBase64Url(encoded))) as { role?: string; expiresAt?: number };
-    return session.role === 'ADMIN' && typeof session.expiresAt === 'number' && session.expiresAt > Math.floor(Date.now() / 1000);
+    if (!valid) return null;
+    const session = JSON.parse(new TextDecoder().decode(decodeBase64Url(encoded))) as MiddlewareSession;
+    if (!session.userId || !['CUSTOMER', 'ADMIN'].includes(session.role ?? '') || typeof session.expiresAt !== 'number' || session.expiresAt <= Math.floor(Date.now() / 1000)) return null;
+    return session;
   } catch {
-    return false;
+    return null;
   }
 }
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isApi = pathname.startsWith('/api/admin/');
+  const isAdminApi = pathname.startsWith('/api/admin/');
+  const isAdminPage = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isAccountPage = pathname === '/tai-khoan' || pathname.startsWith('/tai-khoan/');
   const token = request.cookies.get('mkf_session')?.value;
-  if (await isAdminSession(token, process.env.AUTH_SECRET)) return NextResponse.next();
-  if (isApi) return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Cần quyền quản trị.' } }, { status: 403 });
+  const sessionSecret = [process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET]
+    .find((secret) => Boolean(secret && secret.length >= 32));
+  const session = await readSession(token, sessionSecret);
+
+  if (isAdminApi) {
+    if (session?.role === 'ADMIN') return NextResponse.next();
+    return NextResponse.json({ error: 'Truy cập bị từ chối' }, { status: 403 });
+  }
+
+  if (isAdminPage && session?.role === 'CUSTOMER') {
+    const deniedUrl = new URL('/', request.url);
+    deniedUrl.searchParams.set('error', 'forbidden');
+    return NextResponse.redirect(deniedUrl);
+  }
+  if (isAdminPage && session?.role === 'ADMIN') return NextResponse.next();
+  if (isAccountPage && session) return NextResponse.next();
+  if (!isAdminPage && !isAccountPage) return NextResponse.next();
 
   const loginUrl = new URL('/dang-nhap', request.url);
-  loginUrl.searchParams.set('next', pathname);
+  loginUrl.searchParams.set('callbackUrl', isAdminPage ? '/admin' : '/tai-khoan');
   return NextResponse.redirect(loginUrl);
 }
 
-export const config = { matcher: ['/admin/:path*', '/api/admin/:path*'] };
+export const config = { matcher: ['/admin/:path*', '/api/admin/:path*', '/tai-khoan/:path*'] };

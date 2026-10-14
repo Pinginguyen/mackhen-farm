@@ -22,11 +22,11 @@ export default async function AdminOrdersPage() {
         </nav>
       </header>
 
-      <section className="page-card">
+      <section className="page-card admin-orders-page">
         <div className="page-title">
           <div>
             <p className="eyebrow">Quản lý</p>
-            <h2>Đơn hàng</h2>
+            <h2>Trung tâm xử lý đơn hàng</h2>
           </div>
         </div>
 

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return withDatabase(async () => {
       const orders = await prisma.order.findMany({
         where: orderCode ? { orderCode } : { phone },
-        include: { items: { select: { productId: true, productName: true, quantity: true, price: true } } },
+        include: { items: { select: { productId: true, productName: true, quantity: true, price: true } }, warrantyRequest: { select: { reason: true, status: true, createdAt: true } } },
         orderBy: { createdAt: 'desc' },
         take: 20,
       });
@@ -25,6 +25,8 @@ export async function POST(request: Request) {
         trackingCode: order.trackingCode,
         carrier: order.carrier,
         createdAt: order.createdAt,
+        deliveredAt: order.deliveredAt,
+        warrantyRequest: order.warrantyRequest,
         items: order.items,
       })) });
     });

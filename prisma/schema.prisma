@@ -34,11 +34,13 @@ enum UserRole {
 enum CheckoutPaymentMethod {
   COD
   VIETQR
+  MOMO
 }
 
 enum ShippingCarrier {
   GHTK
   SPX
+  VIETTEL_POST
 }
 
 model User {
@@ -54,6 +56,17 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
 model Product {
   id            String           @id @default(cuid())
   slug          String           @unique
@@ -63,7 +76,7 @@ model Product {
   originalPrice Int?
   unit          String?
   weight        Int?
-  protein       Int?
+  protein       String?
   calories      Int?
   images        String[]         @default([])
   rating        Float            @default(0)
@@ -135,6 +148,13 @@ model Customer {
   updatedAt DateTime @updatedAt
 }
 
+enum ReturnRequestStatus {
+  PENDING
+  REPLACEMENT_APPROVED
+  REFUNDED
+  REJECTED
+}
+
 model Order {
   id            String               @id @default(cuid())
   orderCode     String               @unique
@@ -153,11 +173,14 @@ model Order {
   totalAmount   Int                  @map("total")
   note          String?
   trackingCode  String?
+  deliveredAt   DateTime?
   carrier       ShippingCarrier?
   customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   payments      Payment[]
+  warrantyRequest WarrantyRequest?
+  returnRequests ReturnRequest[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -210,4 +233,29 @@ model Payment {
   updatedAt   DateTime      @updatedAt
 
   @@index([orderId, status])
+}
+
+model WarrantyRequest {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  reason    String
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model ReturnRequest {
+  id            String              @id @default(cuid())
+  orderId       String
+  customerPhone String
+  issueType     String
+  description   String
+  imageUrl      String?
+  status        ReturnRequestStatus @default(PENDING)
+  adminNote     String?
+  createdAt     DateTime            @default(now())
+  order         Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([orderId])
 }

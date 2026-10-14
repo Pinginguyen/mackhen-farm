@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const SESSION_COOKIE = 'mkf_session';
+export const ADMIN_EMAIL = 'admin@mackhenfarm.vn';
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 
 export type SessionPayload = {
@@ -11,12 +12,13 @@ export type SessionPayload = {
   expiresAt: number;
 };
 
-function authSecret(): string | null {
-  return process.env.AUTH_SECRET?.length && process.env.AUTH_SECRET.length >= 32 ? process.env.AUTH_SECRET : null;
+export function getAuthSecret(): string | null {
+  return [process.env.AUTH_SECRET, process.env.NEXTAUTH_SECRET]
+    .find((secret): secret is string => Boolean(secret && secret.length >= 32)) ?? null;
 }
 
 export function createSessionToken(user: Omit<SessionPayload, 'expiresAt'>): string | null {
-  const secret = authSecret();
+  const secret = getAuthSecret();
   if (!secret) return null;
 
   const payload = Buffer.from(JSON.stringify({ ...user, expiresAt: Math.floor(Date.now() / 1000) + SESSION_SECONDS })).toString('base64url');
@@ -25,7 +27,7 @@ export function createSessionToken(user: Omit<SessionPayload, 'expiresAt'>): str
 }
 
 export function verifySessionToken(token?: string): SessionPayload | null {
-  const secret = authSecret();
+  const secret = getAuthSecret();
   if (!secret || !token) return null;
   const [payload, signature, extra] = token.split('.');
   if (!payload || !signature || extra) return null;
@@ -56,4 +58,9 @@ export function sessionCookieOptions() {
     path: '/',
     maxAge: SESSION_SECONDS,
   };
+}
+
+export function getRequestSession(request: Request): SessionPayload | null {
+  const token = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
+  return verifySessionToken(token ? decodeURIComponent(token) : undefined);
 }

@@ -2,7 +2,7 @@ import { hash } from 'bcryptjs';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
-import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth';
+import { ADMIN_EMAIL, createSessionToken, getAuthSecret, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -13,8 +13,11 @@ export async function POST(request: Request) {
     if (!name || !email || !password || name.length > 100 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 10 || password.length > 100) {
       return NextResponse.json({ error: 'Nhập họ tên, email hợp lệ và mật khẩu từ 10 ký tự.' }, { status: 400 });
     }
-    if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
-      return NextResponse.json({ error: 'Máy chủ chưa cấu hình AUTH_SECRET (tối thiểu 32 ký tự).' }, { status: 503 });
+    if (email === ADMIN_EMAIL) {
+      return NextResponse.json({ error: 'Email quản trị được khởi tạo riêng, không thể tự đăng ký.' }, { status: 403 });
+    }
+    if (!getAuthSecret()) {
+      return NextResponse.json({ error: 'Máy chủ chưa cấu hình AUTH_SECRET hoặc NEXTAUTH_SECRET (tối thiểu 32 ký tự).' }, { status: 503 });
     }
 
     const user = await prisma.user.create({

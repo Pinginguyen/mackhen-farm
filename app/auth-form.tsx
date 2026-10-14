@@ -25,7 +25,7 @@ export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
         setError(result.error ?? 'Không thể xác thực tài khoản.');
         return;
       }
-      const next = searchParams.get('next');
+      const next = searchParams.get('callbackUrl') ?? searchParams.get('next');
       router.push(next?.startsWith('/') && !next.startsWith('//') ? next : '/tai-khoan');
       router.refresh();
     } catch {

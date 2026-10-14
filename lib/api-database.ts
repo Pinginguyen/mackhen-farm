@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 
-export async function withDatabase(operation: () => Promise<NextResponse>): Promise<NextResponse> {
+export async function withDatabase(operation: () => Promise<NextResponse>, errorLabel?: string): Promise<NextResponse> {
   try {
     return await operation();
   } catch (error) {
+    if (errorLabel) console.error(errorLabel, error);
     if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') {
       return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
     }

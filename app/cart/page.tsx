@@ -3,29 +3,18 @@ import Link from 'next/link';
 import { fetchApiWithFallback } from '@/lib/server-api';
 import { formatCurrency } from '@/lib/store-data';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import Header from '@/components/layout/Header';
+import CartItems from './cart-items';
 
 export default async function CartPage() {
-  const { data: cart, unavailable } = await fetchApiWithFallback('/api/cart', { items: [] as { id: string; name: string; quantity: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
+  const { data: cart, unavailable } = await fetchApiWithFallback('/api/cart', { items: [] as { id: string; name: string; image: string; quantity: number; total: number; stock: number; variantId: string | null; variantLabel: string | null; variants: { id: string; label: string; price: number; weight: string; stock: number }[] }[], subtotal: 0, shipping: 0, total: 0 });
   const freeShipping = cart.items.length > 0 && cart.shipping === 0;
   const progress = Math.min(100, Math.round((cart.subtotal / FREE_SHIPPING_THRESHOLD) * 100));
   const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - cart.subtotal);
+  const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
   return (
     <main className="page-shell">
-      <header className="topbar">
-        <div className="brand-wrap">
-          <span className="brand-badge">M</span>
-          <div>
-            <p className="eyebrow">Mắc Khén Farm - Nông sản sấy vị Tây Bắc</p>
-            <h1>Mắc Khén Farm</h1>
-          </div>
-        </div>
-        <nav className="main-nav" aria-label="Menu chính">
-          <Link href="/">Trang chủ</Link>
-          <Link href="/products">Sản phẩm</Link>
-          <Link href="/cart">Giỏ hàng</Link>
-          <Link href="/checkout">Thanh toán</Link>
-        </nav>
-      </header>
+      <Header />
 
       <section className="page-card">
         <div className="page-title">
@@ -39,17 +28,7 @@ export default async function CartPage() {
           {unavailable && <p className="empty-state" role="status">Không thể tải giỏ hàng vì cơ sở dữ liệu hiện không khả dụng.</p>}
           <div>
             {cart.items.length > 0 && <section className={`free-shipping-progress${freeShipping ? ' is-free' : ''}`} aria-live="polite"><p>{freeShipping ? 'Chúc mừng bạn đã được FREESHIP toàn quốc!' : `Mua thêm ${formatCurrency(remaining)} để được MIỄN PHÍ VẬN CHUYỂN TOÀN QUỐC`}</p><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(cart.subtotal, FREE_SHIPPING_THRESHOLD)}><span style={{ width: `${progress}%` }} /></div><small>{formatCurrency(Math.min(cart.subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
-            {cart.items.length ? cart.items.map((item) => (
-              <div key={item.id} className="table-row cart-item">
-                <div>
-                  <strong>{item.name}</strong>
-                  <div>{item.quantity} sản phẩm</div>
-                </div>
-                <div>
-                  <strong>{formatCurrency(item.total)}</strong>
-                </div>
-              </div>
-            )) : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
+            {cart.items.length ? <CartItems items={cart.items} /> : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
           </div>
 
           <aside className="summary-card">
@@ -61,14 +40,15 @@ export default async function CartPage() {
               </div>
               <div className="item">
                 <span>Vận chuyển</span>
-                <strong>{cart.items.length && cart.shipping === 0 ? 'Miễn phí · 0đ' : formatCurrency(cart.shipping)}</strong>
+                <strong>{freeShippingApplied ? <><del>{formatCurrency(35000)}</del> 0đ</> : cart.items.length && cart.shipping === 0 ? 'Miễn phí · 0đ' : formatCurrency(cart.shipping)}</strong>
               </div>
               <div className="item">
                 <span>Thành tiền</span>
                 <strong>{formatCurrency(cart.total)}</strong>
               </div>
             </div>
-            {cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+            {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+            {!freeShippingApplied && cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
             <div className="cart-footer">
               <Link href="/products" className="secondary-action">
                 Tiếp tục mua

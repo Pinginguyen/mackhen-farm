@@ -11,8 +11,8 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
     });
     const payment = order?.payments[0];
 
-    if (!order || !payment || order.paymentMethod !== 'VIETQR') {
-      return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch VietQR.' } }, { status: 404 });
+    if (!order || !payment || !['VIETQR', 'MOMO'].includes(order.paymentMethod)) {
+      return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch thanh toán.' } }, { status: 404 });
     }
     if (order.paymentStatus === 'PAID' || ['PAID', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order.orderStatus)) {
       return NextResponse.json({ confirmed: true });
