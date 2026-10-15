@@ -164,7 +164,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         setSubmitting(false);
         setRetryAvailable(retryable);
         setMessage(retryable
-          ? 'Hệ thống đang bận ghi nhận đơn hàng hoặc cơ sở dữ liệu chưa sẵn sàng (lỗi kết nối). Chưa nhận được xác nhận tạo đơn; chưa chuyển sang bước thanh toán. Vui lòng thử lại sau giây lát.'
+          ? getErrorMessage(result.error, 'Hệ thống đang bận ghi nhận đơn hàng. Chưa nhận được xác nhận; vui lòng thử lại sau giây lát.')
           : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
         return;
       }

@@ -284,7 +284,7 @@ export async function POST(request: Request) {
             }) },
           },
         });
-      }, { isolationLevel: 'Serializable' });
+      }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {
       const prismaErrorCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
       if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
@@ -320,6 +320,7 @@ export async function POST(request: Request) {
 
       const prismaCode = (error as Error & { code?: string }).code;
       const schemaMismatch = prismaCode === 'P2021' || prismaCode === 'P2022';
+      const transactionExpired = prismaCode === 'P2028';
       console.error('Checkout persistence failed; no unverified order was created.', {
         name: error.name,
         code: prismaCode,
@@ -327,10 +328,12 @@ export async function POST(request: Request) {
       });
       return NextResponse.json({
         error: {
-          code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
+          code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : transactionExpired ? 'CHECKOUT_TRANSACTION_TIMEOUT' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
           message: schemaMismatch
-            ? 'Cơ sở dữ liệu cần được cập nhật migration trước khi nhận đơn. Chưa ghi nhận đơn hoặc thanh toán.'
-            : 'Kết nối đặt hàng đang gián đoạn. Đơn chưa được ghi nhận và chưa phát sinh thanh toán; vui lòng thử lại, giỏ hàng vẫn được giữ.',
+            ? 'Cơ sở dữ liệu cần được cập nhật migration trước khi nhận đơn.'
+            : transactionExpired
+              ? 'Giao dịch ghi nhận đơn vượt quá thời gian xử lý. Vui lòng thử lại; hệ thống sẽ kiểm tra theo cùng mã yêu cầu để tránh tạo trùng.'
+              : 'Kết nối đặt hàng đang gián đoạn. Vui lòng thử lại; giỏ hàng vẫn được giữ.',
         },
       }, { status: 503, headers: { 'retry-after': '30' } });
     }

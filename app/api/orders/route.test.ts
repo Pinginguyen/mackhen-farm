@@ -64,6 +64,7 @@ describe('POST /api/orders checkout', () => {
     expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: 'spice-1', stock: { gte: 1 } }, data: { stock: { decrement: 1 } } });
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentMethod: 'MOMO', paymentStatus: 'PENDING', shippingFee: 0, totalAmount: 169000 }) }));
     expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', timeout: 8_000 });
   });
 
   it('accepts the flat checkout contract and validates submitted line prices against the cart', async () => {
@@ -402,6 +403,27 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(503);
     expect(response.headers.get('retry-after')).toBe('30');
     expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
+  });
+
+  it('returns a retryable response when the interactive checkout transaction expires', async () => {
+    const transactionError = Object.assign(new Error('Transaction not found.'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2028',
+    });
+    prisma.$transaction.mockRejectedValueOnce(transactionError);
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'VIETQR' }),
+    }));
+
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatchObject({
+      code: 'CHECKOUT_TRANSACTION_TIMEOUT',
+      message: expect.stringContaining('Giao dịch ghi nhận đơn vượt quá thời gian xử lý'),
+    });
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('refuses to create a client-priced MoMo order when the Prisma connection pool times out', async () => {
