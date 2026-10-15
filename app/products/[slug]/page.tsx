@@ -20,6 +20,8 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   let product: Product | null = null;
   let inactiveInDatabase = false;
   let reviews: ProductReview[] = [];
+  let reviewCount = 0;
+  let ratingCounts = [0, 0, 0, 0, 0];
   try {
     const databaseProduct = await prisma.product.findFirst({
       where: { OR: [{ slug: params.slug }, { id: params.slug }] },
@@ -37,6 +39,20 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         })),
       };
       reviews = databaseProduct.reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString() }));
+      try {
+        const ratingGroups = await prisma.review.groupBy({
+          by: ['rating'],
+          where: { productId: databaseProduct.id },
+          _count: { _all: true },
+        });
+        ratingGroups.forEach((group) => {
+          ratingCounts[group.rating - 1] = group._count._all;
+          reviewCount += group._count._all;
+        });
+      } catch {
+        reviewCount = reviews.length;
+        ratingCounts = [1, 2, 3, 4, 5].map((rating) => reviews.filter((review) => review.rating === rating).length);
+      }
     }
   } catch {
     console.warn('Không kết nối được DB, dùng dữ liệu chi tiết sản phẩm mặc định');
@@ -133,6 +149,8 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         productId={product.id}
         initialRating={product.rating}
         initialReviews={reviews}
+        initialReviewCount={reviewCount}
+        initialRatingCounts={ratingCounts}
       />
     </main>
   );
