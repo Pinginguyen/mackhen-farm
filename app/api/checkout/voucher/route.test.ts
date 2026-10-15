@@ -47,7 +47,7 @@ describe('POST /api/checkout/voucher', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ code: 'GIAM10', discount: 16900, subtotal: 169000, shipping: 0 });
-    expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member' } });
+    expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member', orderStatus: { not: 'CANCELLED' } } });
   });
 
   it('rejects accounts that already placed an order', async () => {
@@ -73,5 +73,13 @@ describe('POST /api/checkout/voucher', () => {
 
     expect(response.status).toBe(400);
     expect((await response.json()).error.message).toBe('Cần mua thêm 81.000đ để áp dụng FREESHIP.');
+  });
+
+  it('reports the exact 10,000 VND shortfall for a 240,000 VND cart', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [{ quantity: 1, product: { price: 240000, slug: 'hat-doi-rung-nep-thuong-hang' }, variant: null }] });
+    const response = await POST(request('FREESHIP', memberCookie()));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('Cần mua thêm 10.000đ để áp dụng FREESHIP.');
   });
 });

@@ -115,8 +115,8 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <span id="product-quantity-label">Số lượng</span>
         <div className="quantity-stepper" role="group" aria-labelledby="product-quantity-label">
           <button type="button" aria-label="Giảm số lượng" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={16} /></button>
-          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={99} value={quantity} onChange={(event) => setQuantity(Math.min(99, Math.max(1, Number(event.target.value) || 1)))} />
-          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 99} onClick={() => setQuantity((value) => Math.min(99, value + 1))}><Plus size={16} /></button>
+          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={20} value={quantity} onChange={(event) => setQuantity(Math.min(20, Math.max(1, Number(event.target.value) || 1)))} />
+          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 20} onClick={() => setQuantity((value) => Math.min(20, value + 1))}><Plus size={16} /></button>
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>

@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return withDatabase(async () => {
       const order = await prisma.order.findUnique({
         where: { orderCode },
-        select: { customerName: true, phone: true, orderStatus: true, items: { select: { productId: true } } },
+        select: { id: true, customerName: true, phone: true, orderStatus: true, items: { select: { productId: true } } },
       });
       if (!order) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng để xác minh đánh giá.' } }, { status: 404 });
       if (normalizeVietnamesePhone(order.phone) !== phone) {
@@ -37,8 +37,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: { code: 'PRODUCT_NOT_IN_ORDER', message: 'Sản phẩm này không có trong đơn hàng đã xác minh.' } }, { status: 400 });
       }
 
+      const previousReview = await prisma.review.findUnique({ where: { orderId_productId: { orderId: order.id, productId } }, select: { id: true } });
+      if (previousReview) {
+        return NextResponse.json({ error: { code: 'REVIEW_ALREADY_EXISTS', message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng trước đó.' } }, { status: 409 });
+      }
+
       const displayName = customerName && customerName.length > 1 ? customerName : order.customerName;
-      const review = await prisma.review.create({ data: { productId, customerName: displayName, rating: body.rating!, comment } });
+      let review;
+      try {
+        review = await prisma.review.create({ data: { orderId: order.id, productId, customerName: displayName, rating: body.rating!, comment } });
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+          return NextResponse.json({ error: { code: 'REVIEW_ALREADY_EXISTS', message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng trước đó.' } }, { status: 409 });
+        }
+        throw error;
+      }
       const average = await prisma.review.aggregate({ where: { productId }, _avg: { rating: true } });
       await prisma.product.update({ where: { id: productId }, data: { rating: average._avg.rating ?? 0 } });
       return NextResponse.json({ review }, { status: 201 });

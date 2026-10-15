@@ -42,7 +42,7 @@ type CreatedOrder = {
   totalAmount: number;
   duplicate?: boolean;
 };
-type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED'; message?: string };
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY'; message?: string };
 
 function normalizeVietnamesePhone(value: string): string | null {
   const compact = value.trim().replace(/[\s().-]/g, '');
@@ -55,7 +55,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isCheckoutItemSnapshot(value: unknown): value is CheckoutItemSnapshot {
-  if (!isRecord(value) || !Number.isSafeInteger(value.quantity) || Number(value.quantity) < 1) return false;
+  if (!isRecord(value) || !Number.isSafeInteger(value.quantity) || Number(value.quantity) < 1 || Number(value.quantity) > 20) return false;
   if (typeof value.id === 'string' && value.id.length > 0) return true;
   return typeof value.productId === 'string'
     && typeof value.productSlug === 'string'
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   }
   if (!isRecord(payload)) return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
   const body = payload as CheckoutBody;
-  if (Array.isArray(body.items) && body.items.length === 0) {
+  if (body.items === null || (Array.isArray(body.items) && body.items.length === 0)) {
     return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Đơn hàng không có sản phẩm.' } }, { status: 400 });
   }
   const submittedIdempotencyKey = request.headers.get('idempotency-key')
@@ -163,6 +163,9 @@ export async function POST(request: Request) {
           include: { items: { include: { product: true, variant: true } } },
         });
         if (!cart?.items.length) return null;
+        if (cart.items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
+          return { rejected: 'INVALID_QUANTITY' as const };
+        }
 
         const currentItems = cart.items.map((item) => ({
           id: item.id,
@@ -178,10 +181,10 @@ export async function POST(request: Request) {
         if (isStaticVoucher && voucherValidationError) return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
 
         if (isStaticVoucher && session) {
-          const priorOrders = await transaction.order.count({ where: { userId: session.userId } });
+          const priorOrders = await transaction.order.count({ where: { userId: session.userId, orderStatus: { not: 'CANCELLED' } } });
           if (priorOrders > 0) return { rejected: 'VOUCHER_FIRST_ORDER_ONLY' as const };
           const phoneUsed = await transaction.order.findFirst({
-            where: { phone, OR: [{ paymentStatus: 'PAID' }, { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } }] },
+            where: { phone, orderStatus: { not: 'CANCELLED' }, OR: [{ paymentStatus: 'PAID' }, { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } }] },
             select: { id: true },
           });
           if (phoneUsed) return { rejected: 'VOUCHER_PHONE_USED' as const };
@@ -328,7 +331,7 @@ export async function POST(request: Request) {
       }
       if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
         const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
-        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 409 });
+        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 400 });
       }
       const databaseUnavailable = error instanceof Error && (
         error.name.startsWith('PrismaClient')
@@ -377,11 +380,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: {
           code: order.rejected,
-          message: invalidVoucher
+          message: order.rejected === 'INVALID_QUANTITY'
+            ? 'Mỗi sản phẩm chỉ được đặt từ 1 đến 20 đơn vị trong một đơn hàng.'
+            : invalidVoucher
             ? voucherErrorMessage
             : 'Giỏ hàng hoặc số lượng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng rồi thử lại.',
         },
-      }, { status: invalidVoucher ? (['VOUCHER_FIRST_ORDER_ONLY', 'VOUCHER_PHONE_USED'].includes(order.rejected) ? 403 : 400) : 409 });
+      }, { status: order.rejected === 'PRICE_MISMATCH' ? 409 : invalidVoucher && ['VOUCHER_FIRST_ORDER_ONLY', 'VOUCHER_PHONE_USED'].includes(order.rejected) ? 403 : 400 });
     }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
     const postCommitTasks: Promise<unknown>[] = [];

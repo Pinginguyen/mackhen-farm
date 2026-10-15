@@ -109,6 +109,7 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ subtotal: 169000, discountAmount: 16900, totalAmount: 152100 }),
     }));
+    expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member', orderStatus: { not: 'CANCELLED' } } });
   });
 
   it('rejects promotional vouchers for guests before opening a transaction', async () => {
@@ -278,7 +279,7 @@ describe('POST /api/orders checkout', () => {
       body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
     }));
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect((await response.json()).error.code).toBe('INSUFFICIENT_STOCK');
     expect(orderCreate).not.toHaveBeenCalled();
   });
@@ -344,7 +345,7 @@ describe('POST /api/orders checkout', () => {
       body: JSON.stringify({ customer: { name: 'A', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
     }));
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect((await response.json()).error.message).toContain('Hạt Dổi');
     expect(orderCreate).not.toHaveBeenCalled();
   });
@@ -570,11 +571,11 @@ describe('POST /api/orders checkout', () => {
     expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
   });
 
-  it('rejects an empty submitted cart before querying the database', async () => {
+  it.each([[], null])('rejects an empty submitted cart (%s) before querying the database', async (items) => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=empty-cart' },
-      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', items: [] }),
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', items }),
     }));
 
     expect(response.status).toBe(400);
@@ -582,6 +583,22 @@ describe('POST /api/orders checkout', () => {
     expect(cartFindUnique).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
     expect(productUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects database cart quantities above 20 before reserving inventory', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [{
+      id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 21, unitPrice: 169000,
+      product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 30 }, variant: null,
+    }] });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST', headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_QUANTITY');
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it.each(['COD', 'VIETQR'])('creates a %s order without requiring a payment provider', async (paymentMethod) => {

@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
   return withDatabase(async () => {
-    const previousOrders = await prisma.order.count({ where: { userId: session.userId } });
+    const previousOrders = await prisma.order.count({ where: { userId: session.userId, orderStatus: { not: 'CANCELLED' } } });
     if (previousOrders > 0) {
       return NextResponse.json({ error: { code: 'VOUCHER_FIRST_ORDER_ONLY', message: 'Mã giảm giá này chỉ áp dụng cho đơn hàng đầu tiên của thành viên mới.' } }, { status: 403 });
     }
@@ -62,6 +62,7 @@ export async function POST(request: Request) {
     const phoneUsed = await prisma.order.findFirst({
       where: {
         phone: enteredPhone,
+        orderStatus: { not: 'CANCELLED' },
         OR: [{ paymentStatus: 'PAID' }, { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } }],
       },
       select: { id: true },

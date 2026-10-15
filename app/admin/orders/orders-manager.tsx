@@ -24,9 +24,9 @@ export type AdminOrder = {
 const statusOptions = [
   ['PENDING', 'Chờ thanh toán / xác nhận'], ['CONFIRMED', 'Đã xác nhận'], ['PAID', 'Đã thanh toán'], ['PROCESSING', 'Đang đóng gói phòng sạch'],
   ['HANDED_OFF', 'Đã bàn giao 3PL'], ['IN_TRANSIT', 'Đang giao hàng'], ['SHIPPING', 'Đang giao (cũ)'],
-  ['DELIVERED', 'Giao thành công'], ['COMPLETED', 'Hoàn tất'], ['CANCELLED', 'Đã hủy'],
+  ['DELIVERED', 'Giao thành công'], ['COMPLETED', 'Hoàn tất'], ['RETURNED', 'Chuyển hoàn'], ['CANCELLED', 'Đã hủy'],
 ];
-const orderStatusLabels: Record<string, string> = { PENDING: 'Chờ thanh toán / xác nhận', CONFIRMED: 'Đã xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao hàng', SHIPPING: 'Đang giao', DELIVERED: 'Giao thành công', COMPLETED: 'Hoàn tất', CANCELLED: 'Đã hủy' };
+const orderStatusLabels: Record<string, string> = { PENDING: 'Chờ thanh toán / xác nhận', CONFIRMED: 'Đã xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao hàng', SHIPPING: 'Đang giao', DELIVERED: 'Giao thành công', COMPLETED: 'Hoàn tất', RETURNED: 'Chuyển hoàn', CANCELLED: 'Đã hủy' };
 
 export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const [orderList, setOrderList] = useState(orders);

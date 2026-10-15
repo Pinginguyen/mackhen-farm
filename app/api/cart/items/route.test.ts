@@ -81,6 +81,14 @@ describe('PATCH /api/cart/items', () => {
     expect(itemFindMany).not.toHaveBeenCalled();
   });
 
+  it('rejects a quantity above the per-product limit', async () => {
+    const response = await PATCH(request({ itemId: 'item-1', quantity: 21, variantId: 'variant-large' }));
+
+    expect(response.status).toBe(400);
+    expect(itemFindFirst).not.toHaveBeenCalled();
+    expect(itemUpdate).not.toHaveBeenCalled();
+  });
+
   it('does not update an item that does not belong to the cart cookie', async () => {
     itemFindFirst.mockReset().mockResolvedValue(null);
     const response = await PATCH(request({ itemId: 'other-cart-item', quantity: 1, variantId: 'variant-small' }));
@@ -121,6 +129,14 @@ describe('POST /api/cart/items regular cart', () => {
     itemUpdate.mockReset().mockResolvedValue({ id: 'existing-item', quantity: 4, unitPrice: 100, productVariantId: 'variant-small' });
     itemCreate.mockReset();
     itemFindMany.mockReset().mockResolvedValue([{ quantity: 4, unitPrice: 100, product: { slug: 'mac-khen' } }]);
+  });
+
+  it('rejects quantities above the per-product limit before database access', async () => {
+    const response = await POST(request({ productId: 'product-1', quantity: 21 }, 'POST'));
+
+    expect(response.status).toBe(400);
+    expect(productFindFirst).not.toHaveBeenCalled();
+    expect(cartUpsert).not.toHaveBeenCalled();
   });
 
   it('adds the selected quantity to the existing product variant and returns the new cart count', async () => {

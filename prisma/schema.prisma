@@ -17,6 +17,7 @@ enum OrderStatus {
   SHIPPING
   COMPLETED
   DELIVERED
+  RETURNED
   CANCELLED
 }
 
@@ -211,6 +212,7 @@ model Order {
   returnRequests ReturnRequest[]
   refundOperations RefundOperation[]
   compensationVouchers CompensationVoucher[]
+  reviews       Review[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -240,6 +242,7 @@ model OrderItem {
 
 model Review {
   id           String   @id @default(cuid())
+  orderId      String?
   productId    String
   customerName String
   rating       Int
@@ -247,8 +250,10 @@ model Review {
   riskTag      String?
   riskAnalyzedAt DateTime?
   createdAt    DateTime @default(now())
+  order        Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  @@unique([orderId, productId])
   @@index([productId, createdAt])
 }
 

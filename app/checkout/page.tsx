@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { readCartSnapshot } from '@/lib/cart-server';
 import CheckoutForm, { BuyNowCartRecovery } from './checkout-form';
+import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
@@ -35,21 +36,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
         <div className="checkout-layout">
           <div>
             {cart.unavailable || cart.items.length === 0 ? (
-              <div className="checkout-empty-state">
-                <p className={cart.unavailable ? 'checkout-service-notice' : 'empty-state'} role="status">
-                  {cart.unavailable
-                    ? 'Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy thử tải lại sau ít phút.'
-                    : buyNow
-                      ? 'Đang kiểm tra và đồng bộ phiên Mua ngay. Nếu vẫn chưa có sản phẩm, hãy quay lại chọn sản phẩm.'
-                      : 'Giỏ hàng hiện chưa có sản phẩm nên chưa thể tạo đơn.'}
-                </p>
-                <div className="cart-footer">
-                  <Link href="/products" className="primary-action">Quay lại mua sắm</Link>
-                  <Link href="/cart" className="secondary-action">Mở giỏ hàng</Link>
-                  <Link href="/tra-cuu" className="secondary-action">Tra cứu đơn hàng</Link>
-                </div>
-                <button className="primary-action" type="button" disabled aria-disabled="true">Không thể đặt đơn hàng trống</button>
-              </div>
+              <CheckoutEmptyState unavailable={cart.unavailable} buyNow={buyNow} />
             ) : (
               <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} />
             )}

@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
   }
 
-  if (typeof body.productId !== 'string' || !body.productId.trim() || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
-    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thiếu thông tin sản phẩm' } }, { status: 400 });
+  if (typeof body.productId !== 'string' || !body.productId.trim() || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1 || body.quantity > 20) {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Số lượng mỗi sản phẩm phải từ 1 đến 20.' } }, { status: 400 });
   }
   const quantity = body.quantity;
 
@@ -117,8 +117,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
   }
 
-  if (!body.itemId || !('variantId' in body) || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
-    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thông tin cập nhật giỏ hàng không hợp lệ' } }, { status: 400 });
+  if (!body.itemId || !('variantId' in body) || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1 || body.quantity > 20) {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Số lượng mỗi sản phẩm phải từ 1 đến 20.' } }, { status: 400 });
   }
 
   const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];

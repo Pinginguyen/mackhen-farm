@@ -33,7 +33,7 @@ function CartItemRow({
 }) {
   const [saving, setSaving] = useState(false);
   const selectedVariant = item.variants.find((variant) => variant.id === item.variantId);
-  const maxQuantity = selectedVariant?.stock ?? item.stock;
+  const maxQuantity = Math.min(selectedVariant?.stock ?? item.stock, 20);
   const unitPrice = selectedVariant?.price ?? item.unitPrice;
 
   async function update(quantity: number, variantId = item.variantId) {

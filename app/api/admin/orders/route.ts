@@ -9,7 +9,7 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
-const statuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'CANCELLED'] as const;
+const statuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] as const;
 const carriers = ['GHTK', 'SPX', 'VIETTEL_POST'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       { warrantyRequest: { is: { status: 'OPEN' } } },
       { returnRequests: { some: { status: 'PENDING' } } },
     ] });
-    else if (status && ['PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'CANCELLED'].includes(status)) filters.push({ orderStatus: status as (typeof statuses)[number] });
+    else if (status && ['PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'RETURNED', 'CANCELLED'].includes(status)) filters.push({ orderStatus: status as (typeof statuses)[number] });
     if (paymentMethod === 'COD' || paymentMethod === 'VIETQR' || paymentMethod === 'MOMO') where.paymentMethod = paymentMethod;
     if (from || to) {
       where.createdAt = {
@@ -102,23 +102,54 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { message: 'Chọn hãng vận chuyển trước khi cập nhật trạng thái giao hàng.' } }, { status: 400 });
     }
     return withDatabase(async () => {
-      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { orderStatus: true, paymentStatus: true, carrier: true, trackingCode: true, deliveredAt: true } });
-      if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
-      const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
-      const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
-      const paymentStatus = isDelivered ? 'PAID' : body.paymentStatus === 'PAID' || body.paymentStatus === 'PENDING'
-        ? body.paymentStatus
-        : currentOrder.paymentStatus;
-      const order = await prisma.order.update({
-        where: { orderCode },
-        data: {
-          orderStatus: targetStatus,
-          paymentStatus,
-          carrier: body.carrier ? body.carrier as (typeof carriers)[number] : null,
-          trackingCode: trackingCode || null,
-          deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
-        },
-      });
+      const result = await prisma.$transaction(async (transaction) => {
+        const currentOrder = await transaction.order.findUnique({
+          where: { orderCode },
+          include: { items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } },
+        });
+        if (!currentOrder) return { error: { status: 404, message: 'Không tìm thấy đơn hàng.' } };
+        if (currentOrder.orderStatus === 'CANCELLED' && targetStatus !== 'CANCELLED') {
+          return { error: { status: 409, message: 'Đơn đã hủy không thể chuyển sang trạng thái khác.' } };
+        }
+
+        const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
+        const explicitlyPaid = body.paymentStatus === 'PAID';
+        if (isDelivered && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID' && !explicitlyPaid) {
+          return { error: { status: 409, message: 'Chưa xác nhận thanh toán VietQR/MoMo. Hãy cập nhật thanh toán thành Đã thanh toán trước khi hoàn tất đơn.' } };
+        }
+
+        if (targetStatus === 'RETURNED' && currentOrder.orderStatus !== 'RETURNED') {
+          for (const item of currentOrder.items) {
+            await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+            if (item.productVariantId) {
+              await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
+            }
+            if (item.lotCode) {
+              await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+            }
+          }
+        }
+
+        const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
+        const paymentStatus = isDelivered
+          ? (currentOrder.paymentMethod === 'COD' || currentOrder.paymentStatus === 'PAID' || explicitlyPaid ? 'PAID' : currentOrder.paymentStatus)
+          : body.paymentStatus === 'PAID' || body.paymentStatus === 'PENDING'
+            ? body.paymentStatus
+            : currentOrder.paymentStatus;
+        const order = await transaction.order.update({
+          where: { orderCode },
+          data: {
+            orderStatus: targetStatus,
+            paymentStatus,
+            carrier: body.carrier ? body.carrier as (typeof carriers)[number] : null,
+            trackingCode: trackingCode || null,
+            deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
+          },
+        });
+        return { order, currentOrder };
+      }, { isolationLevel: 'Serializable' });
+      if ('error' in result && result.error) return NextResponse.json({ error: { message: result.error.message } }, { status: result.error.status });
+      const { order, currentOrder } = result;
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
         action: targetStatus === 'CANCELLED' ? 'CANCEL_ORDER' : 'UPDATE_ORDER_STATUS',
@@ -130,6 +161,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, carrier: order.carrier, trackingCode: order.trackingCode });
     });
   } catch (error) {
+    if (error instanceof Error && (error as Error & { code?: string }).code === 'P2034') {
+      return NextResponse.json({ error: { message: 'Đơn hàng vừa được cập nhật đồng thời. Vui lòng tải lại trạng thái mới nhất.' } }, { status: 409 });
+    }
     console.error('Admin order update failed:', error);
     return NextResponse.json({ error: { message: 'Không thể cập nhật đơn hàng.' } }, { status: 500 });
   }
