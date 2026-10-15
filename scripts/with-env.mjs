@@ -14,6 +14,7 @@ const commands = {
   prisma: require.resolve('prisma/build/index.js'),
   seed: path.resolve('prisma/seed.js'),
   seedMacKhen: path.resolve('prisma/seed-mac-khen-products.js'),
+  markCompletedOrdersPaid: path.resolve('scripts/mark-completed-orders-paid.mjs'),
   rollback: path.resolve('prisma/rollback.mjs'),
 };
 

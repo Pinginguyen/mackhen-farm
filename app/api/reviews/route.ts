@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
     return withDatabase(async () => {
       const order = await prisma.order.findFirst({
-        where: { orderCode, phone, orderStatus: 'DELIVERED', items: { some: { productId } } },
+        where: { orderCode, phone, orderStatus: { in: ['DELIVERED', 'COMPLETED'] }, items: { some: { productId } } },
         select: { customerName: true },
       });
       if (!order) return NextResponse.json({ error: 'Chỉ đơn đã giao đúng số điện thoại mới được đánh giá sản phẩm.' }, { status: 403 });

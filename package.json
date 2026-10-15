@@ -17,6 +17,7 @@
     "migrate:rollback": "node scripts/with-env.mjs rollback",
     "db:seed": "node scripts/with-env.mjs seed",
     "db:seed:mac-khen": "node scripts/with-env.mjs seedMacKhen",
+    "db:fix-completed-order-payments": "node scripts/with-env.mjs markCompletedOrdersPaid",
     "admin:promote": "node scripts/promote-admin.js",
     "admin:bootstrap": "node scripts/bootstrap-admin.js",
     "emulators:start": "docker compose up -d",

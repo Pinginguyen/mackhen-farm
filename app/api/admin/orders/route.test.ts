@@ -15,8 +15,8 @@ import { GET, PATCH } from './route';
 describe('/api/admin/orders', () => {
   beforeEach(() => {
     orderFindMany.mockReset().mockResolvedValue([]);
-    orderFindUnique.mockReset().mockResolvedValue({ orderStatus: 'PENDING', deliveredAt: null });
-    orderUpdate.mockReset().mockResolvedValue({ orderCode: 'MKF-100001', orderStatus: 'SHIPPING' });
+    orderFindUnique.mockReset().mockResolvedValue({ orderStatus: 'PENDING', paymentStatus: 'PENDING', carrier: null, trackingCode: null, deliveredAt: null });
+    orderUpdate.mockReset().mockResolvedValue({ orderCode: 'MKF-100001', orderStatus: 'SHIPPING', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
     requireAdmin.mockReset().mockResolvedValue(null);
   });
 
@@ -68,7 +68,7 @@ describe('/api/admin/orders', () => {
     });
   });
 
-  it('generates an SPX tracking code when handing an order to 3PL', async () => {
+  it('allows handing an order to 3PL without a tracking code', async () => {
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -77,7 +77,33 @@ describe('/api/admin/orders', () => {
 
     expect(response.status).toBe(200);
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ orderStatus: 'HANDED_OFF', carrier: 'SPX', trackingCode: expect.stringMatching(/^SPX\d{11}$/) }),
+      data: expect.objectContaining({ orderStatus: 'HANDED_OFF', carrier: 'SPX', trackingCode: null }),
+    }));
+  });
+
+  it.each(['DELIVERED', 'COMPLETED'])('marks a %s order paid automatically', async (status) => {
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status, paymentStatus: 'PENDING' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ orderStatus: status, paymentStatus: 'PAID' }),
+    }));
+  });
+
+  it('lets an admin manually mark a VietQR order as paid', async () => {
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING', paymentStatus: 'PAID' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ orderStatus: 'PROCESSING', paymentStatus: 'PAID' }),
     }));
   });
 });

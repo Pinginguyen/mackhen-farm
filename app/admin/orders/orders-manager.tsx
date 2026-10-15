@@ -91,11 +91,11 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
     setPending(order.orderCode);
     setToast('');
     try {
-      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: form.get('status'), carrier: form.get('carrier'), trackingCode: form.get('trackingCode') }) });
-      const result = await response.json() as { status?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
+      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: form.get('status'), paymentStatus: form.get('paymentStatus'), carrier: form.get('carrier'), trackingCode: form.get('trackingCode') }) });
+      const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
       else {
-        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? String(form.get('status')), carrier: result.carrier ?? (String(form.get('carrier') || '') || null), trackingCode: result.trackingCode ?? (String(form.get('trackingCode') || '') || null) } : item));
+        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? String(form.get('status')), paymentStatus: result.paymentStatus ?? String(form.get('paymentStatus')), carrier: result.carrier ?? (String(form.get('carrier') || '') || null), trackingCode: result.trackingCode ?? (String(form.get('trackingCode') || '') || null) } : item));
         setToast(`Đã cập nhật đơn ${order.orderCode}.`);
       }
     } catch {
@@ -114,12 +114,12 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ orderCode: order.orderCode, status, carrier: carrier ?? order.carrier, trackingCode: order.trackingCode }),
       });
-      const result = await response.json() as { status?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
+      const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) {
         setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
         return;
       }
-      setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? status, carrier: result.carrier ?? carrier ?? order.carrier, trackingCode: result.trackingCode ?? order.trackingCode } : item));
+      setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? status, paymentStatus: result.paymentStatus ?? order.paymentStatus, carrier: result.carrier ?? carrier ?? order.carrier, trackingCode: result.trackingCode ?? order.trackingCode } : item));
       setToast(status === 'HANDED_OFF' ? `Đã bàn giao ${order.orderCode} cho SPX${result.trackingCode ? ` · Mã ${result.trackingCode}` : ''}.` : `Đã cập nhật đơn ${order.orderCode}.`);
     } catch {
       setToast('Không thể kết nối để cập nhật đơn.');
@@ -161,8 +161,9 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-update" onSubmit={(event) => save(event, order)}>
               <label className="field">Trạng thái<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value === 'PAID'}>{label}</option>)}</select></label>
+              <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID">Đã thanh toán</option></select></label>
               <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
-              <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} /></label>
+              <label className="field">Mã vận đơn (không bắt buộc)<input name="trackingCode" defaultValue={order.trackingCode ?? ''} /></label>
               <button className="primary-action" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>
               <Link className="secondary-action" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu nhặt hàng &amp; vận đơn</Link>
             </form>

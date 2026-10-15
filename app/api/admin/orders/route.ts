@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { randomInt } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
@@ -85,11 +84,12 @@ export async function PATCH(request: Request) {
   try {
     const payload: unknown = await request.json();
     if (!isRecord(payload)) return NextResponse.json({ error: { message: 'Dữ liệu yêu cầu không hợp lệ.' } }, { status: 400 });
-    const body = payload as { orderCode?: unknown; status?: unknown; carrier?: unknown; trackingCode?: unknown };
+    const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown };
     const orderCode = typeof body.orderCode === 'string' ? body.orderCode.trim().toUpperCase() : '';
     if (!/^MKF-\d{6}$/.test(orderCode) || typeof body.status !== 'string' || !statuses.includes(body.status as (typeof statuses)[number])
+      || (body.paymentStatus !== undefined && body.paymentStatus !== 'PENDING' && body.paymentStatus !== 'PAID')
       || (body.carrier !== undefined && body.carrier !== null && typeof body.carrier !== 'string')
-      || (body.trackingCode !== undefined && typeof body.trackingCode !== 'string')
+      || (body.trackingCode !== undefined && body.trackingCode !== null && typeof body.trackingCode !== 'string')
       || (typeof body.trackingCode === 'string' && body.trackingCode.length > 160)) {
       return NextResponse.json({ error: { message: 'Mã đơn hoặc trạng thái không hợp lệ.' } }, { status: 400 });
     }
@@ -97,22 +97,23 @@ export async function PATCH(request: Request) {
     if (body.carrier && !carriers.includes(body.carrier as (typeof carriers)[number])) {
       return NextResponse.json({ error: { message: 'Đơn vị vận chuyển không hợp lệ.' } }, { status: 400 });
     }
-    let trackingCode = body.trackingCode?.trim() || '';
-    if (targetStatus === 'HANDED_OFF' && body.carrier === 'SPX' && !trackingCode) {
-      trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
-    }
-    if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (!body.carrier || !trackingCode)) {
-      return NextResponse.json({ error: { message: 'Nhập hãng vận chuyển và mã vận đơn trước khi bàn giao.' } }, { status: 400 });
+    const trackingCode = typeof body.trackingCode === 'string' ? body.trackingCode.trim() : '';
+    if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && !body.carrier) {
+      return NextResponse.json({ error: { message: 'Chọn hãng vận chuyển trước khi cập nhật trạng thái giao hàng.' } }, { status: 400 });
     }
     return withDatabase(async () => {
       const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { orderStatus: true, paymentStatus: true, carrier: true, trackingCode: true, deliveredAt: true } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
       const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
+      const paymentStatus = isDelivered ? 'PAID' : body.paymentStatus === 'PAID' || body.paymentStatus === 'PENDING'
+        ? body.paymentStatus
+        : currentOrder.paymentStatus;
       const order = await prisma.order.update({
         where: { orderCode },
         data: {
           orderStatus: targetStatus,
+          paymentStatus,
           carrier: body.carrier ? body.carrier as (typeof carriers)[number] : null,
           trackingCode: trackingCode || null,
           deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
@@ -124,9 +125,9 @@ export async function PATCH(request: Request) {
         targetEntity: 'Order',
         targetId: order.orderCode,
         oldValue: currentOrder,
-        newValue: { orderStatus: order.orderStatus, carrier: order.carrier, trackingCode: order.trackingCode },
+        newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, carrier: order.carrier, trackingCode: order.trackingCode },
       });
-      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, carrier: order.carrier, trackingCode: order.trackingCode });
+      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, carrier: order.carrier, trackingCode: order.trackingCode });
     });
   } catch (error) {
     console.error('Admin order update failed:', error);
