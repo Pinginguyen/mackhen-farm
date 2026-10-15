@@ -9,7 +9,6 @@ export default async function ThankYouPage({ searchParams }: { searchParams: { o
     try {
       const order = await prisma.order.findUnique({ where: { orderCode: searchParams.orderCode }, select: { paymentMethod: true, paymentStatus: true } });
       if (!order) redirect(`/tra-cuu?orderCode=${encodeURIComponent(searchParams.orderCode)}`);
-      if (order.paymentMethod === 'MOMO' && order.paymentStatus !== 'PAID') redirect(`/checkout/momo/${encodeURIComponent(searchParams.orderCode)}`);
       if (order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID') redirect(`/checkout/vietqr/${encodeURIComponent(searchParams.orderCode)}`);
     } catch (error) {
       if (error && typeof error === 'object' && 'digest' in error) throw error;

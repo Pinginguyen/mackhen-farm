@@ -25,7 +25,7 @@ export default function PaymentConfirmation({
   isLocalOnly?: boolean;
   expiresAt: string;
   alreadyConfirmed: boolean;
-  paymentMethod?: 'VIETQR' | 'MOMO';
+  paymentMethod?: 'VIETQR';
   redirectToTracking?: boolean;
 }) {
   const router = useRouter();
@@ -112,8 +112,8 @@ export default function PaymentConfirmation({
       <p className={secondsLeft ? 'payment-countdown' : 'payment-expired'}>
         {secondsLeft ? `Mã QR hết hạn sau ${minutes}:${seconds}` : 'Mã QR đã hết hạn'}
       </p>
-      <button className={`primary-action payment-confirm-button${paymentMethod === 'MOMO' ? ' momo-confirm-button' : ''}`} type="button" onClick={confirmTransfer} disabled={submitting || confirmed || secondsLeft === 0}>
-        {confirmed ? 'Đã xác nhận thanh toán' : submitting ? 'Đang xác nhận...' : paymentMethod === 'MOMO' ? 'Tôi đã hoàn tất thanh toán trên MoMo' : 'Tôi đã chuyển khoản'}
+      <button className="primary-action payment-confirm-button" type="button" onClick={confirmTransfer} disabled={submitting || confirmed || secondsLeft === 0}>
+        {confirmed ? 'Đã xác nhận thanh toán' : submitting ? 'Đang xác nhận...' : 'Tôi đã chuyển khoản'}
       </button>
       {message && <p role="status">{message}</p>}
     </div>

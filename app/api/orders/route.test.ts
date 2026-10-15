@@ -57,24 +57,21 @@ describe('POST /api/orders checkout', () => {
     prisma.$transaction.mockClear();
   });
 
-  it('creates a MoMo order and leaves its cart intact until payment succeeds', async () => {
+  it('rejects new MoMo orders before accessing the database', async () => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
       body: JSON.stringify({
-        customer: { name: 'Nguyen Thi A', email: 'a@example.com', phone: '0762793244' },
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
         delivery: { address: 'Lai Chau, Tam Duong, Binh Lu' },
         paymentMethod: 'MOMO',
       }),
     }));
-    const result = await response.json() as { orderCode: string; total: number; status: string; success: boolean; redirectUrl: string };
 
-    expect(response.status).toBe(201);
-    expect(result).toMatchObject({ orderCode: 'MKF-123456', total: 169000, status: 'pending', success: true, redirectUrl: '/checkout/momo/MKF-123456?amount=169000' });
-    expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: 'spice-1', stock: { gte: 1 } }, data: { stock: { decrement: 1 } } });
-    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentMethod: 'MOMO', paymentStatus: 'PENDING', shippingFee: 0, totalAmount: 169000 }) }));
-    expect(cartItemDeleteMany).not.toHaveBeenCalled();
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', timeout: 8_000 });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_ORDER');
+    expect(cartFindUnique).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('accepts the flat checkout contract and validates submitted line prices against the cart', async () => {
@@ -511,46 +508,6 @@ describe('POST /api/orders checkout', () => {
       message: expect.stringContaining('Giao dịch ghi nhận đơn vượt quá thời gian xử lý'),
     });
     expect(orderCreate).not.toHaveBeenCalled();
-  });
-
-  it('refuses to create a client-priced MoMo order when the Prisma connection pool times out', async () => {
-    const databaseError = Object.assign(new Error('Timed out fetching a new connection from the connection pool.'), {
-      name: 'PrismaClientKnownRequestError',
-      code: 'P2024',
-    });
-    cartFindUnique.mockRejectedValueOnce(databaseError);
-
-    const response = await POST(new Request('https://mackhen.example/api/checkout', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
-      body: JSON.stringify({
-        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
-        delivery: { address: 'Lai Chau' },
-        paymentMethod: 'MOMO',
-        fallbackTotal: 360000,
-      }),
-    }));
-    expect(response.status).toBe(503);
-    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
-  });
-
-  it('does not create a MoMo payment redirect from a client-provided fallback total', async () => {
-    const databaseError = new Error('Neon connection timed out');
-    databaseError.name = 'PrismaClientInitializationError';
-    cartFindUnique.mockRejectedValueOnce(databaseError);
-
-    const response = await POST(new Request('https://mackhen.example/api/checkout', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
-      body: JSON.stringify({
-        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
-        delivery: { address: 'Lai Chau' },
-        paymentMethod: 'MOMO',
-        fallbackTotal: 360000,
-      }),
-    }));
-    expect(response.status).toBe(503);
-    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
   });
 
   it('does not create a COD demo order from a client-provided fallback total', async () => {

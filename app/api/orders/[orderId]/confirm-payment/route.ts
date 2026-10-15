@@ -11,11 +11,8 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
     });
     const payment = order?.payments[0];
 
-    if (!order || !['VIETQR', 'MOMO'].includes(order.paymentMethod)) {
+    if (!order || order.paymentMethod !== 'VIETQR') {
       return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch thanh toán.' } }, { status: 404 });
-    }
-    if (!payment && order.paymentMethod === 'MOMO') {
-      return NextResponse.json({ confirmed: false, message: 'MoMo chưa gửi IPN xác nhận thanh toán hợp lệ. Đơn vẫn đang chờ thanh toán.' }, { status: 202 });
     }
     if (!payment) return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch thanh toán.' } }, { status: 404 });
     if (order.paymentStatus === 'PAID' && payment.status === 'PAID') {
@@ -25,16 +22,9 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
       return NextResponse.json({ error: { message: 'Mã QR đã hết hạn. Vui lòng tạo lại đơn thanh toán.' } }, { status: 410 });
     }
 
-    if (order.paymentMethod === 'VIETQR') {
-      return NextResponse.json({
-        confirmed: false,
-        message: 'Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật tự động sau khi SePay xác minh giao dịch.',
-      }, { status: 202 });
-    }
-
     return NextResponse.json({
       confirmed: false,
-      message: 'MoMo chưa gửi IPN xác nhận thanh toán hợp lệ. Đơn vẫn đang chờ thanh toán.',
+      message: 'Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật tự động sau khi SePay xác minh giao dịch.',
     }, { status: 202 });
   });
 }

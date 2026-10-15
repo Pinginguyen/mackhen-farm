@@ -18,10 +18,10 @@ vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<R
 
 import { POST } from './route';
 
-const pendingOrder = (paymentMethod: 'VIETQR' | 'MOMO' = 'VIETQR') => ({
+const pendingOrder = () => ({
   id: 'order-1',
   orderCode: 'MKF-556213',
-  paymentMethod,
+  paymentMethod: 'VIETQR',
   paymentStatus: 'PENDING',
   orderStatus: 'PENDING',
   payments: [{ id: 'payment-1', status: 'PENDING', createdAt: new Date() }],
@@ -62,23 +62,4 @@ describe('POST /api/orders/[orderId]/confirm-payment', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('does not mark a MoMo order paid from a client button click', async () => {
-    orderFindUnique.mockResolvedValue(pendingOrder('MOMO'));
-    const response = await POST(request(), { params: { orderId: 'MKF-556213' } });
-    const result = await response.json() as { confirmed: boolean; message: string };
-
-    expect(response.status).toBe(202);
-    expect(result.confirmed).toBe(false);
-    expect(result.message).toContain('IPN');
-    expect(transaction).not.toHaveBeenCalled();
-  });
-
-  it('keeps a MoMo order pending if the IPN has not created a payment record', async () => {
-    orderFindUnique.mockResolvedValue({ ...pendingOrder('MOMO'), payments: [] });
-    const response = await POST(request(), { params: { orderId: 'MKF-556213' } });
-
-    expect(response.status).toBe(202);
-    expect(await response.json()).toMatchObject({ confirmed: false, message: expect.stringContaining('IPN') });
-    expect(transaction).not.toHaveBeenCalled();
-  });
 });

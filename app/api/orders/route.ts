@@ -80,9 +80,8 @@ function sameCartContents(
   });
 }
 
-function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number, buyNow = false): string {
+function buildPaymentRedirect(method: 'COD' | 'VIETQR', orderCode: string, amount: number): string {
   if (method === 'COD') return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
-  if (method === 'MOMO') return `/checkout/momo/${encodeURIComponent(orderCode)}?amount=${amount}${buyNow ? '&mode=buy_now' : ''}`;
   return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
 }
 
@@ -113,7 +112,7 @@ export async function POST(request: Request) {
   const phone = phoneInput ? normalizeVietnamesePhone(phoneInput) : null;
   const address = typeof submittedAddress === 'string' ? submittedAddress.trim() : '';
   const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
-  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR', 'MOMO'].includes(paymentMethod ?? '')) {
+  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR'].includes(paymentMethod)) {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
   }
   const submittedVoucherCode = body.voucherCode ?? body.discountCode;
@@ -282,7 +281,7 @@ export async function POST(request: Request) {
             customerName: name,
             phone,
             address,
-            paymentMethod: paymentMethod as 'COD' | 'VIETQR' | 'MOMO',
+            paymentMethod: paymentMethod as 'COD' | 'VIETQR',
             paymentStatus: 'PENDING',
             orderStatus: 'PENDING',
             subtotal,
@@ -409,7 +408,7 @@ export async function POST(request: Request) {
       status: order.orderStatus.toLowerCase(),
       total: order.totalAmount,
       totalAmount: order.totalAmount,
-      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR' | 'MOMO', order.orderCode, order.totalAmount, body.buyNow === true),
+      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR', order.orderCode, order.totalAmount),
       ...(order.duplicate ? { duplicate: true } : {}),
     }, { status: order.duplicate ? 200 : 201 });
     if (body.buyNow === true && paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
