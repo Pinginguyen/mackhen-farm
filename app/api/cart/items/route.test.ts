@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma } = vi.hoisted(() => {
+const { productFindFirst, productUpsert, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     productFindFirst: vi.fn(),
+    productUpsert: vi.fn(),
     cartUpsert: vi.fn(),
     itemFindFirst: vi.fn(),
     itemUpdate: vi.fn(),
@@ -17,7 +18,7 @@ const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, ite
   };
   const client = {
     $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)),
-    product: { findFirst: mocks.productFindFirst },
+    product: { findFirst: mocks.productFindFirst, upsert: mocks.productUpsert },
     cartItem: { findMany: mocks.itemFindMany, deleteMany: mocks.itemDeleteMany },
   };
   return { ...mocks, transaction: tx, prisma: client };
@@ -49,6 +50,7 @@ function request(body: object, method = 'PATCH', cookie = 'bohoch_cart=cart-1') 
 describe('PATCH /api/cart/items', () => {
   beforeEach(() => {
     productFindFirst.mockReset().mockResolvedValue({ ...product, slug: 'mac-khen', active: true });
+    productUpsert.mockReset().mockResolvedValue({ ...product, slug: 'mac-khen', active: true });
     cartUpsert.mockReset().mockResolvedValue({ id: 'cart-1' });
     itemFindFirst.mockReset()
       .mockResolvedValueOnce({ id: 'item-1', cartId: 'cart-1', productId: 'product-1', quantity: 1, product });
@@ -140,6 +142,25 @@ describe('POST /api/cart/items regular cart', () => {
     expect(response.status).toBe(409);
     expect(itemUpdate).not.toHaveBeenCalled();
     expect(itemCreate).not.toHaveBeenCalled();
+  });
+
+  it('materializes a trusted default catalog product when it is not yet in Prisma', async () => {
+    productFindFirst.mockResolvedValueOnce(null);
+    productUpsert.mockResolvedValueOnce({
+      id: 'fallback-combo-bo-ba-nhau-xanh', slug: 'combo-bo-ba-nhau-xanh', name: 'Combo Bộ Ba Nhậu Xanh',
+      price: 169000, stock: 60, active: true, variants: [],
+    });
+    itemFindFirst.mockResolvedValueOnce(null);
+    itemCreate.mockResolvedValueOnce({ id: 'quick-item', quantity: 1, unitPrice: 169000, productId: 'fallback-combo-bo-ba-nhau-xanh', productVariantId: null });
+    itemFindMany.mockResolvedValueOnce([{ quantity: 1, unitPrice: 169000, product: { slug: 'combo-bo-ba-nhau-xanh' } }]);
+
+    const response = await POST(request({ productId: 'mkf-combo-3', quantity: 1, buyNow: true }, 'POST', ''));
+
+    expect(response.status).toBe(200);
+    expect(productUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'fallback-combo-bo-ba-nhau-xanh' },
+      create: expect.objectContaining({ slug: 'combo-bo-ba-nhau-xanh', price: 169000, stock: 60 }),
+    }));
   });
 });
 

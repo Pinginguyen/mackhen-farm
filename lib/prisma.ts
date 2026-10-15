@@ -3,18 +3,22 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 const databaseUrl = process.env.DATABASE_URL;
-const datasourceUrl = databaseUrl ? new URL(databaseUrl) : undefined;
-if (datasourceUrl?.hostname.includes('-pooler.')) {
-  datasourceUrl.searchParams.set('pgbouncer', 'true');
+let datasourceUrl: URL | undefined;
+if (databaseUrl) {
+  try {
+    datasourceUrl = new URL(databaseUrl);
+  } catch {
+    console.error('DATABASE_URL is not a valid URL; database requests will fail until deployment configuration is corrected.');
+  }
 }
-if (datasourceUrl && process.env.VERCEL && !datasourceUrl.searchParams.has('connection_limit')) {
-  datasourceUrl.searchParams.set('connection_limit', '1');
+if (datasourceUrl) {
+  const isPooler = datasourceUrl.hostname.includes('-pooler.') || datasourceUrl.searchParams.has('pgbouncer');
+  if (isPooler || process.env.VERCEL) datasourceUrl.searchParams.set('pgbouncer', 'true');
+  if (process.env.VERCEL) datasourceUrl.searchParams.set('connection_limit', '1');
 }
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient(
   datasourceUrl ? { datasourceUrl: datasourceUrl.toString() } : undefined,
 );
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;

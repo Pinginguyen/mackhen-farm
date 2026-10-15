@@ -125,21 +125,29 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
     let result: {
       orderId?: string;
       orderCode?: string;
-      total?: number;
-      success?: boolean;
       redirectUrl?: string;
-      order?: { code?: string; total?: number; paymentMethod?: string };
       error?: unknown;
     } = {};
     let response: Response = new Response(null, { status: 503 });
     try {
       const requestBody = JSON.stringify({
+        customerName: form.get('name'),
+        phone: form.get('phone'),
+        address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', '),
+        discountCode: appliedVoucher || (freeShippingApplied ? 'FREESHIP169' : ''),
         customer: { name: form.get('name'), email: form.get('email'), phone: form.get('phone') },
         delivery: { address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', ') },
         paymentMethod,
         note: form.get('notes'),
         voucherCode: appliedVoucher || (freeShippingApplied ? 'FREESHIP169' : ''),
-        items: checkoutItems.map((item) => ({ id: item.id, quantity: item.quantity })),
+        items: checkoutItems.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productSlug: item.productSlug,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          price: item.unitPrice,
+        })),
         buyNow,
       });
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -164,26 +172,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       return;
     }
 
-    const resultOrderCode = result.order?.code ?? result.orderCode ?? result.orderId ?? '';
-    if (response.ok && resultOrderCode) rememberUserOrder(resultOrderCode);
-    if (result.success === true || result.redirectUrl) {
-      if (buyNow) clearBuyNowSnapshot();
-      if (result.redirectUrl) {
-        window.location.assign(result.redirectUrl);
-        return;
-      }
-      if (paymentMethod === 'COD') {
-        window.location.assign(`/tra-cuu?orderCode=${encodeURIComponent(resultOrderCode)}&success=1`);
-        return;
-      }
-
-      const destination = result.redirectUrl
-        ?? `/checkout/vietqr/${encodeURIComponent(resultOrderCode)}?demo=1&amount=${result.order?.total ?? result.total ?? 0}`;
-      window.location.assign(destination);
-      return;
-    }
-
-    if (!response.ok || !result.orderId) {
+    if (!response.ok || !result.redirectUrl) {
       submitLock.current = false;
       setSubmitting(false);
       const temporaryFailure = response.status === 503;
@@ -194,32 +183,9 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       return;
     }
 
+    if (result.orderCode) rememberUserOrder(result.orderCode);
     if (buyNow) clearBuyNowSnapshot();
-
-    if (paymentMethod === 'MOMO') {
-      window.location.assign(`/checkout/momo/${encodeURIComponent(result.orderCode ?? result.orderId)}?amount=${result.total ?? Math.round(subtotal + shipping - (discount ?? 0))}`);
-      return;
-    }
-
-    if (paymentMethod === 'VIETQR') {
-      setSubmitting(true);
-      let destination = `/checkout/vietqr/${encodeURIComponent(result.orderCode ?? result.orderId)}`;
-      try {
-        const paymentResponse = await fetch('/api/payments/payos/create', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ orderId: result.orderId, amount: result.total }),
-        });
-        const payment = await paymentResponse.json() as { checkoutUrl?: string; fallbackUrl?: string };
-        destination = payment.checkoutUrl ?? payment.fallbackUrl ?? destination;
-      } catch {
-        setMessage('PayOS chưa khả dụng. Đang chuyển sang thanh toán VietQR.');
-      }
-      window.location.assign(destination);
-      return;
-    }
-
-    window.location.assign(`/tra-cuu?orderCode=${encodeURIComponent(result.orderCode ?? '')}&success=1`);
+    window.location.assign(result.redirectUrl);
   }
 
   return (
@@ -244,8 +210,12 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         <label className={paymentMethod === 'MOMO' ? 'is-selected' : ''}><input type="radio" name="method" value="MOMO" checked={paymentMethod === 'MOMO'} onChange={() => setPaymentMethod('MOMO')} /><span><strong>MoMo Sandbox</strong><small>Mô phỏng thanh toán để kiểm thử</small></span></label>
       </fieldset>
       <div className="field"><label htmlFor="notes">Ghi chú</label><textarea id="notes" name="notes" rows={4} /></div>
-      <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>{submitting ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang xử lý đơn hàng...</> : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}</button>
-      {message && <div className={retryAvailable ? 'checkout-retry-notice' : undefined} role="status"><p>{message}</p>{retryAvailable && <button className="checkout-retry-button" type="button" onClick={() => formRef.current?.requestSubmit()} disabled={submitting}>Thử lại</button>}</div>}
+      <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
+        {submitting
+          ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang xử lý an toàn...</>
+          : retryAvailable ? 'Thử lại xác nhận đơn hàng' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
+      </button>
+      {message && <p className="checkout-inline-error" role={retryAvailable ? 'status' : 'alert'}>{message}</p>}
     </form>
   );
 }

@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
-import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
@@ -23,9 +22,6 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       {searchParams.error === 'forbidden' && <p className="role-notice" role="alert">Bạn không có quyền truy cập khu vực quản trị.</p>}
 
       <section className="hero">
-        <div className="hero3d-layer" aria-hidden="true">
-          <Hero3DCanvasLoader />
-        </div>
         <div className="hero-copy">
           <div className="hero-badges">
             <span className="pill">Upcycled Food · Hương vị Tây Bắc</span>

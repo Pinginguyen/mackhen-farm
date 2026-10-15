@@ -57,13 +57,29 @@ describe('POST /api/orders checkout', () => {
         voucherCode: 'FREESHIP169',
       }),
     }));
-    const result = await response.json() as { orderCode: string; total: number; status: string };
+    const result = await response.json() as { orderCode: string; total: number; status: string; success: boolean; redirectUrl: string };
 
     expect(response.status).toBe(201);
-    expect(result).toMatchObject({ orderCode: 'MKF-123456', total: 169000, status: 'pending' });
+    expect(result).toMatchObject({ orderCode: 'MKF-123456', total: 169000, status: 'pending', success: true, redirectUrl: '/checkout/momo/MKF-123456?amount=169000' });
     expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: 'spice-1', stock: { gte: 1 } }, data: { stock: { decrement: 1 } } });
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentMethod: 'MOMO', paymentStatus: 'PENDING', shippingFee: 0, totalAmount: 169000 }) }));
     expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
+  });
+
+  it('accepts the flat checkout contract and validates submitted line prices against the cart', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', paymentMethod: 'COD', discountCode: '',
+        items: [{ id: 'cart-item-1', productId: 'spice-1', productSlug: 'hat-doi-rung-nep-thuong-hang', variantId: null, quantity: 1, price: 169000 }],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000 }),
+    }));
   });
 
   it('applies GIAM10 to the merchandise subtotal before creating the order', async () => {
@@ -312,7 +328,7 @@ describe('POST /api/orders checkout', () => {
     expect(cartFindUnique).not.toHaveBeenCalled();
   });
 
-  it('returns the existing order for an identical checkout within ten seconds', async () => {
+  it('returns the existing order for an identical checkout within three seconds', async () => {
     orderFindMany.mockResolvedValueOnce([{
       id: 'order-previous', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000,
       customerName: 'A', address: 'Lai Chau', paymentMethod: 'COD', discountAmount: 0,
@@ -328,6 +344,23 @@ describe('POST /api/orders checkout', () => {
     expect(await response.json()).toMatchObject({ orderId: 'order-previous', orderCode: 'MKF-123456' });
     expect(productUpdateMany).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('recovers a concurrent serializable conflict with the committed idempotent order', async () => {
+    const existingOrder = { id: 'order-winner', orderCode: 'MKF-654321', numericCode: 654321, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'COD' };
+    orderFindUnique.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce(existingOrder);
+    prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('Transaction failed due to a write conflict'), { code: 'P2034' }));
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1', 'idempotency-key': 'checkout-race-001' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true, duplicate: true, orderCode: 'MKF-654321', redirectUrl: '/tra-cuu?orderCode=MKF-654321&success=1',
+    });
   });
 
   it('refuses to create a client-priced VietQR order when Prisma is unavailable', async () => {

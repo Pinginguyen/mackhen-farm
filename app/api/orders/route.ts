@@ -18,6 +18,10 @@ type CheckoutItemSnapshot = {
 };
 
 type CheckoutBody = {
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  discountCode?: string;
   customer?: { name?: string; email?: string; phone?: string };
   delivery?: { address?: string };
   paymentMethod?: string;
@@ -76,6 +80,12 @@ function sameCartContents(
   });
 }
 
+function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number): string {
+  if (method === 'COD') return `/tra-cuu?orderCode=${encodeURIComponent(orderCode)}&success=1`;
+  if (method === 'MOMO') return `/checkout/momo/${encodeURIComponent(orderCode)}?amount=${amount}`;
+  return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
+}
+
 export async function POST(request: Request) {
   let payload: unknown;
   try {
@@ -92,15 +102,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Mã yêu cầu đặt hàng không hợp lệ.' } }, { status: 400 });
   }
 
-  const name = typeof body.customer?.name === 'string' ? body.customer.name.trim() : '';
-  const phoneInput = typeof body.customer?.phone === 'string' ? body.customer.phone.trim() : '';
+  const submittedName = body.customer?.name ?? body.customerName;
+  const submittedPhone = body.customer?.phone ?? body.phone;
+  const submittedAddress = body.delivery?.address ?? body.address;
+  const name = typeof submittedName === 'string' ? submittedName.trim() : '';
+  const phoneInput = typeof submittedPhone === 'string' ? submittedPhone.trim() : '';
   const phone = phoneInput ? normalizeVietnamesePhone(phoneInput) : null;
-  const address = typeof body.delivery?.address === 'string' ? body.delivery.address.trim() : '';
+  const address = typeof submittedAddress === 'string' ? submittedAddress.trim() : '';
   const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
   if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR', 'MOMO'].includes(paymentMethod ?? '')) {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
   }
-  const voucherCode = typeof body.voucherCode === 'string' ? body.voucherCode.trim().toUpperCase() : '';
+  const submittedVoucherCode = body.voucherCode ?? body.discountCode;
+  const voucherCode = typeof submittedVoucherCode === 'string' ? submittedVoucherCode.trim().toUpperCase() : '';
   if (calculateVoucherDiscount(voucherCode, 0, 0) === null && !/^MKF50-[A-F0-9]{8}$/.test(voucherCode)) {
     return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không hợp lệ.' } }, { status: 400 });
   }
@@ -114,16 +128,18 @@ export async function POST(request: Request) {
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
         where: { idempotencyKey },
-        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
       });
       if (existingOrder) {
         return NextResponse.json({
+          success: true,
           orderId: existingOrder.id,
           orderCode: existingOrder.orderCode,
           numericCode: existingOrder.numericCode,
           status: existingOrder.orderStatus.toLowerCase(),
           total: existingOrder.totalAmount,
           duplicate: true,
+          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
         });
       }
     }
@@ -166,7 +182,7 @@ export async function POST(request: Request) {
         }
 
         const recentOrders = await transaction.order.findMany({
-          where: { phone, createdAt: { gte: new Date(Date.now() - 10_000) } },
+          where: { phone, createdAt: { gte: new Date(Date.now() - 3_000) } },
           include: { items: { select: { productId: true, productVariantId: true, quantity: true, price: true } } },
           orderBy: { createdAt: 'desc' },
         });
@@ -256,7 +272,7 @@ export async function POST(request: Request) {
             discountAmount: discount,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
-            grossAmount: subtotal + shipping,
+            grossAmount: subtotal,
             netAmount: totalAmount,
             reconciled: false,
             holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
@@ -270,14 +286,27 @@ export async function POST(request: Request) {
         });
       }, { isolationLevel: 'Serializable' });
     } catch (error) {
-      if (idempotencyKey && error instanceof Error && (error as Error & { code?: string }).code === 'P2002') {
+      const prismaErrorCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+      if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
         const existingOrder = await prisma.order.findUnique({
           where: { idempotencyKey },
-          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
         });
         if (existingOrder) {
-          return NextResponse.json({ orderId: existingOrder.id, orderCode: existingOrder.orderCode, numericCode: existingOrder.numericCode, status: existingOrder.orderStatus.toLowerCase(), total: existingOrder.totalAmount, duplicate: true });
+          return NextResponse.json({
+            success: true,
+            orderId: existingOrder.id,
+            orderCode: existingOrder.orderCode,
+            numericCode: existingOrder.numericCode,
+            status: existingOrder.orderStatus.toLowerCase(),
+            total: existingOrder.totalAmount,
+            duplicate: true,
+            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
+          });
         }
+      }
+      if (prismaErrorCode === 'P2034') {
+        return NextResponse.json({ error: { code: 'CHECKOUT_CONCURRENT_REQUEST', message: 'Yêu cầu đặt hàng đang được xử lý đồng thời. Vui lòng thử lại.' } }, { status: 409 });
       }
       if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
         const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
@@ -289,9 +318,20 @@ export async function POST(request: Request) {
       );
       if (!databaseUnavailable) throw error;
 
-      console.error('Checkout database unavailable; refusing to create an unpriced order.', error.name);
+      const prismaCode = (error as Error & { code?: string }).code;
+      const schemaMismatch = prismaCode === 'P2021' || prismaCode === 'P2022';
+      console.error('Checkout persistence failed; no unverified order was created.', {
+        name: error.name,
+        code: prismaCode,
+        message: error.message,
+      });
       return NextResponse.json({
-        error: { code: 'CHECKOUT_TEMPORARILY_UNAVAILABLE', message: 'Kết nối đặt hàng đang gián đoạn. Đơn chưa được ghi nhận và chưa phát sinh thanh toán; vui lòng thử lại, giỏ hàng vẫn được giữ.' },
+        error: {
+          code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
+          message: schemaMismatch
+            ? 'Cơ sở dữ liệu cần được cập nhật migration trước khi nhận đơn. Chưa ghi nhận đơn hoặc thanh toán.'
+            : 'Kết nối đặt hàng đang gián đoạn. Đơn chưa được ghi nhận và chưa phát sinh thanh toán; vui lòng thử lại, giỏ hàng vẫn được giữ.',
+        },
       }, { status: 503, headers: { 'retry-after': '30' } });
     }
 
@@ -321,7 +361,16 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
     }
-    const response = NextResponse.json({ orderId: order.id, orderCode: order.orderCode, numericCode: order.numericCode, status: order.orderStatus.toLowerCase(), total: order.totalAmount }, { status: order.duplicate ? 200 : 201 });
+    const response = NextResponse.json({
+      success: true,
+      orderId: order.id,
+      orderCode: order.orderCode,
+      numericCode: order.numericCode,
+      status: order.orderStatus.toLowerCase(),
+      total: order.totalAmount,
+      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR' | 'MOMO', order.orderCode, order.totalAmount),
+      ...(order.duplicate ? { duplicate: true } : {}),
+    }, { status: order.duplicate ? 200 : 201 });
     if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
     return response;
   }, 'Lỗi đặt hàng:');

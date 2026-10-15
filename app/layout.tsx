@@ -2,7 +2,6 @@ import './globals.css';
 import type { Metadata } from 'next';
 import SiteFooter from './site-footer';
 import FloatingContact from './floating-contact';
-import AiChatBox from '@/components/AiChatBox';
 import Header from '@/components/layout/Header';
 import SiteHeaderVisibility from '@/components/layout/SiteHeaderVisibility';
 import SmoothScroll from '@/components/SmoothScroll';
@@ -45,7 +44,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <SiteFooter />
           <FloatingContact />
-          <AiChatBox />
           <CartToast />
           <ExitIntentPopup />
         </SmoothScroll>

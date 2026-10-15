@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { calculateShipping } from '@/lib/shipping';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 
 export async function POST(request: Request) {
   let body: { productId?: string; variantId?: string; quantity?: number; buyNow?: boolean };
@@ -12,17 +13,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
   }
 
-  if (!body.productId || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
+  if (typeof body.productId !== 'string' || !body.productId.trim() || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
     return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thiếu thông tin sản phẩm' } }, { status: 400 });
   }
   const quantity = body.quantity;
 
   return withDatabase(async () => {
-  const product = await prisma.product.findFirst({
+  let product = await prisma.product.findFirst({
     where: { active: true, OR: [{ id: body.productId }, { slug: body.productId }] },
     include: { variants: true },
   });
+  if (!product) {
+    const legacySlug = body.productId === 'mkf-combo-3' ? 'combo-bo-ba-nhau-xanh' : null;
+    const fallback = DEFAULT_PRODUCTS.find((item) => item.id === body.productId || item.slug === body.productId || item.slug === legacySlug);
+    if (fallback) {
+      try {
+        product = await prisma.product.upsert({
+          where: { id: fallback.id },
+          create: {
+            id: fallback.id,
+            slug: fallback.slug,
+            name: fallback.name,
+            category: fallback.category,
+            price: fallback.price,
+            originalPrice: fallback.originalPrice,
+            unit: fallback.unit,
+            weight: fallback.weight,
+            protein: fallback.protein,
+            rating: fallback.rating,
+            stock: fallback.stock,
+            description: fallback.description,
+            image: fallback.image,
+            images: fallback.images,
+            highlight: fallback.highlight,
+            active: fallback.active,
+          },
+          update: {},
+          include: { variants: true },
+        });
+      } catch (error) {
+        if (!(error instanceof Error) || (error as Error & { code?: string }).code !== 'P2002') throw error;
+        product = await prisma.product.findFirst({ where: { slug: fallback.slug }, include: { variants: true } });
+      }
+    }
+  }
   if (!product) return NextResponse.json({ error: { code: 'PRODUCT_NOT_FOUND', message: 'Không tìm thấy sản phẩm' } }, { status: 404 });
+  if (!product.active) return NextResponse.json({ error: { code: 'PRODUCT_NOT_FOUND', message: 'Sản phẩm hiện không khả dụng' } }, { status: 404 });
 
   const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : undefined;
   if (body.variantId && !variant) return NextResponse.json({ error: { code: 'VARIANT_NOT_FOUND', message: 'Không tìm thấy phân loại' } }, { status: 404 });

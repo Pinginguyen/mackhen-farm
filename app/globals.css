@@ -4668,7 +4668,7 @@ body {
 
 .floating-zalo {
   position: fixed;
-  right: calc(max(18px, env(safe-area-inset-right)) + 72px);
+  right: max(18px, env(safe-area-inset-right));
   bottom: max(18px, env(safe-area-inset-bottom));
   z-index: 70;
   display: grid;
@@ -5091,40 +5091,10 @@ body {
   font-size: 0.84rem;
 }
 
-.checkout-retry-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+.checkout-inline-error {
   margin: 0;
-  padding: 11px 13px;
-  border: 1px solid #e7e5e4;
-  border-radius: 8px;
-  background: #fafaf9;
-  color: #44403c;
+  color: var(--primary);
   font-size: 0.84rem;
-}
-
-.checkout-retry-notice p {
-  flex: 1 1 240px;
-  margin: 0;
-}
-
-.checkout-retry-button {
-  min-height: 38px;
-  padding: 7px 13px;
-  border: 1px solid #d6d3d1;
-  border-radius: 7px;
-  background: #fff;
-  color: #292524;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.checkout-retry-button:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 
 .admin-system-health-widget {
@@ -6318,7 +6288,7 @@ body {
   }
 
   .floating-zalo {
-    right: calc(max(12px, env(safe-area-inset-right)) + 64px);
+    right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, env(safe-area-inset-bottom));
     width: 52px;
     height: 52px;
