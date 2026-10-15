@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { LoaderCircle } from 'lucide-react';
 import { calculateVoucherDiscount } from '@/lib/vouchers';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
@@ -33,6 +34,7 @@ function rememberUserOrder(orderCode: string) {
 }
 
 export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean }) {
+  const router = useRouter();
   const [message, setMessage] = useState('');
   const [retryAvailable, setRetryAvailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -122,13 +124,6 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         ? crypto.randomUUID()
         : `mkf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
-    let result: {
-      orderId?: string;
-      orderCode?: string;
-      redirectUrl?: string;
-      error?: unknown;
-    } = {};
-    let response: Response = new Response(null, { status: 503 });
     try {
       const requestBody = JSON.stringify({
         customerName: form.get('name'),
@@ -150,42 +145,48 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         })),
         buyNow,
       });
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          response = await fetch('/api/checkout', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKeyRef.current },
-            body: requestBody,
-          });
-          result = await response.json() as typeof result;
-          if (response.status !== 503 || attempt === 1) break;
-        } catch (requestError) {
-          if (attempt === 1) throw requestError;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKeyRef.current },
+        body: requestBody,
+      });
+      const result = await response.json() as {
+        success?: boolean;
+        orderId?: string;
+        orderCode?: string;
+        redirectUrl?: string;
+        error?: unknown;
+      };
+
+      if (!response.ok) {
+        const retryable = response.status >= 500 || response.status === 408 || response.status === 429;
+        submitLock.current = false;
+        setSubmitting(false);
+        setRetryAvailable(retryable);
+        setMessage(retryable
+          ? 'Hệ thống đang bận ghi nhận đơn hàng hoặc cơ sở dữ liệu chưa sẵn sàng (lỗi kết nối). Chưa nhận được xác nhận tạo đơn; chưa chuyển sang bước thanh toán. Vui lòng thử lại sau giây lát.'
+          : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
+        return;
       }
+
+      if (result.success !== true || !result.orderId || !result.orderCode || !result.redirectUrl) {
+        throw new Error('Checkout response did not confirm a persisted order.');
+      }
+
+      const destination = new URL(result.redirectUrl, window.location.origin);
+      if (destination.origin !== window.location.origin) {
+        throw new Error('Checkout returned an unsafe redirect URL.');
+      }
+
+      rememberUserOrder(result.orderCode);
+      if (buyNow) clearBuyNowSnapshot();
+      router.push(`${destination.pathname}${destination.search}${destination.hash}`);
     } catch {
       submitLock.current = false;
       setSubmitting(false);
       setRetryAvailable(true);
-      setMessage('Chưa nhận được xác nhận đặt hàng. Chưa phát sinh thanh toán; thông tin vẫn được giữ để thử lại.');
-      return;
+      setMessage('Chưa nhận được xác nhận từ hệ thống. Đơn có thể đã được ghi nhận; hãy thử lại để hệ thống kiểm tra bằng cùng mã yêu cầu, tránh tạo trùng. Chưa chuyển sang bước thanh toán.');
     }
-
-    if (!response.ok || !result.redirectUrl) {
-      submitLock.current = false;
-      setSubmitting(false);
-      const temporaryFailure = response.status === 503;
-      setRetryAvailable(temporaryFailure);
-      setMessage(temporaryFailure
-        ? 'Chưa nhận được xác nhận đặt hàng. Chưa phát sinh thanh toán; giỏ hàng và thông tin vẫn được giữ.'
-        : getErrorMessage(result.error, 'Không thể tạo đơn hàng.'));
-      return;
-    }
-
-    if (result.orderCode) rememberUserOrder(result.orderCode);
-    if (buyNow) clearBuyNowSnapshot();
-    window.location.assign(result.redirectUrl);
   }
 
   return (
@@ -212,7 +213,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       <div className="field"><label htmlFor="notes">Ghi chú</label><textarea id="notes" name="notes" rows={4} /></div>
       <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
         {submitting
-          ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang xử lý an toàn...</>
+          ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang xử lý và ghi nhận đơn hàng...</>
           : retryAvailable ? 'Thử lại xác nhận đơn hàng' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
       </button>
       {message && <p className="checkout-inline-error" role={retryAvailable ? 'status' : 'alert'}>{message}</p>}

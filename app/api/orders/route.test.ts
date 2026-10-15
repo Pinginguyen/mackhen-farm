@@ -363,6 +363,27 @@ describe('POST /api/orders checkout', () => {
     });
   });
 
+  it('returns a clear retryable error when the checkout schema is out of date', async () => {
+    const databaseError = Object.assign(new Error('The column `Product.originalPrice` does not exist.'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2022',
+    });
+    cartFindUnique.mockRejectedValueOnce(databaseError);
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'VIETQR' }),
+    }));
+
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatchObject({
+      code: 'DATABASE_SCHEMA_OUT_OF_DATE',
+      message: expect.stringContaining('Cơ sở dữ liệu cần được cập nhật migration'),
+    });
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
   it('refuses to create a client-priced VietQR order when Prisma is unavailable', async () => {
     const databaseError = new Error('Environment variable not found: DATABASE_URL');
     databaseError.name = 'PrismaClientInitializationError';
