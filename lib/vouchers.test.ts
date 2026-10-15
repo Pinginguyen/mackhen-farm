@@ -6,7 +6,7 @@ describe('calculateVoucherDiscount', () => {
   it('waives all shipping for FREESHIP only at the 250,000đ minimum', () => {
     expect(calculateVoucherDiscount('FREESHIP', 250000, 35000)).toBe(35000);
     expect(calculateVoucherDiscount('FREESHIP', 249999, 35000)).toBeNull();
-    expect(getVoucherValidationError('FREESHIP', 249999)).toBe('Mã FREESHIP chỉ áp dụng cho đơn từ 250.000đ trở lên.');
+    expect(getVoucherValidationError('FREESHIP', 249999)).toBe('Cần mua thêm 1đ để áp dụng FREESHIP.');
   });
 
   it('discounts ten percent up to 30,000đ for GIAM10 at the 150,000đ minimum', () => {

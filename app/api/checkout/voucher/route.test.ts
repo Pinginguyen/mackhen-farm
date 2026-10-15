@@ -72,6 +72,6 @@ describe('POST /api/checkout/voucher', () => {
     const response = await POST(request('FREESHIP', memberCookie()));
 
     expect(response.status).toBe(400);
-    expect((await response.json()).error.message).toBe('Mã FREESHIP chỉ áp dụng cho đơn từ 250.000đ trở lên.');
+    expect((await response.json()).error.message).toBe('Cần mua thêm 81.000đ để áp dụng FREESHIP.');
   });
 });
