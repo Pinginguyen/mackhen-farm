@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
-    orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
+    orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
     userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
@@ -14,7 +14,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
     productVariant: { updateMany: vi.fn() },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
     user: { update: mocks.userUpdate },
-    order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, create: mocks.orderCreate },
+    order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate },
     productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
   };
@@ -25,6 +25,12 @@ vi.mock('@/lib/prisma', () => ({ prisma }));
 
 import { SESSION_COOKIE, createSessionToken } from '@/lib/auth';
 import { POST } from './route';
+
+function memberCookie(cartId = 'cart-1') {
+  vi.stubEnv('AUTH_SECRET', 'test-secret-with-at-least-32-characters');
+  const token = createSessionToken({ userId: 'new-member', name: 'Buyer', email: 'buyer@example.com', role: 'CUSTOMER' });
+  return `bohoch_cart=${cartId}; ${SESSION_COOKIE}=${token}`;
+}
 
 describe('POST /api/orders checkout', () => {
   beforeEach(() => {
@@ -38,6 +44,8 @@ describe('POST /api/orders checkout', () => {
     customerUpsert.mockReset().mockResolvedValue({ id: 'customer-1' });
     customerCreate.mockReset().mockResolvedValue({ id: 'customer-1' });
     orderFindUnique.mockReset().mockResolvedValue(null);
+    orderCount.mockReset().mockResolvedValue(0);
+    orderFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindFirst.mockReset().mockResolvedValue(null);
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
@@ -46,9 +54,10 @@ describe('POST /api/orders checkout', () => {
     orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
     cartItemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
+    prisma.$transaction.mockClear();
   });
 
-  it('creates a MoMo order, deducts inventory, and applies free shipping transactionally', async () => {
+  it('creates a MoMo order and leaves its cart intact until payment succeeds', async () => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
@@ -56,7 +65,6 @@ describe('POST /api/orders checkout', () => {
         customer: { name: 'Nguyen Thi A', email: 'a@example.com', phone: '0762793244' },
         delivery: { address: 'Lai Chau, Tam Duong, Binh Lu' },
         paymentMethod: 'MOMO',
-        voucherCode: 'FREESHIP169',
       }),
     }));
     const result = await response.json() as { orderCode: string; total: number; status: string; success: boolean; redirectUrl: string };
@@ -65,7 +73,7 @@ describe('POST /api/orders checkout', () => {
     expect(result).toMatchObject({ orderCode: 'MKF-123456', total: 169000, status: 'pending', success: true, redirectUrl: '/checkout/momo/MKF-123456?amount=169000' });
     expect(productUpdateMany).toHaveBeenCalledWith({ where: { id: 'spice-1', stock: { gte: 1 } }, data: { stock: { decrement: 1 } } });
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentMethod: 'MOMO', paymentStatus: 'PENDING', shippingFee: 0, totalAmount: 169000 }) }));
-    expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
+    expect(cartItemDeleteMany).not.toHaveBeenCalled();
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'Serializable', timeout: 8_000 });
   });
 
@@ -85,10 +93,10 @@ describe('POST /api/orders checkout', () => {
     }));
   });
 
-  it('applies GIAM10 to the merchandise subtotal before creating the order', async () => {
+  it('applies GIAM10 to the merchandise subtotal for a new authenticated member', async () => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
       body: JSON.stringify({
         customer: { name: 'Buyer', phone: '0762793244' },
         delivery: { address: 'Lai Chau' },
@@ -101,6 +109,60 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ subtotal: 169000, discountAmount: 16900, totalAmount: 152100 }),
     }));
+  });
+
+  it('rejects promotional vouchers for guests before opening a transaction', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'GIAM10' }),
+    }));
+
+    expect(response.status).toBe(401);
+    expect((await response.json()).error.message).toContain('đăng nhập hoặc tạo tài khoản');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a voucher for an account that already has an order', async () => {
+    orderCount.mockResolvedValueOnce(1);
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'GIAM10' }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.message).toContain('đơn hàng đầu tiên');
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a new-member voucher when the phone has a previously successful order', async () => {
+    orderFindFirst.mockResolvedValueOnce({ id: 'previous-order' });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'GIAM10' }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.message).toContain('Số điện thoại này đã có đơn hàng thành công');
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects GIAM10 when the database cart subtotal is below its minimum', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [{
+      id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 149999,
+      product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 149999, stock: 5 }, variant: null,
+    }] });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'GIAM10' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.message).toBe('Mã GIAM10 chỉ áp dụng cho đơn từ 150.000đ trở lên.');
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('applies and consumes a valid one-time 50% compensation voucher', async () => {
@@ -142,19 +204,19 @@ describe('POST /api/orders checkout', () => {
   it('applies FREESHIP to the server-calculated shipping fee', async () => {
     cartFindUnique.mockResolvedValueOnce({
       items: [{
-        id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 1,
-        product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 100000, stock: 5 }, variant: null,
+        id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 300000,
+        product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 300000, stock: 5 }, variant: null,
       }],
     });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
       body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'FREESHIP' }),
     }));
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ subtotal: 100000, shippingFee: 35000, discountAmount: 35000, totalAmount: 100000 }),
+      data: expect.objectContaining({ subtotal: 300000, shippingFee: 0, discountAmount: 0, totalAmount: 300000 }),
     }));
   });
 
@@ -250,7 +312,7 @@ describe('POST /api/orders checkout', () => {
       success: true, orderId: 'order-existing', orderCode: 'MKF-123456', totalAmount: 169000,
       redirectUrl: '/checkout/vietqr/MKF-123456?amount=169000', duplicate: true,
     });
-    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
+    expect(response.headers.get('set-cookie')).toBeNull();
     expect(cartFindUnique).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
   });
@@ -384,7 +446,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
-      success: true, duplicate: true, orderCode: 'MKF-654321', redirectUrl: '/tra-cuu?orderCode=MKF-654321&success=1',
+      success: true, duplicate: true, orderCode: 'MKF-654321', redirectUrl: '/cam-on?orderCode=MKF-654321',
     });
   });
 

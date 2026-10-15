@@ -20,6 +20,7 @@ type ProductDraft = {
   stock: string;
   imageUrl: string;
   description: string;
+  highlights: string;
 };
 
 const emptyDraft: ProductDraft = {
@@ -32,6 +33,7 @@ const emptyDraft: ProductDraft = {
   stock: '0',
   imageUrl: '',
   description: '',
+  highlights: '',
 };
 
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
@@ -92,6 +94,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       stock: String(product.stock),
       imageUrl: product.image,
       description: product.description,
+      highlights: (product.highlights ?? []).join('\n'),
     });
     setFormError('');
     setNotice('');
@@ -119,6 +122,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           weight: String(draft.weight || '150g').trim(),
           protein: String(draft.protein).trim(),
           description: String(draft.description).trim(),
+          highlights: draft.highlights,
           imageUrl: draft.imageUrl || undefined,
         }),
       });
@@ -282,6 +286,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 )}
               </div>
               <label className="field admin-product-full-width">Mô tả ngắn<textarea rows={3} maxLength={2000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
+              <label className="field admin-product-full-width">Đặc điểm nổi bật riêng của sản phẩm (Mỗi dòng 1 gạch đầu dòng)<textarea rows={5} maxLength={1200} placeholder={'22g protein thực vật / 100g\nKhử mùi ngái đậu nành, đậm vị hạt dổi mắc khén\nChuẩn vị Điện Biên / 100% tự nhiên không chất bảo quản'} value={draft.highlights} onChange={(event) => setDraft({ ...draft, highlights: event.target.value })} /></label>
               {formError && <p className="admin-return-alert admin-product-full-width" role="alert">{formError}</p>}
               <footer className="admin-product-modal-actions admin-product-full-width">
                 <button className="secondary-action" type="button" onClick={() => setOpen(false)} disabled={saving}>Hủy</button>

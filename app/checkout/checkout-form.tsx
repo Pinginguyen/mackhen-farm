@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LoaderCircle } from 'lucide-react';
-import { calculateVoucherDiscount } from '@/lib/vouchers';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import { getErrorMessage } from '@/lib/error-message';
 import { createAbortSignal } from '@/lib/request-timeout';
@@ -79,6 +79,15 @@ function clearBuyNowSnapshot() {
   }
 }
 
+function clearLocalCartSnapshot() {
+  try {
+    window.localStorage.removeItem('bohoch_cart_quantities');
+    window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: 0 } }));
+  } catch {
+    return;
+  }
+}
+
 function rememberUserOrder(orderCode: string) {
   if (!/^MKF-\d{6}$/.test(orderCode)) return;
   try {
@@ -90,7 +99,7 @@ function rememberUserOrder(orderCode: string) {
   }
 }
 
-export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean }) {
+export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR' }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR' | 'MOMO' }) {
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [retryAvailable, setRetryAvailable] = useState(false);
@@ -101,13 +110,15 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
   const idempotencyBodyRef = useRef('');
   const [voucher, setVoucher] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState('');
-  const [voucherFeedback, setVoucherFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState('VIETQR');
+  const [voucherFeedback, setVoucherFeedback] = useState<{ type: 'success' | 'error'; text: string; requiresLogin?: boolean } | null>(null);
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod);
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
   const normalizedVoucher = voucher.trim().toUpperCase();
   const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const discount = appliedVoucher ? calculateVoucherDiscount(appliedVoucher, subtotal, shipping) ?? 0 : 0;
+  const discount = appliedVoucher ? voucherDiscount : 0;
   const checkoutTotal = Math.max(0, subtotal + shipping - discount);
 
   useEffect(() => {
@@ -129,35 +140,36 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
     }
   }, [buyNow]);
 
-  useEffect(() => {
-    try {
-      const pendingVoucher = window.sessionStorage.getItem('checkout_voucher');
-      if (!pendingVoucher) return;
-      window.sessionStorage.removeItem('checkout_voucher');
-      const code = pendingVoucher.trim().toUpperCase();
-      if (calculateVoucherDiscount(code, subtotal, shipping) !== null) {
-        setVoucher(code);
-        setAppliedVoucher(code);
-        setVoucherFeedback({ type: 'success', text: `Đã áp dụng mã ${code}: Giảm 10%.` });
-      }
-    } catch {
-      return;
-    }
-  }, [shipping, subtotal]);
-
-  function applyVoucher() {
+  async function applyVoucher() {
     const code = normalizedVoucher;
-    const amount = calculateVoucherDiscount(code, subtotal, shipping);
-    if (!code || amount === null) {
-      setAppliedVoucher('');
-      setVoucherFeedback({ type: 'error', text: 'Mã giảm giá không hợp lệ hoặc đã hết hạn.' });
-      return;
+    const phone = String(new FormData(formRef.current ?? undefined).get('phone') ?? '');
+    setApplyingVoucher(true);
+    setAppliedVoucher('');
+    setVoucherDiscount(0);
+    setVoucherFeedback(null);
+    try {
+      const response = await fetch('/api/checkout/voucher', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ voucherCode: code, phone, buyNow }),
+      });
+      const result = await response.json() as { discount?: number; error?: { code?: string; message?: string } };
+      if (!response.ok || typeof result.discount !== 'number') {
+        setVoucherFeedback({
+          type: 'error',
+          text: result.error?.message ?? 'Mã giảm giá không tồn tại hoặc đã hết hạn.',
+          requiresLogin: result.error?.code === 'VOUCHER_LOGIN_REQUIRED',
+        });
+        return;
+      }
+      setAppliedVoucher(code);
+      setVoucherDiscount(result.discount);
+      setVoucherFeedback({ type: 'success', text: `Đã áp dụng mã ${code}: giảm ${result.discount.toLocaleString('vi-VN')}đ.` });
+    } catch {
+      setVoucherFeedback({ type: 'error', text: 'Không thể kiểm tra mã giảm giá. Vui lòng thử lại.' });
+    } finally {
+      setApplyingVoucher(false);
     }
-    setAppliedVoucher(code);
-    setVoucherFeedback({
-      type: 'success',
-      text: code === 'GIAM10' ? 'Đã áp dụng mã GIAM10: Giảm 10%.' : `Đã áp dụng mã ${code}: Giảm ${amount.toLocaleString('vi-VN')}đ phí vận chuyển.`,
-    });
   }
 
   async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
@@ -182,12 +194,12 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         customerName: form.get('name'),
         phone: form.get('phone'),
         address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', '),
-        discountCode: appliedVoucher || (freeShippingApplied ? 'FREESHIP169' : ''),
+        discountCode: appliedVoucher,
         customer: { name: form.get('name'), email: form.get('email'), phone: form.get('phone') },
         delivery: { address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', ') },
         paymentMethod,
         note: form.get('notes'),
-        voucherCode: appliedVoucher || (freeShippingApplied ? 'FREESHIP169' : ''),
+        voucherCode: appliedVoucher,
         items: checkoutItems.map((item) => ({
           id: item.id,
           productId: item.productId,
@@ -221,6 +233,13 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         };
 
         if (!response.ok) {
+          const serverError = result.error && typeof result.error === 'object' ? result.error as { code?: string; message?: string } : null;
+          if (serverError?.code === 'VOUCHER_NOT_ELIGIBLE') {
+            setVoucher('');
+            setAppliedVoucher('');
+            setVoucherDiscount(0);
+            setVoucherFeedback({ type: 'error', text: serverError.message ?? 'Mã giảm giá không còn đủ điều kiện và đã được hủy.' });
+          }
           const retryable = response.status >= 500 || response.status === 408 || response.status === 429;
           submitLock.current = false;
           setSubmitting(false);
@@ -241,7 +260,10 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         }
 
         rememberUserOrder(result.orderCode);
-        if (buyNow) clearBuyNowSnapshot();
+        if (paymentMethod === 'COD') {
+          clearLocalCartSnapshot();
+          if (buyNow) clearBuyNowSnapshot();
+        }
         router.push(`${destination.pathname}${destination.search}${destination.hash}`);
         return;
       } finally {
@@ -268,11 +290,12 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       <div className="checkout-voucher-entry">
         <label className="field" htmlFor="voucher">Mã giảm giá</label>
         <div className="checkout-voucher-controls">
-          <input id="voucher" name="voucher" value={voucher} onChange={(event) => { setVoucher(event.target.value); setAppliedVoucher(''); setVoucherFeedback(null); }} placeholder="GIAM10 hoặc FREESHIP" />
-          <button type="button" className="secondary-action" onClick={applyVoucher} disabled={!voucher.trim()}>Áp dụng</button>
+          <input id="voucher" name="voucher" value={voucher} onChange={(event) => { setVoucher(event.target.value); setAppliedVoucher(''); setVoucherDiscount(0); setVoucherFeedback(null); }} placeholder="Nhập mã giảm giá..." />
+          <button type="button" className="secondary-action" onClick={() => void applyVoucher()} disabled={!voucher.trim() || applyingVoucher}>{applyingVoucher ? 'Đang kiểm tra...' : 'Áp dụng'}</button>
         </div>
       </div>
       {voucherFeedback && <p className={voucherFeedback.type === 'success' ? 'checkout-voucher-success' : 'checkout-voucher-error'} role={voucherFeedback.type === 'success' ? 'status' : 'alert'}>{voucherFeedback.text}</p>}
+      {voucherFeedback?.requiresLogin && <p className="checkout-voucher-error"><Link href={`/dang-nhap?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Đăng nhập</Link> · <Link href={`/dang-ky?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Tạo tài khoản</Link></p>}
       {appliedVoucher && <div className="checkout-discount-summary"><span>Giảm giá</span><strong>−{discount.toLocaleString('vi-VN')}đ</strong><span>Tổng thanh toán sau giảm</span><strong>{checkoutTotal.toLocaleString('vi-VN')}đ</strong></div>}
       <fieldset className="payment-method-options"><legend>Phương thức thanh toán</legend>
         <label className={paymentMethod === 'COD' ? 'is-selected' : ''}><input type="radio" name="method" value="COD" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} /><span><strong>COD</strong><small>Thanh toán khi nhận hàng</small></span></label>

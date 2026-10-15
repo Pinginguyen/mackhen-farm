@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
-import { calculateVoucherDiscount } from '@/lib/vouchers';
+import { calculateVoucherDiscount, getVoucherValidationError, VOUCHER_CODES } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
 
 type CheckoutItemSnapshot = {
@@ -42,7 +42,7 @@ type CreatedOrder = {
   totalAmount: number;
   duplicate?: boolean;
 };
-type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' };
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED'; message?: string };
 
 function normalizeVietnamesePhone(value: string): string | null {
   const compact = value.trim().replace(/[\s().-]/g, '');
@@ -80,9 +80,9 @@ function sameCartContents(
   });
 }
 
-function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number): string {
-  if (method === 'COD') return `/tra-cuu?orderCode=${encodeURIComponent(orderCode)}&success=1`;
-  if (method === 'MOMO') return `/checkout/momo/${encodeURIComponent(orderCode)}?amount=${amount}`;
+function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number, buyNow = false): string {
+  if (method === 'COD') return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
+  if (method === 'MOMO') return `/checkout/momo/${encodeURIComponent(orderCode)}?amount=${amount}${buyNow ? '&mode=buy_now' : ''}`;
   return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
 }
 
@@ -118,13 +118,18 @@ export async function POST(request: Request) {
   }
   const submittedVoucherCode = body.voucherCode ?? body.discountCode;
   const voucherCode = typeof submittedVoucherCode === 'string' ? submittedVoucherCode.trim().toUpperCase() : '';
-  if (calculateVoucherDiscount(voucherCode, 0, 0) === null && !/^MKF50-[A-F0-9]{8}$/.test(voucherCode)) {
-    return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không hợp lệ.' } }, { status: 400 });
+  const isStaticVoucher = (VOUCHER_CODES as readonly string[]).includes(voucherCode);
+  const isCompensationVoucher = /^MKF50-[A-F0-9]{8}$/.test(voucherCode);
+  if (voucherCode && !isStaticVoucher && !isCompensationVoucher) {
+    return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không tồn tại hoặc đã hết hạn.' } }, { status: 400 });
   }
   const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
+  if (isStaticVoucher && !session) {
+    return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
+  }
 
   return withDatabase(async () => {
     if (idempotencyKey) {
@@ -142,9 +147,9 @@ export async function POST(request: Request) {
           total: existingOrder.totalAmount,
           totalAmount: existingOrder.totalAmount,
           duplicate: true,
-          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
+          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount, body.buyNow === true),
         }, { status: 200 });
-        if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+        if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
         return response;
       }
     }
@@ -169,10 +174,24 @@ export async function POST(request: Request) {
         }));
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
         const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug));
+        const voucherValidationError = getVoucherValidationError(voucherCode, subtotal);
+        if (isStaticVoucher && voucherValidationError) return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
+
+        if (isStaticVoucher && session) {
+          const priorOrders = await transaction.order.count({ where: { userId: session.userId } });
+          if (priorOrders > 0) return { rejected: 'VOUCHER_FIRST_ORDER_ONLY' as const };
+          const phoneUsed = await transaction.order.findFirst({
+            where: { phone, OR: [{ paymentStatus: 'PAID' }, { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } }] },
+            select: { id: true },
+          });
+          if (phoneUsed) return { rejected: 'VOUCHER_PHONE_USED' as const };
+        }
+
         const staticDiscount = calculateVoucherDiscount(voucherCode, subtotal, shipping);
         let compensationVoucherId: string | null = null;
         let discount = staticDiscount ?? 0;
         if (staticDiscount === null) {
+          if (!isCompensationVoucher) return { rejected: 'INVALID_VOUCHER' as const };
           const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
           if (!voucher || voucher.customerPhone !== phone || voucher.redeemedAt || voucher.expiresAt <= new Date()) {
             return { rejected: 'INVALID_VOUCHER' as const };
@@ -298,9 +317,9 @@ export async function POST(request: Request) {
             total: existingOrder.totalAmount,
             totalAmount: existingOrder.totalAmount,
             duplicate: true,
-            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
+            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount, body.buyNow === true),
           }, { status: 200 });
-          if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+          if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
           return response;
         }
       }
@@ -347,22 +366,30 @@ export async function POST(request: Request) {
           newValue: { reason: 'submitted cart state or line price differs from server data' },
         });
       }
-      const invalidVoucher = order.rejected === 'INVALID_VOUCHER';
+      const invalidVoucher = order.rejected !== 'PRICE_MISMATCH';
+      const voucherErrorMessage = order.rejected === 'VOUCHER_FIRST_ORDER_ONLY'
+        ? 'Mã giảm giá này chỉ áp dụng cho đơn hàng đầu tiên của thành viên mới.'
+        : order.rejected === 'VOUCHER_PHONE_USED'
+          ? 'Số điện thoại này đã có đơn hàng thành công và không đủ điều kiện dùng mã thành viên mới.'
+          : order.rejected === 'VOUCHER_NOT_ELIGIBLE'
+            ? order.message ?? 'Mã giảm giá không đủ điều kiện cho đơn hàng này.'
+            : 'Mã voucher bồi thường đã hết hạn, đã sử dụng hoặc không thuộc số điện thoại đặt hàng.';
       return NextResponse.json({
         error: {
           code: order.rejected,
           message: invalidVoucher
-            ? 'Mã voucher bồi thường đã hết hạn, đã sử dụng hoặc không thuộc số điện thoại đặt hàng.'
+            ? voucherErrorMessage
             : 'Giỏ hàng hoặc số lượng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng rồi thử lại.',
         },
-      }, { status: invalidVoucher ? 400 : 409 });
+      }, { status: invalidVoucher ? (['VOUCHER_FIRST_ORDER_ONLY', 'VOUCHER_PHONE_USED'].includes(order.rejected) ? 403 : 400) : 409 });
     }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
-    const postCommitTasks: Promise<unknown>[] = [
+    const postCommitTasks: Promise<unknown>[] = [];
+    if (paymentMethod === 'COD') postCommitTasks.push(
       prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } }).catch((error) => {
         console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
       }),
-    ];
+    );
     if (session?.userId) {
       postCommitTasks.push(prisma.user.update({ where: { id: session.userId }, data: { name, phone, address } }).catch((error) => {
         console.error('Order was created but profile update failed.', error instanceof Error ? error.name : 'UnknownError');
@@ -377,10 +404,10 @@ export async function POST(request: Request) {
       status: order.orderStatus.toLowerCase(),
       total: order.totalAmount,
       totalAmount: order.totalAmount,
-      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR' | 'MOMO', order.orderCode, order.totalAmount),
+      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR' | 'MOMO', order.orderCode, order.totalAmount, body.buyNow === true),
       ...(order.duplicate ? { duplicate: true } : {}),
     }, { status: order.duplicate ? 200 : 201 });
-    if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+    if (body.buyNow === true && paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
     return response;
   }, 'Lỗi đặt hàng:');
 }

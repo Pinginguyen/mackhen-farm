@@ -7,7 +7,7 @@ import { readCartSnapshot } from '@/lib/cart-server';
 import CheckoutForm, { BuyNowCartRecovery } from './checkout-form';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
-export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string } }) {
+export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
   const cart = await readCartSnapshot({ buyNow });
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
@@ -51,7 +51,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
                 <button className="primary-action" type="button" disabled aria-disabled="true">Không thể đặt đơn hàng trống</button>
               </div>
             ) : (
-              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} />
+              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} />
             )}
           </div>
 

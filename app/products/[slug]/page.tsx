@@ -28,6 +28,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
       inactiveInDatabase = !databaseProduct.active;
       product = {
         ...databaseProduct,
+        highlights: databaseProduct.highlights ?? [],
         status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
         variants: databaseProduct.variants.map((variant) => ({
           ...variant,
@@ -121,7 +122,23 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               </section>
             </div>
 
-            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} variants={product.variants} isSeasoning={isSeasoning} />
+            <section className="product-reassurance-list" aria-label="Đặc điểm sản phẩm và cam kết cửa hàng">
+              {product.highlights?.length ? (
+                <div>
+                  <h2>Đặc điểm riêng của sản phẩm</h2>
+                  <ul>{product.highlights.map((item) => <li key={item}>{item}</li>)}</ul>
+                </div>
+              ) : null}
+              <div>
+                <h2>Cam kết chung của Shop</h2>
+                <ul>
+                  <li>Đổi gói mới 0đ trong 24h nếu xì túi / hư hỏng bao bì, không cần trả hàng cũ</li>
+                  <li>Đóng gói tiêu chuẩn khử oxy, đảm bảo vệ sinh ATTP và giữ trọn hương vị Tây Bắc</li>
+                </ul>
+              </div>
+            </section>
+
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} variants={product.variants} />
           </div>
         </div>
       </section>

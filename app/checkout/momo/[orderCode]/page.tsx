@@ -14,6 +14,7 @@ const momoAccountName = 'TRAN TRUNG CHAU';
 
 type MomoOrder = {
   paymentMethod: string;
+  paymentStatus: string;
   totalAmount: number;
 };
 
@@ -22,7 +23,7 @@ export default async function MomoPaymentPage({
   searchParams,
 }: {
   params: { orderCode: string };
-  searchParams?: { amount?: string };
+  searchParams?: { amount?: string; mode?: string; resultCode?: string; message?: string };
 }) {
   const orderCode = params.orderCode.trim().toUpperCase();
   if (!/^MKF-\d{6}$/.test(orderCode)) notFound();
@@ -35,7 +36,7 @@ export default async function MomoPaymentPage({
   try {
     const foundOrder = await prisma.order.findUnique({
       where: { orderCode },
-      select: { paymentMethod: true, totalAmount: true },
+      select: { paymentMethod: true, paymentStatus: true, totalAmount: true },
     });
 
     if (foundOrder && foundOrder.paymentMethod !== 'MOMO') {
@@ -49,7 +50,9 @@ export default async function MomoPaymentPage({
   if (invalidPaymentMethod) notFound();
 
   const amount = order?.totalAmount ?? queryAmount;
-  const isLocalOnly = !order;
+  const paymentComplete = order?.paymentStatus === 'PAID';
+  const resultFailed = searchParams?.resultCode !== undefined && searchParams.resultCode !== '0';
+  const resultMessage = searchParams?.message?.slice(0, 300);
 
   return (
     <main className="page-shell">
@@ -86,8 +89,16 @@ export default async function MomoPaymentPage({
               <li><span>2</span><p>Chọn “Quét Mã” và hướng camera vào mã QR bên cạnh.</p></li>
               <li><span>3</span><p>Nhập đúng số tiền và nội dung đơn hàng rồi bấm “Xác nhận”.</p></li>
             </ol>
-            {isLocalOnly && <p className="momo-pending-note" role="status">Đơn đang chờ hệ thống xác minh. Vui lòng giữ lại biên nhận giao dịch để đối soát.</p>}
-            <MomoPaymentActions orderCode={orderCode} />
+            {paymentComplete ? (
+              <p className="momo-payment-success" role="status">Thanh toán MoMo đã được hệ thống xác nhận.</p>
+            ) : resultFailed ? (
+              <p className="momo-pending-note" role="status">Thanh toán MoMo chưa hoàn tất hoặc đã bị hủy.{resultMessage ? ` Lý do: ${resultMessage}` : ''} Đơn vẫn ở trạng thái chờ thanh toán.</p>
+            ) : searchParams?.resultCode === '0' ? (
+              <p className="momo-pending-note" role="status">MoMo trả về thành công nhưng hệ thống chưa nhận IPN hợp lệ. Đơn chưa được xác nhận; vui lòng kiểm tra lại sau.</p>
+            ) : (
+              <p className="momo-pending-note" role="status">Đơn đang chờ xác nhận từ IPN MoMo. Chưa quét hoặc chưa hoàn tất thanh toán sẽ không được tính là thành công.</p>
+            )}
+            <MomoPaymentActions orderCode={orderCode} mode={searchParams?.mode} paymentComplete={paymentComplete} />
           </div>
         </div>
       </section>

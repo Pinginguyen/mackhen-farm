@@ -10,6 +10,19 @@ export default function PaymentStatusPoller({ orderCode, initiallyPaid = false, 
   const [paid, setPaid] = useState(initiallyPaid);
 
   useEffect(() => {
+    if (!paid) return;
+    void fetch(`/api/orders/${encodeURIComponent(orderCode)}/clear-cart`, { method: 'POST' }).then((response) => {
+      if (!response.ok) return;
+      try {
+        window.localStorage.removeItem('bohoch_cart_quantities');
+        window.sessionStorage.removeItem('buy_now_item');
+      } catch {
+        return;
+      }
+    }).catch(() => undefined);
+  }, [orderCode, paid]);
+
+  useEffect(() => {
     if (paid) {
       const redirectTimer = window.setTimeout(() => {
         router.replace(`/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`);

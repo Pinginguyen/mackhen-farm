@@ -18,6 +18,7 @@ export type CatalogProduct = {
   image: string;
   images?: string[];
   highlight: string;
+  highlights?: string[];
 };
 
 export default function ProductCatalogFilter({ products, initialQuery = '' }: { products: CatalogProduct[]; initialQuery?: string }) {

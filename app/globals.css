@@ -1746,6 +1746,24 @@ textarea {
   font-size: 0.84rem;
 }
 
+.product-reassurance-list > div {
+  display: grid;
+  gap: 8px;
+}
+
+.product-reassurance-list h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.product-reassurance-list ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 20px;
+}
+
 .product-reassurance-list li::marker {
   color: #8b2323;
 }

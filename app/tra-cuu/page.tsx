@@ -1,11 +1,21 @@
 import { Suspense } from 'react';
+import { prisma } from '@/lib/prisma';
 import TrackingForm from './tracking-form';
 import ReturnRequestForm from './return-request-form';
 import { ArrowRight, Camera, MessageCircle, PackageCheck, ShieldCheck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-export default function TrackingPage({ searchParams }: { searchParams?: { success?: string } }) {
+export default async function TrackingPage({ searchParams }: { searchParams?: { success?: string; orderCode?: string } }) {
+  let paymentVerified = false;
+  if (searchParams?.success === '1' && searchParams.orderCode && /^MKF-\d{6}$/.test(searchParams.orderCode)) {
+    try {
+      const order = await prisma.order.findUnique({ where: { orderCode: searchParams.orderCode }, select: { paymentStatus: true } });
+      paymentVerified = order?.paymentStatus === 'PAID';
+    } catch {
+      paymentVerified = false;
+    }
+  }
   const supportZaloUrl = process.env.NEXT_PUBLIC_SUPPORT_ZALO_URL;
   const steps = [
     {
@@ -30,7 +40,7 @@ export default function TrackingPage({ searchParams }: { searchParams?: { succes
       <section className="page-card return-tracking-card">
         <p className="eyebrow">Theo dõi giao hàng</p>
         <h1>Đơn hàng của bạn đang ở đâu?</h1>
-        {searchParams?.success === '1' && <p className="payment-tracking-notice" role="status">Đã ghi nhận thông tin thanh toán. Nhập số điện thoại đặt hàng để xem trạng thái đơn.</p>}
+        {paymentVerified && <p className="payment-tracking-notice" role="status">Thanh toán đã được hệ thống xác nhận. Nhập số điện thoại đặt hàng để xem trạng thái đơn.</p>}
         <Suspense fallback={<p className="empty-state" role="status">Đang tải biểu mẫu tra cứu...</p>}>
           <TrackingForm />
         </Suspense>

@@ -39,7 +39,7 @@ export default function ProductQuickView({ product, onClose }: { product: Catalo
             <p className="quick-view-highlight">{product.highlight}</p>
             <p className="quick-view-price">{formatCurrency(product.price)}{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</p>
             <p className="quick-view-description">{product.description}</p>
-            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={image} price={product.price} variants={[]} isSeasoning={product.category === 'Gia vị Tây Bắc'} />
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={image} price={product.price} variants={[]} />
           </div>
         </div>
       </section>

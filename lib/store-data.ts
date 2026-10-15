@@ -25,6 +25,7 @@ export type Product = {
   description: string;
   image: string;
   highlight: string;
+  highlights?: string[];
   variants: ProductVariant[];
 };
 
