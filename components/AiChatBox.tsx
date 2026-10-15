@@ -29,7 +29,7 @@ export default function AiChatBox() {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading, open]);
 
-  if (pathname === '/admin' || pathname.startsWith('/admin/')) return null;
+  if (pathname?.startsWith('/admin')) return null;
 
   async function sendMessage(text = input) {
     const question = text.trim();
@@ -38,10 +38,13 @@ export default function AiChatBox() {
     setInput('');
     setLoading(true);
     try {
-      const response = await fetch('/api/ai-chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({
+          message: question,
+          history: messages.slice(-12).map(({ role, text }) => ({ role, text })),
+        }),
       });
       const result = await response.json() as { reply?: string; error?: string };
       if (!response.ok || !result.reply) throw new Error(result.error ?? 'Chat service unavailable');

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Check, House, PackageCheck, Truck } from 'lucide-react';
+import { Box, Check, House, PackageCheck, Printer, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
+import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import WarrantyRequest from './warranty-request';
 
 type TrackedItem = { productId: string; productName: string; quantity: number; price: number };
@@ -11,8 +12,17 @@ type TrackingTimelineItem = { label: string };
 
 type TrackedOrder = {
   orderCode: string;
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  maskedPhone?: string;
+  maskedAddress?: string;
   orderStatus: string;
   paymentStatus: string;
+  paymentMethod?: string;
+  subtotal?: number;
+  shippingFee?: number;
+  discountAmount?: number;
   totalAmount: number;
   trackingCode: string | null;
   carrier: 'GHTK' | 'SPX' | 'VIETTEL_POST' | null;
@@ -47,8 +57,17 @@ function normalizeOrder(value: unknown): TrackedOrder | null {
 
   return {
     orderCode: order.orderCode,
+    customerName: typeof order.customerName === 'string' ? order.customerName : undefined,
+    phone: typeof order.phone === 'string' ? order.phone : undefined,
+    address: typeof order.address === 'string' ? order.address : undefined,
+    maskedPhone: typeof order.maskedPhone === 'string' ? order.maskedPhone : undefined,
+    maskedAddress: typeof order.maskedAddress === 'string' ? order.maskedAddress : undefined,
     orderStatus: typeof order.orderStatus === 'string' ? order.orderStatus : 'PENDING',
     paymentStatus: typeof order.paymentStatus === 'string' ? order.paymentStatus : 'PENDING',
+    paymentMethod: typeof order.paymentMethod === 'string' ? order.paymentMethod : undefined,
+    subtotal: typeof order.subtotal === 'number' ? order.subtotal : undefined,
+    shippingFee: typeof order.shippingFee === 'number' ? order.shippingFee : undefined,
+    discountAmount: typeof order.discountAmount === 'number' ? order.discountAmount : undefined,
     totalAmount: typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount) ? order.totalAmount : 0,
     trackingCode: typeof order.trackingCode === 'string' ? order.trackingCode : null,
     carrier,
@@ -68,7 +87,7 @@ function normalizeOrders(value: unknown): TrackedOrder[] {
 
 function activeStep(status: string): number {
   if (['DELIVERED', 'COMPLETED'].includes(status)) return 3;
-  if (status === 'SHIPPING') return 2;
+  if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(status)) return 2;
   if (['CONFIRMED', 'PAID', 'PROCESSING'].includes(status)) return 1;
   return 0;
 }
@@ -93,17 +112,44 @@ function ReviewAfterDelivery({ order, productId }: { order: TrackedOrder; produc
     }
   }
 
-  return <form className="tracking-review" onSubmit={submit}><h4>Đánh giá {productName}</h4><div className="field"><label>Số điện thoại đặt hàng<input name="phone" type="tel" required /></label></div><div className="field"><label>Số sao<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} sao</option>)}</select></label></div><div className="field"><label>Bình luận<input name="comment" minLength={3} maxLength={1000} required /></label></div><button className="secondary-action" type="submit">Gửi đánh giá</button>{message && <p role="status">{message}</p>}</form>;
+  return <form className="tracking-review" onSubmit={submit}><h4>Đánh giá {productName}</h4><div className="field"><label>Số điện thoại đặt hàng<ValidatedPhoneInput name="phone" required /></label></div><div className="field"><label>Số sao<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} sao</option>)}</select></label></div><div className="field"><label>Bình luận<input name="comment" minLength={3} maxLength={1000} required /></label></div><button className="secondary-action" type="submit">Gửi đánh giá</button>{message && <p role="status">{message}</p>}</form>;
 }
 
 export default function TrackingForm() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<TrackedOrder[]>([]);
+  const [cachedOrder, setCachedOrder] = useState<TrackedOrder | null>(null);
+  const [usingCachedOrder, setUsingCachedOrder] = useState(false);
+  const [printOrderCode, setPrintOrderCode] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const lookupRef = useRef({ orderCode: '', phone: '' });
+
+  useEffect(() => {
+    try {
+      const savedOrder = window.localStorage.getItem('current_order');
+      if (savedOrder) setCachedOrder(normalizeOrder(JSON.parse(savedOrder)));
+    } catch {
+      setCachedOrder(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    function finishPrint() {
+      document.body.classList.remove('tracking-print-mode');
+      setPrintOrderCode(null);
+    }
+    window.addEventListener('afterprint', finishPrint);
+    return () => window.removeEventListener('afterprint', finishPrint);
+  }, []);
+
+  function printOrder(orderCode: string) {
+    setPrintOrderCode(orderCode);
+    document.body.classList.add('tracking-print-mode');
+    window.requestAnimationFrame(() => window.print());
+  }
 
   useEffect(() => {
     if (!orders.length) return;
@@ -132,8 +178,13 @@ export default function TrackingForm() {
     setError('');
     setLoading(true);
     setOrders([]);
+    setUsingCachedOrder(false);
     lookupRef.current = { orderCode, phone: enteredPhone };
     setPhone(enteredPhone);
+    const normalizedOrderCode = orderCode.trim().toUpperCase();
+    const matchingCachedOrder = normalizedOrderCode && cachedOrder?.orderCode.toUpperCase() === normalizedOrderCode
+      ? cachedOrder
+      : null;
     try {
       const response = await fetch('/api/tracking', {
         method: 'POST',
@@ -141,14 +192,34 @@ export default function TrackingForm() {
         body: JSON.stringify({ orderCode: orderCode || undefined, phone: enteredPhone || undefined }),
       });
       const result = await response.json() as { items?: unknown; error?: unknown; message?: unknown } | null;
-      if (!response.ok) setError(getErrorMessage(result?.error ?? result, 'Không thể tra cứu đơn hàng.'));
-      else {
+      if (!response.ok) {
+        if (matchingCachedOrder) {
+          setOrders([matchingCachedOrder]);
+          setUsingCachedOrder(true);
+          setError('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.');
+        } else {
+          setError(getErrorMessage(result?.error ?? result, 'Không thể tra cứu đơn hàng.'));
+        }
+      } else {
         const matchingOrders = normalizeOrders(result?.items);
-        if (!matchingOrders.length) setError('Không tìm thấy đơn hàng phù hợp. Vui lòng kiểm tra thông tin và thử lại.');
-        else setOrders(matchingOrders);
+        if (!matchingOrders.length && matchingCachedOrder) {
+          setOrders([matchingCachedOrder]);
+          setUsingCachedOrder(true);
+          setError('Không tìm thấy đơn trên hệ thống. Đang hiển thị bản lưu gần nhất trên thiết bị; trạng thái chưa được xác minh.');
+        } else if (!matchingOrders.length) {
+          setError('Không tìm thấy đơn hàng phù hợp. Vui lòng kiểm tra thông tin và thử lại.');
+        } else {
+          setOrders(matchingOrders);
+        }
       }
     } catch {
-      setError('Không thể kết nối. Vui lòng thử lại.');
+      if (matchingCachedOrder) {
+        setOrders([matchingCachedOrder]);
+        setUsingCachedOrder(true);
+        setError('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.');
+      } else {
+        setError('Không thể kết nối. Vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
     }
@@ -178,12 +249,12 @@ export default function TrackingForm() {
       <form ref={formRef} className="tracking-search" onSubmit={lookup}>
         <div className="field">
           <label htmlFor="tracking-code">Mã đơn hàng</label>
-          <input id="tracking-code" name="orderCode" placeholder="MKF-123456" defaultValue={searchParams.get('orderCode') ?? ''} />
+          <input id="tracking-code" name="orderCode" placeholder="MKF-123456" defaultValue={searchParams.get('orderCode') ?? ''} required />
         </div>
         <span>hoặc</span>
         <div className="field">
           <label htmlFor="tracking-phone">Số điện thoại</label>
-          <input id="tracking-phone" name="phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <ValidatedPhoneInput id="tracking-phone" name="phone" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
         </div>
         <button className="primary-action" disabled={loading}>{loading ? 'Đang tra cứu...' : 'Tra cứu đơn hàng'}</button>
       </form>
@@ -197,6 +268,8 @@ export default function TrackingForm() {
         </div>
       )}
 
+      {usingCachedOrder && <p className="tracking-cache-notice" role="status">Bản lưu cục bộ chỉ để tham khảo; trạng thái chính thức cần được xác minh từ hệ thống.</p>}
+
       {orders.map((order) => {
         const orderItems = order?.items ?? [];
         const timeline = order?.timeline?.length ? order.timeline : steps;
@@ -207,11 +280,20 @@ export default function TrackingForm() {
         const productIds = [...new Set(orderItems.map((item) => item.productId).filter(Boolean))];
 
         return (
-          <article className="tracking-order" key={order.orderCode}>
+          <article className={`tracking-order${printOrderCode === order.orderCode ? ' is-print-target' : ''}`} key={order.orderCode}>
             <header>
               <div><p className="eyebrow">Mã đơn</p><h2>{order.orderCode}</h2></div>
               <strong>{order.totalAmount.toLocaleString('vi-VN')}đ</strong>
+              <button type="button" className="secondary-action tracking-print-button" onClick={() => printOrder(order.orderCode)}><Printer size={16} /> In hóa đơn / Phiếu đóng gói</button>
             </header>
+
+            <div className="tracking-invoice-meta">
+              <p><strong>Ngày đặt:</strong> {new Date(order.createdAt).toLocaleString('vi-VN')}</p>
+              <p><strong>Người nhận:</strong> {order.customerName ?? 'Khách hàng'}</p>
+              <p><strong>Điện thoại:</strong> {order.phone ?? order.maskedPhone ?? 'Không có'}</p>
+              <p><strong>Địa chỉ:</strong> {order.address ?? order.maskedAddress ?? 'Không có'}</p>
+              <p><strong>Thanh toán:</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'COD' ? 'COD' : 'Chưa xác minh'}</p>
+            </div>
 
             {orderStatus === 'CANCELLED' ? (
               <p className="form-error">Đơn hàng đã hủy.</p>
@@ -235,6 +317,8 @@ export default function TrackingForm() {
             <div className="tracking-carrier">
               <span>Đơn vị vận chuyển: {order.carrier === 'SPX' ? 'SPX Express' : order.carrier === 'GHTK' ? 'GHTK' : order.carrier === 'VIETTEL_POST' ? 'Viettel Post' : 'Chưa bàn giao'}</span>
               {order.trackingCode && <span>Mã vận đơn: <strong>{order.trackingCode}</strong></span>}
+              {order.maskedPhone && <span>Điện thoại: <strong>{order.maskedPhone}</strong></span>}
+              {order.maskedAddress && <span>Khu vực giao hàng: <strong>{order.maskedAddress}</strong></span>}
             </div>
 
             <div className="tracking-items">
@@ -246,6 +330,13 @@ export default function TrackingForm() {
               ))}
               {!orderItems.length && <p>Đơn hàng chưa có thông tin sản phẩm.</p>}
             </div>
+            <div className="tracking-invoice-totals">
+              {order.subtotal !== undefined && <p><span>Tạm tính</span><strong>{order.subtotal.toLocaleString('vi-VN')}đ</strong></p>}
+              {order.discountAmount ? <p><span>Giảm giá</span><strong>−{order.discountAmount.toLocaleString('vi-VN')}đ</strong></p> : null}
+              {order.shippingFee !== undefined && <p><span>Vận chuyển</span><strong>{order.shippingFee ? `${order.shippingFee.toLocaleString('vi-VN')}đ` : 'Miễn phí'}</strong></p>}
+              <p><span>Tổng cộng</span><strong>{order.totalAmount.toLocaleString('vi-VN')}đ</strong></p>
+            </div>
+            <p className="tracking-invoice-guarantee">Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.</p>
 
             {delivered && (
               <>

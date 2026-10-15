@@ -3,7 +3,11 @@ import type { Metadata } from 'next';
 import SiteFooter from './site-footer';
 import FloatingContact from './floating-contact';
 import AiChatBox from '@/components/AiChatBox';
+import Header from '@/components/layout/Header';
+import SiteHeaderVisibility from '@/components/layout/SiteHeaderVisibility';
 import SmoothScroll from '@/components/SmoothScroll';
+import CartToast from '@/components/CartToast';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { Be_Vietnam_Pro } from 'next/font/google';
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -14,20 +18,20 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
-  title: 'Mắc Khén Farm - Khô bò thực vật High-Protein vị Tây Bắc',
-  description: 'Khô bò thực vật High-Protein chuẩn vị Tây Bắc, làm từ bã đậu nành theo mô hình Upcycled Food.',
+  title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
+  description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
   openGraph: {
     type: 'website',
     locale: 'vi_VN',
     siteName: 'Mắc Khén Farm',
-    title: 'Mắc Khén Farm - Khô Bò Thực Vật High-Protein Vị Tây Bắc',
-    description: 'Khô bò thực vật High-Protein chuẩn vị Tây Bắc, làm từ bã đậu nành địa phương theo mô hình kinh tế tuần hoàn Upcycled Food.',
+    title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
+    description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
     images: [{ url: '/products/xe-soi.jpg', alt: 'Mắc Khén Farm - Khô bò thực vật vị Tây Bắc' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Mắc Khén Farm - Khô Bò Thực Vật High-Protein Vị Tây Bắc',
-    description: 'Khô bò thực vật High-Protein từ bã đậu nành địa phương, đậm vị mắc khén và hạt dổi Tây Bắc.',
+    title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
+    description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
     images: ['/products/xe-soi.jpg'],
   },
 };
@@ -37,10 +41,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi">
       <body className={beVietnamPro.variable}>
         <SmoothScroll>
+          <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
           {children}
           <SiteFooter />
           <FloatingContact />
           <AiChatBox />
+          <CartToast />
+          <ExitIntentPopup />
         </SmoothScroll>
       </body>
     </html>

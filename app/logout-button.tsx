@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -11,5 +12,5 @@ export default function LogoutButton() {
     router.refresh();
   }
 
-  return <button className="secondary-action" type="button" onClick={logout}>Đăng xuất</button>;
+  return <button className="account-dropdown-logout" type="button" onClick={logout}><LogOut size={17} aria-hidden="true" />Đăng xuất</button>;
 }

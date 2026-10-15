@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { hash } = require('bcryptjs');
-const { PrismaClient } = require('../generated/prisma');
+const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const email = 'admin@mackhenfarm.vn';

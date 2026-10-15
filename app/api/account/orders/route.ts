@@ -8,9 +8,16 @@ export async function GET(request: Request) {
     const session = getRequestSession(request);
     if (!session) return NextResponse.json({ error: 'Cần đăng nhập để xem đơn hàng.' }, { status: 401 });
 
+    const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { phone: true } });
     const orders = await prisma.order.findMany({
-      where: { userId: session.userId },
-      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, items: { select: { productName: true, quantity: true, price: true } } },
+      where: {
+        OR: [
+          { userId: session.userId },
+          ...(user?.phone ? [{ phone: user.phone }] : []),
+          { customer: { is: { email: session.email } } },
+        ],
+      },
+      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });

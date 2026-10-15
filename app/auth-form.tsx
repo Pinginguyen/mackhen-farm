@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
 export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
     <form className="form-list" onSubmit={submit}>
       {mode === 'register' && <div className="field"><label htmlFor="name">Họ và tên</label><input id="name" name="name" autoComplete="name" required maxLength={100} /></div>}
       <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" required /></div>
-      {mode === 'register' && <div className="field"><label htmlFor="phone">Số điện thoại</label><input id="phone" name="phone" autoComplete="tel" /></div>}
+      {mode === 'register' && <div className="field"><label htmlFor="phone">Số điện thoại</label><ValidatedPhoneInput id="phone" name="phone" autoComplete="tel" /></div>}
       <div className="field"><label htmlFor="password">Mật khẩu</label><input id="password" name="password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required minLength={mode === 'register' ? 10 : undefined} /></div>
       <button className="primary-action" type="submit" disabled={submitting}>{submitting ? 'Đang xử lý...' : mode === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}</button>
       {error && <p className="form-error" role="alert">{error}</p>}

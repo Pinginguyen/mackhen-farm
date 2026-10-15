@@ -1,28 +1,24 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
-import { prisma } from '@/lib/prisma';
-import Header from '@/components/layout/Header';
 import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
-import ProductCatalogFilter from '@/components/ProductCatalogFilter';
+import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
+import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
+import { fetchApiWithFallback } from '@/lib/server-api';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
-  { selector: '.home-page .process-steps > li', stagger: true },
-  { selector: '.home-page .packing-steps > li', stagger: true },
 ];
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
-  const products = await prisma.product.findMany({
-    where: { active: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  const { data: { items: products } } = await fetchApiWithFallback<{ items: CatalogProduct[] }>('/api/products', { items: DEFAULT_PRODUCTS });
   return (
     <main className="page-shell home-page">
-      <Header />
       <ScrollReveal groups={homeRevealGroups} />
       {searchParams.error === 'forbidden' && <p className="role-notice" role="alert">Bạn không có quyền truy cập khu vực quản trị.</p>}
 
@@ -62,25 +58,16 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
         <div className="hero-media">
           <div className="photo-card">
-            <img
+            <Image
               src="/products/xe-soi.jpg"
               alt="Món ăn vặt khô và gia vị Tây Bắc"
+              width={920}
+              height={760}
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority
             />
           </div>
         </div>
-      </section>
-
-      <section className="feature-row">
-        {[
-          { label: 'Hương vị', value: 'Mắc khén, hạt dổi Tây Bắc' },
-          { label: 'Dinh dưỡng', value: 'Thông tin trên 100g' },
-          { label: 'Đóng gói', value: 'Túi nhôm 3 lớp, gói khử oxy' },
-        ].map((item) => (
-          <article key={item.label} className="mini-panel">
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-          </article>
-        ))}
       </section>
 
       <section className="comparison-section">
@@ -99,36 +86,12 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
       </section>
 
-      <section className="process-section">
-        <div className="section-heading home-section-heading"><div><p className="eyebrow">Từ phụ phẩm đến món ngon</p><h2>5 bước sản xuất</h2></div></div>
-        <ol className="process-steps">{['Thu gom bã đậu trong 4 giờ', 'Khử trùng và ép nước', 'Phối trộn hạt dổi, mắc khén', 'Tạo sợi hoặc tạo miếng', 'Sấy dẻo ở 60°C'].map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, '0')}</span><strong>{step}</strong></li>)}</ol>
-      </section>
-
-      <section className="packing-section home-packing-section">
-        <div className="packing-panel">
-          <div className="section-heading home-section-heading"><div><p className="eyebrow">Chuẩn bị cho hành trình</p><h2>4 lớp đóng gói</h2></div></div>
-          <ol className="packing-steps">
-            {[
-              { label: 'Lớp 1: Trong cùng', title: 'Túi nhôm 3 lớp', detail: 'Cản sáng, hạn chế ẩm và giữ trọn hương vị.' },
-              { label: 'Lớp 2: Bảo quản', title: 'Gói khử oxy', detail: 'Hạn chế oxy hóa, hỗ trợ bảo quản sản phẩm.' },
-              { label: 'Lớp 3: Chống sốc', title: 'Hộp carton 3 lớp', detail: 'Giữ hộp chắc chắn, hạn chế móp méo khi vận chuyển.' },
-              { label: 'Lớp 4: Vận chuyển', title: 'Màng xốp bóng khí', detail: 'Giảm va đập trong suốt hành trình giao hàng.' },
-            ].map((layer) => (
-              <li key={layer.title}>
-                <span className="packing-layer-badge">{layer.label}</span>
-                <strong>{layer.title}</strong>
-                <p>{layer.detail}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      <HomeTransparencyTabs />
 
       <section className="catalog-section">
         <div className="section-heading home-section-heading catalog-heading">
           <div>
-            <p className="eyebrow">Sản phẩm bán chạy</p>
-            <h2>Chọn món yêu thích</h2>
+            <h2 className="catalog-section-title">SẢN PHẨM BÁN CHẠY</h2>
           </div>
           <Link href="/products">Xem tất cả</Link>
         </div>

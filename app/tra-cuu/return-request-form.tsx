@@ -1,8 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Image from 'next/image';
 import { Camera, Upload, X } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
+import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
 const issueTypes = [
   'Giao sai sản phẩm',
@@ -15,6 +17,9 @@ const evidenceMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'ima
 
 export default function ReturnRequestForm() {
   const [saving, setSaving] = useState(false);
+  const [isRefundRequested, setIsRefundRequested] = useState(false);
+  const [bankName, setBankName] = useState('');
+  const [otherBankName, setOtherBankName] = useState('');
   const [readingImage, setReadingImage] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageName, setImageName] = useState('');
@@ -96,6 +101,9 @@ export default function ReturnRequestForm() {
           issueType: form.get('issue'),
           description: form.get('description'),
           imageUrl,
+          refundBankName: bankName === 'OTHER' ? otherBankName.trim() : bankName,
+          refundAccountNumber: form.get('refundAccountNumber'),
+          refundAccountHolder: form.get('refundAccountHolder'),
         }),
       });
       const result = await response.json() as { error?: unknown; message?: unknown };
@@ -106,6 +114,9 @@ export default function ReturnRequestForm() {
       }
 
       formElement.reset();
+      setIsRefundRequested(false);
+      setBankName('');
+      setOtherBankName('');
       setImageUrl(null);
       setImageName('');
       setFeedback({ type: 'success', text: 'Đã tiếp nhận yêu cầu! Đội ngũ CSKH sẽ liên hệ hỗ trợ bạn trong vòng 30 phút' });
@@ -126,7 +137,7 @@ export default function ReturnRequestForm() {
 
         <div className="return-form-field">
           <label htmlFor="return-phone">Số điện thoại đặt hàng <span aria-hidden="true">*</span></label>
-          <input id="return-phone" name="phone" type="tel" autoComplete="tel" placeholder="Nhập số điện thoại đặt hàng" required />
+          <ValidatedPhoneInput id="return-phone" name="phone" autoComplete="tel" placeholder="Nhập số điện thoại đặt hàng" required />
         </div>
 
         <div className="return-form-field">
@@ -140,6 +151,63 @@ export default function ReturnRequestForm() {
         <div className="return-form-field return-form-full-width">
           <label htmlFor="return-description">Mô tả chi tiết <span aria-hidden="true">*</span></label>
           <textarea id="return-description" name="description" rows={4} placeholder="Mô tả tình trạng bạn gặp phải..." required />
+        </div>
+
+        <div className="return-refund-group return-form-full-width">
+          <div>
+            <label className="return-refund-toggle">
+              <input type="checkbox" checked={isRefundRequested} onChange={(event) => {
+                setIsRefundRequested(event.target.checked);
+                if (!event.target.checked) {
+                  setBankName('');
+                  setOtherBankName('');
+                }
+              }} />
+              <span>Tôi muốn hoàn tiền về tài khoản ngân hàng / ví điện tử (thay vì đổi gói mới)</span>
+            </label>
+          </div>
+          {isRefundRequested && <div className="return-form-grid">
+            <div className="return-form-field">
+              <label htmlFor="return-refund-bank">Ngân hàng hoặc Ví nhận tiền</label>
+              <select
+                id="return-refund-bank"
+                name="refundBankName"
+                value={bankName}
+                onChange={(event) => setBankName(event.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 bg-white text-sm focus:outline-none focus:border-[#8B2323]"
+              >
+                <option value="">-- Chọn ngân hàng hoặc ví nhận tiền --</option>
+                <optgroup label="Ví điện tử">
+                  <option value="MOMO">Ví MoMo</option>
+                  <option value="ZALOPAY">Ví ZaloPay</option>
+                  <option value="VIETTELMONEY">Viettel Money</option>
+                </optgroup>
+                <optgroup label="Ngân hàng phổ biến">
+                  <option value="MB">MB Bank (Ngân hàng Quân Đội)</option>
+                  <option value="VCB">Vietcombank (Ngoại thương)</option>
+                  <option value="TCB">Techcombank (Kỹ thương)</option>
+                  <option value="CTG">VietinBank (Công thương)</option>
+                  <option value="BIDV">BIDV (Đầu tư & Phát triển)</option>
+                  <option value="ACB">ACB (Á Châu)</option>
+                  <option value="VPB">VPBank (Việt Nam Thịnh Vượng)</option>
+                  <option value="TPB">TPBank (Tiên Phong)</option>
+                  <option value="STB">Sacombank (Sài Gòn Thương Tín)</option>
+                  <option value="VIB">VIB (Quốc tế)</option>
+                  <option value="HDB">HDBank (Phát triển TP.HCM)</option>
+                  <option value="OTHER">Ngân hàng khác (Nhập thủ công)</option>
+                </optgroup>
+              </select>
+              {bankName === 'OTHER' && <input className="return-other-bank-input" aria-label="Tên ngân hàng khác" value={otherBankName} onChange={(event) => setOtherBankName(event.target.value)} maxLength={100} placeholder="Nhập tên ngân hàng hoặc ví" required />}
+            </div>
+            <div className="return-form-field">
+              <label htmlFor="return-refund-account">Số tài khoản / Số điện thoại ví</label>
+              <input id="return-refund-account" name="refundAccountNumber" type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={100} placeholder="Nhập số tài khoản hoặc SĐT ví" />
+            </div>
+            <div className="return-form-field return-form-full-width">
+              <label htmlFor="return-refund-holder">Tên chủ tài khoản</label>
+              <input id="return-refund-holder" name="refundAccountHolder" maxLength={120} placeholder="Tên chủ tài khoản hoặc ví" autoComplete="name" />
+            </div>
+          </div>}
         </div>
 
         <div className="return-form-field return-form-full-width">
@@ -159,7 +227,7 @@ export default function ReturnRequestForm() {
           <small className="return-evidence-help">Chọn ảnh từ thiết bị hoặc camera · Tối đa 2MB</small>
           {imageUrl && (
             <div className="return-upload-preview">
-              <img src={imageUrl} alt="Xem trước ảnh minh chứng" />
+              <Image src={imageUrl} alt="Xem trước ảnh minh chứng" width={480} height={360} sizes="(max-width: 768px) 90vw, 480px" unoptimized />
               <button type="button" onClick={removeEvidence} aria-label="Xóa ảnh minh chứng" title="Xóa ảnh">
                 <X size={16} />
               </button>

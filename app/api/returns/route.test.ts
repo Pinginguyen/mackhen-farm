@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, returnCreate, returnFindMany, returnUpdate, requireAdmin } = vi.hoisted(() => ({
-  orderFindFirst: vi.fn(),
-  returnCreate: vi.fn(),
-  returnFindMany: vi.fn(),
-  returnUpdate: vi.fn(),
-  requireAdmin: vi.fn(),
-}));
+const { orderFindFirst, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, requireAdmin, transaction } = vi.hoisted(() => {
+  const mocks = {
+    orderFindFirst: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
+    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), requireAdmin: vi.fn(),
+  };
+  return {
+    ...mocks,
+    transaction: {
+      returnRequest: { update: mocks.returnUpdate },
+      compensationVoucher: { create: mocks.compensationVoucherCreate },
+    },
+  };
+});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     order: { findFirst: orderFindFirst },
-    returnRequest: { create: returnCreate, findMany: returnFindMany, update: returnUpdate },
+    returnRequest: { create: returnCreate, findMany: returnFindMany, findUnique: returnFindUnique, update: returnUpdate },
+    compensationVoucher: {},
+    $transaction: (operation: (transaction: unknown) => Promise<unknown>) => operation(transaction),
   },
 }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
@@ -40,7 +48,9 @@ describe('/api/returns', () => {
     orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', phone: '0762 793 244' });
     returnCreate.mockReset().mockResolvedValue({ id: 'return-1', status: 'PENDING' });
     returnFindMany.mockReset().mockResolvedValue([]);
+    returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
     returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'REFUNDED' });
+    compensationVoucherCreate.mockReset().mockResolvedValue({ id: 'voucher-1', code: 'MKF50-ABCDEF12' });
     requireAdmin.mockReset().mockResolvedValue(null);
   });
 
@@ -60,7 +70,33 @@ describe('/api/returns', () => {
       issueType: validReturnRequest.issueType,
       description: validReturnRequest.description,
       imageUrl: validReturnRequest.imageUrl,
+      refundBankName: null,
+      refundAccountNumber: null,
+      refundAccountHolder: null,
     } });
+  });
+
+  it('persists complete optional refund transfer details', async () => {
+    const response = await POST(makeRequest('POST', {
+      ...validReturnRequest,
+      refundBankName: 'MB Bank',
+      refundAccountNumber: '0123456789',
+      refundAccountHolder: 'NGUYEN VAN A',
+    }));
+
+    expect(response.status).toBe(201);
+    expect(returnCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      refundBankName: 'MB Bank',
+      refundAccountNumber: '0123456789',
+      refundAccountHolder: 'NGUYEN VAN A',
+    }) });
+  });
+
+  it('rejects partial refund transfer details', async () => {
+    const response = await POST(makeRequest('POST', { ...validReturnRequest, refundBankName: 'MoMo' }));
+
+    expect(response.status).toBe(400);
+    expect(returnCreate).not.toHaveBeenCalled();
   });
 
   it('rejects a phone number that does not match the order', async () => {
@@ -126,20 +162,57 @@ describe('/api/returns', () => {
     expect(response.status).toBe(200);
     expect(result.items).toHaveLength(1);
     expect(returnFindMany).toHaveBeenCalledWith({
-      include: { order: { select: { orderCode: true, customerName: true } } },
+      include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
       orderBy: { createdAt: 'desc' },
     });
   });
 
   it('updates a request status and admin note for an admin', async () => {
-    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.' }));
+    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' }));
 
     expect(response.status).toBe(200);
     expect(returnUpdate).toHaveBeenCalledWith({
       where: { id: 'return-1' },
-      data: { status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.' },
-      include: { order: { select: { orderCode: true, customerName: true } } },
+      data: { status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' },
+      include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
     });
+  });
+
+  it('does not allow a pending request to skip approval and become refunded', async () => {
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', refundTransferReference: 'BANK-REF-1' }));
+
+    expect(response.status).toBe(409);
+    expect(returnUpdate).not.toHaveBeenCalled();
+  });
+
+  it('issues a one-use 50% voucher in the same transaction as the request transition', async () => {
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: null, refundAccountNumber: null, refundAccountHolder: null,
+      refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+    });
+    returnUpdate.mockResolvedValueOnce({ id: 'return-1', status: 'VOUCHER_ISSUED', compensationVoucher: { code: 'MKF50-ABCDEF12' }, order: { orderCode: 'MKF-123456', customerName: 'Buyer' } });
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'VOUCHER_ISSUED' }));
+
+    expect(response.status).toBe(200);
+    expect(compensationVoucherCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ orderId: 'order-1', returnRequestId: 'return-1', customerPhone: '0762793244', discountPercent: 50, code: expect.stringMatching(/^MKF50-[A-F0-9]{8}$/) }),
+    }));
+    expect(returnUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: { status: 'VOUCHER_ISSUED', adminNote: null },
+      include: expect.objectContaining({ compensationVoucher: true }),
+    }));
+  });
+
+  it('requires human approval with refund details before allowing refund completion', async () => {
+    const approval = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUND_APPROVED', adminNote: 'Đã đối chiếu chứng từ.' }));
+    expect(approval.status).toBe(200);
+    expect(returnUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'REFUND_APPROVED', refundApprovedBy: 'unknown-admin', refundApprovedAt: expect.any(Date) }) }));
+
+    returnFindUnique.mockResolvedValueOnce({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
+    const withoutApproval = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', refundTransferReference: 'REF-1' }));
+    expect(withoutApproval.status).toBe(409);
   });
 
   it('rejects invalid admin status updates', async () => {

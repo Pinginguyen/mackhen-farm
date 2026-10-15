@@ -6,6 +6,16 @@ import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
 import { calculateVoucherDiscount } from '@/lib/vouchers';
+import { writeAuditLog } from '@/lib/audit-log';
+
+type CheckoutItemSnapshot = {
+  id?: string;
+  productId?: string;
+  productSlug?: string;
+  variantId?: string | null;
+  quantity: number;
+  price?: number;
+};
 
 type CheckoutBody = {
   customer?: { name?: string; email?: string; phone?: string };
@@ -13,7 +23,11 @@ type CheckoutBody = {
   paymentMethod?: string;
   note?: string;
   voucherCode?: string;
-  fallbackTotal?: number;
+  buyNow?: boolean;
+  items?: unknown;
+  price?: unknown;
+  totalAmount?: unknown;
+  idempotencyKey?: unknown;
 };
 
 type CreatedOrder = {
@@ -22,38 +36,99 @@ type CreatedOrder = {
   numericCode: number;
   orderStatus: string;
   totalAmount: number;
+  duplicate?: boolean;
 };
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' };
+
+function normalizeVietnamesePhone(value: string): string | null {
+  const compact = value.trim().replace(/[\s().-]/g, '');
+  const national = compact.replace(/^\+?84/, '0');
+  return /^0[35789]\d{8}$/.test(national) ? national : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCheckoutItemSnapshot(value: unknown): value is CheckoutItemSnapshot {
+  if (!isRecord(value) || !Number.isSafeInteger(value.quantity) || Number(value.quantity) < 1) return false;
+  if (typeof value.id === 'string' && value.id.length > 0) return true;
+  return typeof value.productId === 'string'
+    && typeof value.productSlug === 'string'
+    && (typeof value.variantId === 'string' || value.variantId === null);
+}
+
+function sameCartContents(
+  submitted: unknown,
+  current: Array<{ id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; price: number }>,
+): boolean {
+  if (submitted === undefined) return true;
+  if (!Array.isArray(submitted) || submitted.length !== current.length || !submitted.every(isCheckoutItemSnapshot)) return false;
+  const matchedIds = new Set<string>();
+
+  return submitted.every((item) => {
+    const matched = typeof item.id === 'string'
+      ? current.find((currentItem) => currentItem.id === item.id)
+      : current.find((currentItem) => currentItem.productId === item.productId && currentItem.variantId === item.variantId);
+    if (!matched || matched.quantity !== item.quantity || (item.price !== undefined && item.price !== matched.price) || matchedIds.has(matched.id)) return false;
+    matchedIds.add(matched.id);
+    return true;
+  });
+}
 
 export async function POST(request: Request) {
-  let body: CheckoutBody;
+  let payload: unknown;
   try {
-    body = await request.json() as CheckoutBody;
+    payload = await request.json();
   } catch {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
   }
-
-  const name = body.customer?.name?.trim();
-  const phone = body.customer?.phone?.trim();
-  const address = body.delivery?.address?.trim();
-  const paymentMethod = body.paymentMethod?.toUpperCase();
-  if (!name || !phone || !address || !['COD', 'VIETQR', 'MOMO'].includes(paymentMethod ?? '')) {
-    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
+  if (!isRecord(payload)) return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
+  const body = payload as CheckoutBody;
+  const submittedIdempotencyKey = request.headers.get('idempotency-key')
+    ?? (typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '');
+  const idempotencyKey = submittedIdempotencyKey.trim();
+  if (idempotencyKey && (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey))) {
+    return NextResponse.json({ error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Mã yêu cầu đặt hàng không hợp lệ.' } }, { status: 400 });
   }
-  const voucherCode = body.voucherCode?.trim().toUpperCase() ?? '';
-  if (calculateVoucherDiscount(voucherCode, 0, 0) === null) {
+
+  const name = typeof body.customer?.name === 'string' ? body.customer.name.trim() : '';
+  const phoneInput = typeof body.customer?.phone === 'string' ? body.customer.phone.trim() : '';
+  const phone = phoneInput ? normalizeVietnamesePhone(phoneInput) : null;
+  const address = typeof body.delivery?.address === 'string' ? body.delivery.address.trim() : '';
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
+  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR', 'MOMO'].includes(paymentMethod ?? '')) {
+    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
+  }
+  const voucherCode = typeof body.voucherCode === 'string' ? body.voucherCode.trim().toUpperCase() : '';
+  if (calculateVoucherDiscount(voucherCode, 0, 0) === null && !/^MKF50-[A-F0-9]{8}$/.test(voucherCode)) {
     return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không hợp lệ.' } }, { status: 400 });
   }
-  const fallbackTotal = typeof body.fallbackTotal === 'number' && Number.isSafeInteger(body.fallbackTotal) && body.fallbackTotal >= 0
-    ? body.fallbackTotal
-    : 0;
-
-  const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];
+  const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
+  const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
   if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
 
   return withDatabase(async () => {
-    let order: CreatedOrder | null;
+    if (idempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { idempotencyKey },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true },
+      });
+      if (existingOrder) {
+        return NextResponse.json({
+          orderId: existingOrder.id,
+          orderCode: existingOrder.orderCode,
+          numericCode: existingOrder.numericCode,
+          status: existingOrder.orderStatus.toLowerCase(),
+          total: existingOrder.totalAmount,
+          duplicate: true,
+        });
+      }
+    }
+
+    let order: CreatedOrder | null | CheckoutRejection;
     try {
       order = await prisma.$transaction(async (transaction) => {
         const cart = await transaction.cart.findUnique({
@@ -62,23 +137,96 @@ export async function POST(request: Request) {
         });
         if (!cart?.items.length) return null;
 
+        const currentItems = cart.items.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productSlug: item.product.slug,
+          variantId: item.productVariantId,
+          quantity: item.quantity,
+          price: item.variant?.price ?? item.product.price,
+        }));
+        const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
+        const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug));
+        const staticDiscount = calculateVoucherDiscount(voucherCode, subtotal, shipping);
+        let compensationVoucherId: string | null = null;
+        let discount = staticDiscount ?? 0;
+        if (staticDiscount === null) {
+          const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
+          if (!voucher || voucher.customerPhone !== phone || voucher.redeemedAt || voucher.expiresAt <= new Date()) {
+            return { rejected: 'INVALID_VOUCHER' as const };
+          }
+          compensationVoucherId = voucher.id;
+          discount = Math.floor(subtotal * voucher.discountPercent / 100);
+        }
+        const totalAmount = subtotal + shipping - discount;
+
+        if (!sameCartContents(body.items, currentItems)) {
+          console.warn('Checkout quantity or cart state mismatch rejected.');
+          return { rejected: 'PRICE_MISMATCH' as const };
+        }
+
+        const recentOrders = await transaction.order.findMany({
+          where: { phone, createdAt: { gte: new Date(Date.now() - 10_000) } },
+          include: { items: { select: { productId: true, productVariantId: true, quantity: true, price: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        const duplicate = recentOrders.find((recentOrder) => {
+          if (recentOrder.customerName !== name || recentOrder.address !== address || recentOrder.paymentMethod !== paymentMethod || recentOrder.discountAmount !== discount) return false;
+          const previous = recentOrder.items.map((item) => ({
+            key: `${item.productId}:${item.productVariantId ?? ''}`,
+            quantity: item.quantity,
+            price: item.price,
+          })).sort((left, right) => left.key.localeCompare(right.key));
+          const current = currentItems.map((item) => ({ key: `${item.productId}:${item.variantId ?? ''}`, quantity: item.quantity, price: item.price }))
+            .sort((left, right) => left.key.localeCompare(right.key));
+          return previous.length === current.length && previous.every((item, index) =>
+            item.key === current[index].key && item.quantity === current[index].quantity && item.price === current[index].price);
+        });
+        if (duplicate) return { ...duplicate, duplicate: true };
+
+        if (compensationVoucherId) {
+          const claimedVoucher = await transaction.compensationVoucher.updateMany({
+            where: { id: compensationVoucherId, customerPhone: phone, redeemedAt: null, expiresAt: { gt: new Date() } },
+            data: { redeemedAt: new Date() },
+          });
+          if (!claimedVoucher.count) return { rejected: 'INVALID_VOUCHER' as const };
+        }
+
+        const reservedLotCodes = new Map<string, string>();
         for (const item of cart.items) {
           const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
-          if (!productStock.count) throw new Error('INSUFFICIENT_STOCK');
+          if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
           if (item.variant) {
             const variantStock = await transaction.productVariant.updateMany({ where: { id: item.variant.id, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
-            if (!variantStock.count) throw new Error('INSUFFICIENT_STOCK');
+            if (!variantStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+          }
+          const lot = await transaction.productionLot.findFirst({
+            where: { productId: item.productId, status: 'ACTIVE', availableQty: { gte: item.quantity }, expDate: { gt: new Date() } },
+            orderBy: [{ expDate: 'asc' }, { mfgDate: 'asc' }],
+            select: { id: true, lotCode: true },
+          });
+          if (!lot) {
+            const trackedLot = await transaction.productionLot.findFirst({
+              where: { productId: item.productId, status: 'ACTIVE', expDate: { gt: new Date() } },
+              select: { id: true },
+            });
+            if (trackedLot) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+          }
+          if (lot) {
+            const lotStock = await transaction.productionLot.updateMany({
+              where: { id: lot.id, availableQty: { gte: item.quantity } },
+              data: { availableQty: { decrement: item.quantity } },
+            });
+            if (!lotStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+            reservedLotCodes.set(item.id, lot.lotCode);
           }
         }
 
-        const email = body.customer?.email?.trim().toLowerCase();
+        const email = typeof body.customer?.email === 'string' ? body.customer.email.trim().toLowerCase() : '';
         const customer = email
           ? await transaction.customer.upsert({ where: { email }, create: { name, email, phone, address }, update: { name, phone, address } })
           : await transaction.customer.create({ data: { name, phone, address } });
         if (session?.userId) await transaction.user.update({ where: { id: session.userId }, data: { name, phone, address } });
-        const subtotal = cart.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-        const shipping = calculateShipping(subtotal, cart.items.map((item) => item.product.slug));
-        const discount = calculateVoucherDiscount(voucherCode, subtotal, shipping) ?? 0;
         let numericCode = 0;
         for (let attempt = 0; attempt < 8; attempt += 1) {
           const candidate = randomInt(100000, 1000000);
@@ -106,32 +254,76 @@ export async function POST(request: Request) {
             subtotal,
             shippingFee: shipping,
             discountAmount: discount,
-            totalAmount: subtotal + shipping - discount,
-            note: body.note?.trim() || null,
-            items: { create: cart.items.map((item) => ({ productId: item.productId, productVariantId: item.productVariantId, productName: item.productName, variantLabel: item.variant?.label, quantity: item.quantity, price: item.unitPrice, lineTotal: item.quantity * item.unitPrice })) },
+            totalAmount,
+            idempotencyKey: idempotencyKey || undefined,
+            grossAmount: subtotal + shipping,
+            netAmount: totalAmount,
+            reconciled: false,
+            holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+            lotCode: [...reservedLotCodes.values()][0] ?? null,
+            note: typeof body.note === 'string' ? body.note.trim() || null : null,
+            items: { create: cart.items.map((item) => {
+              const price = item.variant?.price ?? item.product.price;
+              return { productId: item.productId, productVariantId: item.productVariantId, productName: item.product.name, variantLabel: item.variant?.label, quantity: item.quantity, price, lineTotal: item.quantity * price, lotCode: reservedLotCodes.get(item.id) };
+            }) },
           },
         });
-      });
+      }, { isolationLevel: 'Serializable' });
     } catch (error) {
-      if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') throw error;
-      if (!(error instanceof Error && error.name.startsWith('PrismaClient'))) throw error;
+      if (idempotencyKey && error instanceof Error && (error as Error & { code?: string }).code === 'P2002') {
+        const existingOrder = await prisma.order.findUnique({
+          where: { idempotencyKey },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true },
+        });
+        if (existingOrder) {
+          return NextResponse.json({ orderId: existingOrder.id, orderCode: existingOrder.orderCode, numericCode: existingOrder.numericCode, status: existingOrder.orderStatus.toLowerCase(), total: existingOrder.totalAmount, duplicate: true });
+        }
+      }
+      if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
+        const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
+        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 409 });
+      }
+      const databaseUnavailable = error instanceof Error && (
+        error.name.startsWith('PrismaClient')
+        || ['P1001', 'P1002', 'P1008', 'P1017', 'P2024'].includes((error as Error & { code?: string }).code ?? '')
+      );
+      if (!databaseUnavailable) throw error;
 
-      const fallbackCode = `MKF-${Math.floor(100000 + Math.random() * 900000)}`;
-      console.error('Checkout database unavailable; using demo order.', error.name);
+      console.error('Checkout database unavailable; refusing to create an unpriced order.', error.name);
       return NextResponse.json({
-        success: true,
-        order: { code: fallbackCode, total: fallbackTotal, paymentMethod },
-        redirectUrl: `/checkout/vietqr/${fallbackCode}?demo=1&amount=${fallbackTotal}`,
-      });
+        error: { code: 'CHECKOUT_TEMPORARILY_UNAVAILABLE', message: 'Kết nối đặt hàng đang gián đoạn. Đơn chưa được ghi nhận và chưa phát sinh thanh toán; vui lòng thử lại, giỏ hàng vẫn được giữ.' },
+      }, { status: 503, headers: { 'retry-after': '30' } });
     }
 
+    if (order && 'rejected' in order) {
+      if (order.rejected === 'PRICE_MISMATCH') {
+        await writeAuditLog(request, {
+          adminEmail: 'system:checkout',
+          action: 'REJECT_PRICE_MISMATCH',
+          targetEntity: 'Order',
+          targetId: idempotencyKey || `checkout-${Date.now()}`,
+          newValue: { reason: 'submitted cart state or line price differs from server data' },
+        });
+      }
+      const invalidVoucher = order.rejected === 'INVALID_VOUCHER';
+      return NextResponse.json({
+        error: {
+          code: order.rejected,
+          message: invalidVoucher
+            ? 'Mã voucher bồi thường đã hết hạn, đã sử dụng hoặc không thuộc số điện thoại đặt hàng.'
+            : 'Giỏ hàng hoặc số lượng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng rồi thử lại.',
+        },
+      }, { status: invalidVoucher ? 400 : 409 });
+    }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
     try {
       await prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } });
     } catch (error) {
       console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
     }
-    return NextResponse.json({ orderId: order.id, orderCode: order.orderCode, numericCode: order.numericCode, status: order.orderStatus.toLowerCase(), total: order.totalAmount }, { status: 201 });
+    const response = NextResponse.json({ orderId: order.id, orderCode: order.orderCode, numericCode: order.numericCode, status: order.orderStatus.toLowerCase(), total: order.totalAmount }, { status: order.duplicate ? 200 : 201 });
+    if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+    return response;
   }, 'Lỗi đặt hàng:');
 }
 

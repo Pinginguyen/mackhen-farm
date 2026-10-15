@@ -6,25 +6,30 @@ import { getPayOSClient } from '@/lib/payos';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
-  let body: { orderId?: string; amount?: number };
+  let payload: unknown;
   try {
-    body = (await request.json()) as typeof body;
+    payload = await request.json();
   } catch {
     return NextResponse.json({ error: { code: 'INVALID_PAYMENT', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
   }
 
-  if (!body.orderId || !Number.isInteger(body.amount) || !body.amount || body.amount < 0) {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return NextResponse.json({ error: { code: 'INVALID_PAYMENT', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
+  }
+  const orderId = typeof (payload as { orderId?: unknown }).orderId === 'string' ? (payload as { orderId: string }).orderId.trim() : '';
+  const amount = (payload as { amount?: unknown }).amount;
+  if (!orderId || orderId.length > 128 || !Number.isSafeInteger(amount) || Number(amount) <= 0) {
     return NextResponse.json({ error: { code: 'INVALID_PAYMENT', message: 'Thiếu thông tin thanh toán' } }, { status: 400 });
   }
 
   return withDatabase(async () => {
     const order = await prisma.order.findUnique({
-      where: { id: body.orderId },
+      where: { id: orderId },
       include: { customer: true, items: true },
     });
     if (!order) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng' } }, { status: 404 });
     if (order.paymentMethod !== 'VIETQR') return NextResponse.json({ error: { code: 'INVALID_PAYMENT_METHOD', message: 'Đơn hàng không sử dụng VietQR.' } }, { status: 400 });
-    if (body.amount !== order.totalAmount) return NextResponse.json({ error: { code: 'AMOUNT_MISMATCH', message: 'Số tiền thanh toán không khớp đơn hàng' } }, { status: 400 });
+    if (amount !== order.totalAmount) return NextResponse.json({ error: { code: 'AMOUNT_MISMATCH', message: 'Số tiền thanh toán không khớp đơn hàng' } }, { status: 400 });
 
     const existing = await prisma.payment.findFirst({
       where: { orderId: order.id, status: 'PENDING' },

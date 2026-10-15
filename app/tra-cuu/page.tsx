@@ -1,12 +1,11 @@
 import { Suspense } from 'react';
 import TrackingForm from './tracking-form';
-import Header from '@/components/layout/Header';
 import ReturnRequestForm from './return-request-form';
 import { ArrowRight, Camera, MessageCircle, PackageCheck, ShieldCheck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-export default function TrackingPage() {
+export default function TrackingPage({ searchParams }: { searchParams?: { success?: string } }) {
   const supportZaloUrl = process.env.NEXT_PUBLIC_SUPPORT_ZALO_URL;
   const steps = [
     {
@@ -28,10 +27,10 @@ export default function TrackingPage() {
 
   return (
     <main className="page-shell return-page">
-      <Header />
       <section className="page-card return-tracking-card">
         <p className="eyebrow">Theo dõi giao hàng</p>
         <h1>Đơn hàng của bạn đang ở đâu?</h1>
+        {searchParams?.success === '1' && <p className="payment-tracking-notice" role="status">Đã ghi nhận thông tin thanh toán. Nhập số điện thoại đặt hàng để xem trạng thái đơn.</p>}
         <Suspense fallback={<p className="empty-state" role="status">Đang tải biểu mẫu tra cứu...</p>}>
           <TrackingForm />
         </Suspense>

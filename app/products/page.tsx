@@ -1,19 +1,29 @@
 import { prisma } from '@/lib/prisma';
-import Header from '@/components/layout/Header';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProductsPage() {
-  const products: CatalogProduct[] = await prisma.product.findMany({
-    where: { active: true },
-    orderBy: { createdAt: 'desc' },
-  });
+export default async function ProductsPage({ searchParams }: { searchParams?: { search?: string } }) {
+  let products: CatalogProduct[];
+  try {
+    const databaseProducts = await prisma.product.findMany({
+      where: { active: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (databaseProducts.length) {
+      products = databaseProducts;
+    } else {
+      console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
+      products = DEFAULT_PRODUCTS;
+    }
+  } catch {
+    console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
+    products = DEFAULT_PRODUCTS;
+  }
 
   return (
     <main className="page-shell">
-      <Header />
-
       <section className="page-card">
         <div className="page-title">
           <div>
@@ -22,7 +32,7 @@ export default async function ProductsPage() {
           </div>
         </div>
 
-        <ProductCatalogFilter products={products} />
+        <ProductCatalogFilter products={products} initialQuery={searchParams?.search ?? ''} />
       </section>
     </main>
   );

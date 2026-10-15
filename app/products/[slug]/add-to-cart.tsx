@@ -1,38 +1,100 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Minus, Plus } from 'lucide-react';
 
 import type { ProductVariant } from '@/lib/store-data';
 
-export default function AddToCart({ productId, variants }: { productId: string; variants: ProductVariant[] }) {
+export default function AddToCart({ productId, productSlug, name, image, price, variants, isSeasoning = false }: {
+  productId: string;
+  productSlug: string;
+  name: string;
+  image: string;
+  price: number;
+  variants: ProductVariant[];
+  isSeasoning?: boolean;
+}) {
   const router = useRouter();
   const [variantId, setVariantId] = useState(variants[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
-  const [added, setAdded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showStickyBuyBar, setShowStickyBuyBar] = useState(false);
+  const primaryActionsRef = useRef<HTMLDivElement>(null);
+  const selectedVariant = variants.find((variant) => variant.id === variantId);
+  const selectedPrice = selectedVariant?.price ?? price;
+
+  useEffect(() => {
+    const target = primaryActionsRef.current;
+    if (!target) return;
+
+    const updateStickyBar = () => {
+      const passedPurchaseActions = target.getBoundingClientRect().bottom < 0;
+      const isMobile = window.matchMedia('(max-width: 767px)').matches;
+      setShowStickyBuyBar((current) => current === (passedPurchaseActions && isMobile) ? current : passedPurchaseActions && isMobile);
+    };
+    updateStickyBar();
+    window.addEventListener('scroll', updateStickyBar, { passive: true });
+    window.addEventListener('resize', updateStickyBar, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', updateStickyBar);
+      window.removeEventListener('resize', updateStickyBar);
+    };
+  }, []);
+
+  function clearBuyNowSnapshot() {
+    try {
+      window.sessionStorage.removeItem('buy_now_item');
+    } catch {
+      return;
+    }
+  }
 
   async function addItem(buyNow = false) {
     if (saving) return;
     setMessage('');
     setSaving(true);
+    const selectedVariant = variants.find((variant) => variant.id === variantId);
+    if (buyNow) {
+      try {
+        window.sessionStorage.setItem('buy_now_item', JSON.stringify({
+          productId,
+          productSlug,
+          name,
+          image,
+          variantId: variantId || null,
+          variantLabel: selectedVariant?.label ?? null,
+          unitPrice: selectedVariant?.price ?? price,
+          quantity,
+        }));
+      } catch {
+        setSaving(false);
+        setMessage('Không thể chuẩn bị phiên mua nhanh. Vui lòng thử lại.');
+        return;
+      }
+    }
     try {
       const response = await fetch('/api/cart/items', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ productId, variantId: variantId || undefined, quantity }),
+        body: JSON.stringify({ productId, variantId: variantId || undefined, quantity, buyNow }),
       });
-      const result = await response.json() as { error?: { message?: string } };
+      const result = await response.json() as { error?: { message?: string }; cartCount?: number };
       if (!response.ok) {
+        if (buyNow) clearBuyNowSnapshot();
         setMessage(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
         return;
       }
-      setAdded(true);
-      if (buyNow) router.push('/checkout');
+      if (buyNow) router.push('/checkout?mode=buy_now');
+      else {
+        window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
+        window.dispatchEvent(new CustomEvent('mackhen:cart-added', { detail: { name } }));
+        setMessage('Đã thêm sản phẩm vào giỏ hàng.');
+      }
     } catch {
+      if (buyNow) clearBuyNowSnapshot();
       setMessage('Không thể kết nối để cập nhật giỏ hàng.');
     } finally {
       setSaving(false);
@@ -57,11 +119,28 @@ export default function AddToCart({ productId, variants }: { productId: string; 
           <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 99} onClick={() => setQuantity((value) => Math.min(99, value + 1))}><Plus size={16} /></button>
         </div>
       </div>
-      <div className="inline-actions">
-        {added ? <Link href="/cart" className="primary-action">Xem giỏ hàng</Link> : <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>}
-        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving}>Mua ngay</button>
+      <div className="inline-actions" ref={primaryActionsRef}>
+        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
+        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>
-      {message && <p role="alert">{message}</p>}
+      <ul className="product-reassurance-list" aria-label="Cam kết Mắc Khén Farm">
+        {isSeasoning ? <>
+          <li>Gia vị tuyển chọn, chuẩn vị Tây Bắc</li>
+          <li>Đóng gói kín, tiện sử dụng và bảo quản</li>
+          <li>Hỗ trợ đổi mới trong 24h nếu bao bì lỗi</li>
+        </> : <>
+          <li>Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén Tây Bắc</li>
+          <li>22g protein thực vật / 100g, 0% cholesterol</li>
+          <li>Đổi gói mới 0đ trong 24h nếu xì túi, không cần trả hàng cũ</li>
+          <li>Túi nhôm 3 lớp và gói khử oxy, giữ độ dai đến 6 tháng</li>
+        </>}
+      </ul>
+      {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
+        <Image src={image} alt={name} width={48} height={48} sizes="48px" unoptimized={image.startsWith('data:') || /^https?:\/\//i.test(image)} />
+        <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>
+        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+      </div>}
+      {message && <p role="status">{message}</p>}
     </div>
   );
 }

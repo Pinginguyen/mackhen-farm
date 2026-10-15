@@ -1,0 +1,173 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Minus, Plus, Trash2 } from 'lucide-react';
+
+import { formatCurrency } from '@/lib/store-data';
+import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+
+type CartVariant = { id: string; label: string; price: number; weight: string; stock: number };
+type CartItem = {
+  id: string;
+  productId: string;
+  productSlug: string;
+  name: string;
+  image: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  stock: number;
+  variantId: string | null;
+  variantLabel: string | null;
+  variants: CartVariant[];
+};
+
+function CartItemRow({
+  item,
+  onUpdate,
+}: {
+  item: CartItem;
+  onUpdate: (id: string, quantity: number, variantId: string | null) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const selectedVariant = item.variants.find((variant) => variant.id === item.variantId);
+  const maxQuantity = selectedVariant?.stock ?? item.stock;
+  const unitPrice = selectedVariant?.price ?? item.unitPrice;
+
+  async function update(quantity: number, variantId = item.variantId) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onUpdate(item.id, quantity, variantId);
+    } catch {
+      return;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="table-row cart-item">
+      <Image src={item.image} alt={item.name} width={96} height={96} sizes="96px" unoptimized={item.image.startsWith('data:') || /^https?:\/\//i.test(item.image)} />
+      <div className="cart-item-info">
+        <strong>{item.name}</strong>
+        {item.variantLabel && <div>{item.variantLabel}</div>}
+        <div className="cart-item-meta">
+          <span>{formatCurrency(unitPrice)} / đơn</span>
+          <span className={`product-status ${maxQuantity > 0 ? 'in-stock' : 'out-of-stock'}`}>{maxQuantity > 0 ? 'Còn hàng' : 'Hết hàng'}</span>
+        </div>
+      </div>
+      <div className="cart-item-controls">
+        {item.variants.length > 1 && (
+          <label className="field">
+            <span>Phân loại</span>
+            <select value={item.variantId ?? ''} onChange={(event) => {
+              const nextVariantId = event.target.value || null;
+              const nextVariant = item.variants.find((variant) => variant.id === nextVariantId);
+              void update(Math.min(item.quantity, nextVariant?.stock ?? item.stock), nextVariantId);
+            }} disabled={saving}>
+              {item.variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1 && variant.id !== item.variantId}>{variant.label} · {formatCurrency(variant.price)}</option>)}
+            </select>
+          </label>
+        )}
+        <div className="field">
+          <span id={`cart-quantity-label-${item.id}`}>Số lượng</span>
+          <div className="quantity-stepper" role="group" aria-labelledby={`cart-quantity-label-${item.id}`}>
+            <button type="button" aria-label={`Giảm số lượng ${item.name}`} disabled={saving} onClick={() => void update(item.quantity - 1)}><Minus size={16} /></button>
+            <input aria-label={`Số lượng ${item.name}`} type="number" min={1} max={maxQuantity} value={item.quantity} disabled={saving} readOnly />
+            <button type="button" aria-label={`Tăng số lượng ${item.name}`} disabled={saving || item.quantity >= maxQuantity} onClick={() => void update(Math.min(maxQuantity, item.quantity + 1))}><Plus size={16} /></button>
+          </div>
+        </div>
+      </div>
+      <div className="cart-item-actions">
+        <strong className="cart-item-total">{formatCurrency(unitPrice * item.quantity)}</strong>
+        <button className="cart-item-remove" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
+      </div>
+    </div>
+  );
+}
+
+export default function CartContent({ initialItems }: { initialItems: CartItem[] }) {
+  const [items, setItems] = useState(initialItems);
+  const itemsRef = useRef(initialItems);
+  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug));
+  const total = subtotal + shipping;
+  const freeShipping = items.length > 0 && shipping === 0;
+  const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const progress = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
+  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+
+  function commitItems(nextItems: CartItem[]) {
+    itemsRef.current = nextItems;
+    setItems(nextItems);
+    try {
+      window.localStorage.setItem('bohoch_cart_quantities', JSON.stringify(nextItems.map(({ id, quantity, variantId }) => ({ id, quantity, variantId }))));
+    } catch {
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: nextItems.reduce((sum, item) => sum + item.quantity, 0) } }));
+  }
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('bohoch_cart_quantities', JSON.stringify(items.map(({ id, quantity, variantId }) => ({ id, quantity, variantId }))));
+    } catch {
+      return;
+    }
+  }, []);
+
+  async function updateItem(itemId: string, quantity: number, variantId: string | null) {
+    const currentItems = itemsRef.current;
+    const previousItem = currentItems.find((item) => item.id === itemId);
+    if (!previousItem) return;
+
+    const selectedVariant = previousItem.variants.find((variant) => variant.id === variantId);
+    const unitPrice = selectedVariant?.price ?? previousItem.unitPrice;
+    const updatedItem = { ...previousItem, quantity, variantId, variantLabel: selectedVariant?.label ?? null, unitPrice, total: unitPrice * quantity, stock: selectedVariant?.stock ?? previousItem.stock };
+    const optimisticItems = quantity <= 0
+      ? currentItems.filter((item) => item.id !== itemId)
+      : currentItems.map((item) => item.id === itemId ? updatedItem : item);
+    commitItems(optimisticItems);
+
+    try {
+      const response = quantity <= 0
+        ? await fetch('/api/cart/items', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ itemId }) })
+        : await fetch('/api/cart/items', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ itemId, quantity, variantId }) });
+      const result = await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(result.error?.message ?? 'Không thể đồng bộ giỏ hàng.');
+    } catch (error) {
+      const latestItems = itemsRef.current;
+      const restoredItems = latestItems.some((item) => item.id === itemId)
+        ? latestItems.map((item) => item.id === itemId ? previousItem : item)
+        : [...latestItems, previousItem];
+      commitItems(restoredItems);
+      throw error;
+    }
+  }
+
+  return (
+    <div className="checkout-layout">
+      <div>
+        {items.length > 0 && <section className={`free-shipping-progress${freeShipping ? ' is-free' : ''}`} aria-live="polite"><p>{freeShipping ? '🎉 Chúc mừng! Đơn hàng của bạn đã được MIỄN PHÍ VẬN CHUYỂN toàn quốc!' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ nữa để được FREESHIP toàn quốc! 🚚`}</p><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span style={{ width: `${progress}%` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
+        {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
+      </div>
+      <aside className="summary-card">
+        <h3>Tổng thanh toán</h3>
+        <div className="summary-list">
+          <div className="item"><span>Tạm tính</span><strong>{formatCurrency(subtotal)}</strong></div>
+          <div className="item"><span>Vận chuyển</span><strong>{freeShippingApplied ? <><del>{formatCurrency(35000)}</del> 0đ</> : items.length && shipping === 0 ? 'Miễn phí · 0đ' : formatCurrency(shipping)}</strong></div>
+          <div className="item"><span>Thành tiền</span><strong>{formatCurrency(total)}</strong></div>
+        </div>
+        {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+        {!freeShippingApplied && items.length > 0 && shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+        <div className="cart-footer">
+          <Link href="/products" className="secondary-action">Tiếp tục mua</Link>
+          <Link href="/checkout" aria-disabled={!items.length} className={`primary-action${items.length ? '' : ' is-disabled'}`}>Thanh toán</Link>
+        </div>
+      </aside>
+    </div>
+  );
+}

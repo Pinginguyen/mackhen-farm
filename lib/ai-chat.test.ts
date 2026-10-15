@@ -18,4 +18,11 @@ describe('Mắc Khén Farm chat knowledge fallback', () => {
     expect(reply).toContain('24 giờ');
     expect(reply).toContain('không cần gửi trả');
   });
+
+  it('answers spicy-food questions with a relevant recommendation rather than a full menu', () => {
+    const reply = getKnowledgeReply('Tôi muốn ăn cay nhiều thì sao?');
+    expect(reply).toContain('Xé Sợi Cay Nồng');
+    expect(reply).toContain('Chẳm Chéo Ướt');
+    expect(reply).not.toContain('Cháy Tỏi Giòn Cay');
+  });
 });

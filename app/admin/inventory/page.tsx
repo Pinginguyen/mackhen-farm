@@ -1,8 +1,12 @@
 import Link from 'next/link';
 import { fetchApiWithFallback } from '@/lib/server-api';
+import InventoryManager from './inventory-manager';
 
 export default async function AdminInventoryPage() {
-  const { data: { items: inventory }, unavailable } = await fetchApiWithFallback<{ items: { id: string; name: string; stock: number; status: string }[] }>('/api/admin/inventory', { items: [] });
+  const { data: { items: inventory }, unavailable } = await fetchApiWithFallback<{ items: {
+    id: string; name: string; stock: number; status: string; active: boolean;
+    productionLots: { id: string; lotCode: string; mfgDate: string; expDate: string; receivedQty: number; availableQty: number; status: string; testReportUrl: string | null; receivingNote: string | null }[];
+  }[] }>('/api/admin/inventory', { items: [] });
   return (
     <main className="page-shell">
       <header className="topbar">
@@ -29,28 +33,8 @@ export default async function AdminInventoryPage() {
           </div>
         </div>
 
-        <div className="table-card">
-          {unavailable && <p className="empty-state" role="status">Không thể tải tồn kho vì cơ sở dữ liệu hiện không khả dụng.</p>}
-          <table>
-            <thead>
-              <tr>
-                <th>Sản phẩm</th>
-                <th>Tồn kho</th>
-                <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventory.map((entry) => (
-                <tr key={entry.id}>
-                  <td>{entry.name}</td>
-                  <td>{entry.stock}</td>
-                  <td>{entry.status}</td>
-                </tr>
-              ))}
-              {!inventory.length && <tr><td colSpan={3}>Chưa có sản phẩm trong kho.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        {unavailable && <p className="empty-state" role="status">Không thể tải tồn kho vì cơ sở dữ liệu hiện không khả dụng.</p>}
+        <InventoryManager initialInventory={inventory} />
       </section>
     </main>
   );

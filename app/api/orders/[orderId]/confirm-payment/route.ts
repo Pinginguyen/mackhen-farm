@@ -14,12 +14,20 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
     if (!order || !payment || !['VIETQR', 'MOMO'].includes(order.paymentMethod)) {
       return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch thanh toán.' } }, { status: 404 });
     }
-    if (order.paymentStatus === 'PAID' || ['PAID', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order.orderStatus)) {
+    if (order.paymentStatus === 'PAID' && payment.status === 'PAID') {
       return NextResponse.json({ confirmed: true });
     }
     if (Date.now() - payment.createdAt.getTime() > 15 * 60 * 1000) {
       return NextResponse.json({ error: { message: 'Mã QR đã hết hạn. Vui lòng tạo lại đơn thanh toán.' } }, { status: 410 });
     }
+
+    if (order.paymentMethod === 'VIETQR') {
+      return NextResponse.json({
+        confirmed: false,
+        message: 'Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật sau khi PayOS xác minh giao dịch.',
+      }, { status: 202 });
+    }
+
     if (!['PENDING', 'FAILED'].includes(payment.status) || order.orderStatus !== 'PENDING') {
       return NextResponse.json({ error: { message: 'Đơn hàng không thể xác nhận ở trạng thái hiện tại.' } }, { status: 409 });
     }

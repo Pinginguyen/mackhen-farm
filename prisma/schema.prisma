@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -13,6 +12,8 @@ enum OrderStatus {
   CONFIRMED
   PAID
   PROCESSING
+  HANDED_OFF
+  IN_TRANSIT
   SHIPPING
   COMPLETED
   DELIVERED
@@ -91,6 +92,7 @@ model Product {
   reviews       Review[]
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+    productionLots ProductionLot[]
 
   @@index([active, category])
 }
@@ -112,6 +114,23 @@ model ProductVariant {
   @@index([productId])
 }
 
+model ProductionLot {
+  id            String   @id @default(cuid())
+  lotCode       String   @unique
+  productId     String
+  mfgDate       DateTime
+  expDate       DateTime
+  receivedQty   Int
+  availableQty  Int
+  status        String   @default("ACTIVE")
+  testReportUrl String?
+  receivingNote String?
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([productId, status, expDate])
+}
 model Cart {
   id        String     @id
   items     CartItem[]
@@ -151,6 +170,8 @@ model Customer {
 enum ReturnRequestStatus {
   PENDING
   REPLACEMENT_APPROVED
+  VOUCHER_ISSUED
+  REFUND_APPROVED
   REFUNDED
   REJECTED
 }
@@ -168,9 +189,15 @@ model Order {
   paymentMethod CheckoutPaymentMethod @default(COD)
   paymentStatus PaymentStatus        @default(PENDING)
   subtotal      Int
-  shippingFee   Int                  @map("shipping")
-  discountAmount Int                 @default(0)
+  shippingFee   Float                @map("shipping")
+  discountAmount Float               @default(0)
   totalAmount   Int                  @map("total")
+  idempotencyKey String?              @unique
+  lotCode       String?
+  grossAmount   Float                 @default(0)
+  netAmount     Float                 @default(0)
+  reconciled    Boolean               @default(false)
+  holdExpiresAt DateTime?
   note          String?
   trackingCode  String?
   deliveredAt   DateTime?
@@ -181,6 +208,8 @@ model Order {
   payments      Payment[]
   warrantyRequest WarrantyRequest?
   returnRequests ReturnRequest[]
+  refundOperations RefundOperation[]
+  compensationVouchers CompensationVoucher[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -200,6 +229,7 @@ model OrderItem {
   quantity         Int
   price            Int             @map("unitPrice")
   lineTotal        Int
+  lotCode          String?
   order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant          ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
@@ -213,6 +243,8 @@ model Review {
   customerName String
   rating       Int
   comment      String
+  riskTag      String?
+  riskAnalyzedAt DateTime?
   createdAt    DateTime @default(now())
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -251,11 +283,76 @@ model ReturnRequest {
   issueType     String
   description   String
   imageUrl      String?
+  refundBankName String?
+  refundAccountNumber String?
+  refundAccountHolder String?
+  refundApprovedBy String?
+  refundApprovedAt DateTime?
+  refundTransferReference String?
+  riskTag       String?
+  riskAnalyzedAt DateTime?
   status        ReturnRequestStatus @default(PENDING)
   adminNote     String?
   createdAt     DateTime            @default(now())
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refundOperations RefundOperation[]
+  compensationVoucher CompensationVoucher?
 
   @@index([status, createdAt])
   @@index([orderId])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  adminEmail   String
+  action       String
+  targetEntity String
+  targetId     String
+  oldValue     Json?
+  newValue     Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([targetEntity, targetId, createdAt])
+  @@index([adminEmail, createdAt])
+}
+
+model RefundOperation {
+  id                   String   @id @default(cuid())
+  orderId              String
+  returnRequestId      String?
+  amount               Int
+  bankName             String
+  accountNumber        String
+  accountHolder        String
+  reason               String
+  status               String   @default("PENDING_APPROVAL")
+  requestedBy          String
+  approvedBy           String?
+  approvedAt           DateTime?
+  transferReference    String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  returnRequest        ReturnRequest? @relation(fields: [returnRequestId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([orderId, createdAt])
+}
+
+model CompensationVoucher {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  orderId         String
+  returnRequestId String        @unique
+  customerPhone   String
+  discountPercent Int           @default(50)
+  expiresAt       DateTime
+  redeemedAt      DateTime?
+  createdBy       String
+  createdAt       DateTime      @default(now())
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Restrict)
+
+  @@index([customerPhone, expiresAt, redeemedAt])
 }

@@ -7,9 +7,14 @@ describe('calculateVoucherDiscount', () => {
     expect(calculateVoucherDiscount('FREESHIP169', 100000, 35000)).toBe(35000);
   });
 
-  it('discounts ten percent up to 30000đ', () => {
+  it('discounts up to 35000đ of shipping for FREESHIP', () => {
+    expect(calculateVoucherDiscount('FREESHIP', 100000, 35000)).toBe(35000);
+    expect(calculateVoucherDiscount('FREESHIP', 100000, 0)).toBe(0);
+  });
+
+  it('discounts ten percent of the merchandise subtotal for GIAM10', () => {
     expect(calculateVoucherDiscount('GIAM10', 169000, 35000)).toBe(16900);
-    expect(calculateVoucherDiscount('GIAM10', 500000, 35000)).toBe(30000);
+    expect(calculateVoucherDiscount('GIAM10', 500000, 35000)).toBe(50000);
   });
 
   it('rejects unknown vouchers', () => {

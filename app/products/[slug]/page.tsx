@@ -1,28 +1,56 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ApiRequestError, fetchApi } from '@/lib/server-api';
+import { prisma } from '@/lib/prisma';
 import { formatCurrency, type Product } from '@/lib/store-data';
 import { FALLBACK_NUTRITION, NUTRITION_MAP } from '@/lib/nutritionData';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import AddToCart from './add-to-cart';
-import ReviewForm from './review-form';
-import Header from '@/components/layout/Header';
+import ProductImageGallery from './product-image-gallery';
+import ProductRating from '@/components/ProductRating';
+import ProductReviewsSection from '@/components/ProductReviewsSection';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string };
 
+function normalizeProductLookup(value: string): string {
+  return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
 export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
-  let product: (Product & { reviews?: ProductReview[] }) | undefined;
-  let unavailable = false;
+  let product: Product | null = null;
+  let inactiveInDatabase = false;
+  let reviews: ProductReview[] = [];
   try {
-    ({ product } = await fetchApi<{ product: Product & { reviews?: ProductReview[] } }>(`/api/products/${encodeURIComponent(params.slug)}`));
-  } catch (error) {
-    if (error instanceof ApiRequestError && error.status !== 404) unavailable = true;
-    else notFound();
+    const databaseProduct = await prisma.product.findFirst({
+      where: { OR: [{ slug: params.slug }, { id: params.slug }] },
+      include: { variants: true, reviews: { orderBy: { createdAt: 'desc' }, take: 20 } },
+    });
+    if (databaseProduct) {
+      inactiveInDatabase = !databaseProduct.active;
+      product = {
+        ...databaseProduct,
+        status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
+        variants: databaseProduct.variants.map((variant) => ({
+          ...variant,
+          status: variant.stock > 0 ? 'Còn hàng' : 'Sắp hết',
+        })),
+      };
+      reviews = databaseProduct.reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString() }));
+    }
+  } catch {
+    console.warn('Không kết nối được DB, dùng dữ liệu chi tiết sản phẩm mặc định');
   }
 
-  if (unavailable) {
-    return <main className="page-shell"><p className="empty-state" role="status">Không thể tải sản phẩm vì cơ sở dữ liệu hiện không khả dụng.</p><Link href="/products" className="secondary-action">Quay lại sản phẩm</Link></main>;
+  if (inactiveInDatabase) notFound();
+  if (!product) {
+    const lookup = normalizeProductLookup(params.slug);
+    const fallback = DEFAULT_PRODUCTS.find((item) => item.slug === params.slug || item.id === params.slug || normalizeProductLookup(item.name) === lookup);
+    if (!fallback) notFound();
+    product = {
+      ...fallback,
+      status: fallback.stock > 0 ? 'Còn hàng' : 'Sắp hết',
+      variants: [],
+    };
   }
-  if (!product) notFound();
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const nutrition = NUTRITION_MAP[product.slug] ?? FALLBACK_NUTRITION;
@@ -39,29 +67,30 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
 
   return (
     <main className="page-shell">
-      <Header />
-
       <section className="detail-section">
         <div className="detail-grid">
-          <div className="detail-gallery">
-            <div className="detail-media">
-              <img src={product.image} alt={product.name} />
-            </div>
-            {(product.images ?? []).filter((image) => image !== product.image).map((image, index) => (
-              <div className="detail-gallery-thumb" key={`${image}-${index}`}>
-                <img src={image} alt={`${product.name} - ảnh ${index + 2}`} />
-              </div>
-            ))}
-          </div>
+          <ProductImageGallery image={product.image} images={product.images ?? []} name={product.name} />
           <div className="detail-copy">
-            <span className="pill">{product.highlight}</span>
-            <p className="eyebrow">{product.category}</p>
-            <h1>{product.name}</h1>
+            <div className="detail-header-row">
+              <div className="detail-title-stack">
+                <h1>{product.name}</h1>
+              </div>
+              <div className="detail-header-tags">
+                <span className="pill">{product.category}</span>
+                {product.protein && <span className="detail-protein-tag">{product.protein} Protein</span>}
+                <span className="pill">{product.highlight}</span>
+              </div>
+            </div>
+            <div className="detail-summary-row">
+              <div className="detail-status-badge">{product.stock > 0 ? 'Còn hàng' : 'Tạm hết hàng'}</div>
+              <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
+              <ProductRating rating={product.rating} size="sm" />
+            </div>
             <div className="detail-prices">
               <strong>{formatCurrency(product.price)}</strong>
               {product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}
             </div>
-            <p>{product.description}</p>
+            <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
               <section className="product-info-block nutrition-facts">
                 <h2>Bảng giá trị dinh dưỡng</h2>
@@ -92,30 +121,15 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               </section>
             </div>
 
-            <div className="variant-list">
-              {product.variants.map((variant) => (
-                <div key={variant.label} className="variant-pill">
-                  <strong>{variant.label}</strong>
-                  <span>{variant.weight}</span>
-                  <div>{formatCurrency(variant.price)}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="inline-actions">
-              <AddToCart productId={product.id} variants={product.variants} />
-              <Link href="/products" className="secondary-action">
-                Tiếp tục mua
-              </Link>
-            </div>
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} variants={product.variants} isSeasoning={isSeasoning} />
           </div>
         </div>
       </section>
-      <section className="page-card product-reviews">
-        <div className="section-heading"><div><p className="eyebrow">Đánh giá khách hàng</p><h2>{product.rating.toFixed(1)} / 5</h2></div></div>
-        {product.reviews?.length ? <div className="story-grid">{product.reviews.map((review) => <article className="story-item" key={review.id}><strong>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</strong><p>{review.comment}</p><span>{review.customerName}</span></article>)}</div> : <p>Chưa có đánh giá cho sản phẩm này.</p>}
-        <ReviewForm productId={product.id} />
-      </section>
+      <ProductReviewsSection
+        productId={product.id}
+        initialRating={product.rating}
+        initialReviews={reviews}
+      />
     </main>
   );
 }

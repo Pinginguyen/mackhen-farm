@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 
 type RevealGroup = {
   selector: string;
@@ -43,4 +44,19 @@ export default function ScrollReveal({ groups }: { groups: RevealGroup[] }) {
   }, [groups]);
 
   return null;
+}
+
+export function ScrollRevealItem({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  const reducedMotion = useReducedMotion();
+
+  return (
+    <motion.li
+      initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: reducedMotion ? 0 : 0.5, delay: reducedMotion ? 0 : delay }}
+    >
+      {children}
+    </motion.li>
+  );
 }

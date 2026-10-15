@@ -13,8 +13,11 @@ export async function GET(request: Request) {
   const now = new Date();
   const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-  const [revenue, orders, paidOrders, pending, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, delivered, closedOrders, cancelled, recentOrders] = await Promise.all([
+  const [revenue, paidFinancials, cancelledFinancials, refundedFinancials, orders, paidOrders, pending, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, delivered, closedOrders, cancelled, recentOrders] = await Promise.all([
     prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _sum: { totalAmount: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _sum: { grossAmount: true, netAmount: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'PAID', orderStatus: 'CANCELLED' }, _sum: { netAmount: true } }),
+    prisma.refundOperation.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
     prisma.order.count(),
     prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _count: true, _avg: { totalAmount: true } }),
     prisma.order.count({ where: { orderStatus: 'PENDING' } }),
@@ -36,9 +39,19 @@ export async function GET(request: Request) {
   const gmvGrowthPercent = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue ? null : 0;
   const deliverySuccessRate = closedOrders ? (delivered / closedOrders) * 100 : null;
   const cancelledRate = closedOrders ? (cancelled / closedOrders) * 100 : null;
+  const grossSales = paidFinancials._sum.grossAmount ?? revenue._sum.totalAmount ?? 0;
+  const cancelledDeductions = cancelledFinancials._sum.netAmount ?? 0;
+  const refundDeductions = refundedFinancials._sum.amount ?? 0;
+  const marketplaceFees: number | null = null;
+  const netRevenue = Math.max(0, (paidFinancials._sum.netAmount ?? revenue._sum.totalAmount ?? 0) - cancelledDeductions - refundDeductions);
 
   return NextResponse.json({
     revenue: revenue._sum.totalAmount ?? 0,
+    grossSales,
+    cancelledDeductions,
+    refundDeductions,
+    marketplaceFees,
+    netRevenue,
     orders,
     pending,
     paidOrders: paidOrders._count,

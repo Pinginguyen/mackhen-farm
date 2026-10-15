@@ -5,11 +5,12 @@ import { fetchApiWithFallback } from '@/lib/server-api';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import CheckoutForm from './checkout-form';
-import Header from '@/components/layout/Header';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
-export default async function CheckoutPage() {
-  const { data: cart, unavailable } = await fetchApiWithFallback('/api/cart', { items: [] as { productId: string; productSlug: string; variantId: string | null; name: string; quantity: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
+export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string } }) {
+  const buyNow = searchParams?.mode === 'buy_now';
+  const cartPath = buyNow ? '/api/cart?buyNow=1' : '/api/cart';
+  const { data: cart, unavailable } = await fetchApiWithFallback(cartPath, { items: [] as { id: string; productId: string; productSlug: string; variantId: string | null; name: string; quantity: number; unitPrice: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   let profile = null;
   if (session) {
@@ -23,8 +24,6 @@ export default async function CheckoutPage() {
   const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
   return (
     <main className="page-shell">
-      <Header />
-
       <section className="page-card">
         <div className="page-title">
           <div>
@@ -35,8 +34,8 @@ export default async function CheckoutPage() {
 
         <div className="checkout-layout">
           <div>
-            {unavailable && <p className="checkout-demo-notice" role="status">Database đang tạm thời không khả dụng. Bạn vẫn có thể thử luồng demo; đơn chỉ được lưu khi kết nối database hoạt động.</p>}
-            <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} allowDemoFallback={unavailable} />
+            {unavailable && <p className="checkout-service-notice" role="status">Chưa tải được giỏ hàng. Đơn chưa thể tạo; hãy thử tải lại trang sau ít phút.</p>}
+            <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} checkoutUnavailable={unavailable} buyNow={buyNow} />
           </div>
 
           <aside className="summary-card">
@@ -48,7 +47,7 @@ export default async function CheckoutPage() {
                 <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
               </div>
               <div className="item">
-                <span>Thành tiền</span>
+                <span>Tạm tính trước mã giảm giá</span>
                 <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
               </div>
             </div>
@@ -58,7 +57,6 @@ export default async function CheckoutPage() {
               <Link href="/cart" className="secondary-action">
                 Quay lại giỏ hàng
               </Link>
-              <span className="primary-action">{cart.items.length ? 'Nhập thông tin để xác nhận' : 'Giỏ hàng đang trống'}</span>
             </div>
           </aside>
         </div>

@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { PrismaClient } = require('../generated/prisma');
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const email = process.argv[2]?.trim().toLowerCase();
 

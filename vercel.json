@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-holds",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/ai-sentiment",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

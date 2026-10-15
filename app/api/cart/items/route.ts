@@ -5,7 +5,7 @@ import { withDatabase } from '@/lib/api-database';
 import { calculateShipping } from '@/lib/shipping';
 
 export async function POST(request: Request) {
-  let body: { productId?: string; variantId?: string; quantity?: number };
+  let body: { productId?: string; variantId?: string; quantity?: number; buyNow?: boolean };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -29,35 +29,46 @@ export async function POST(request: Request) {
   const availableStock = variant?.stock ?? product.stock;
   if (quantity > availableStock) return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
 
-  const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];
+  const buyNow = body.buyNow === true;
+  const cookieName = buyNow ? 'bohoch_buy_now' : 'bohoch_cart';
+  const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
   const id = cartId ? decodeURIComponent(cartId) : crypto.randomUUID();
-  const item = await prisma.$transaction(async (transaction) => {
+  const outcome = await prisma.$transaction(async (transaction) => {
     await transaction.cart.upsert({ where: { id }, create: { id }, update: {} });
+    if (buyNow) await transaction.cartItem.deleteMany({ where: { cartId: id } });
     const existing = await transaction.cartItem.findFirst({
       where: { cartId: id, productId: product.id, productVariantId: variant?.id ?? null },
     });
+    const nextQuantity = Number(existing?.quantity ?? 0) + Number(quantity);
+    if (nextQuantity > availableStock) return { error: 'INSUFFICIENT_STOCK' as const };
     if (existing) {
-      return transaction.cartItem.update({ where: { id: existing.id }, data: { quantity: existing.quantity + quantity } });
+      return { item: await transaction.cartItem.update({ where: { id: existing.id }, data: { quantity: nextQuantity } }) };
     }
-    return transaction.cartItem.create({
-      data: {
-        cartId: id,
-        productId: product.id,
-        productVariantId: variant?.id,
-        productName: product.name,
-        quantity,
-        unitPrice: variant?.price ?? product.price,
-      },
-    });
+    return {
+      item: await transaction.cartItem.create({
+        data: {
+          cartId: id,
+          productId: product.id,
+          productVariantId: variant?.id,
+          productName: product.name,
+          quantity: nextQuantity,
+          unitPrice: variant?.price ?? product.price,
+        },
+      }),
+    };
   });
+  if ('error' in outcome) return NextResponse.json({ error: { code: outcome.error, message: 'Tổng số lượng vượt quá tồn kho' } }, { status: 409 });
+  const item = outcome.item;
   const cartItems = await prisma.cartItem.findMany({ where: { cartId: id }, include: { product: { select: { slug: true } } } });
   const total = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity * cartItem.unitPrice, 0);
   const shipping = calculateShipping(total, cartItems.map((cartItem) => cartItem.product.slug));
+  const cartCount = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
   const response = NextResponse.json({
     item: { id: item.id, productId: item.productId, variantId: item.productVariantId, quantity: item.quantity },
     totals: { subtotal: total, shipping, total: total + shipping },
+    cartCount: buyNow ? undefined : cartCount,
   });
-  if (!cartId) response.cookies.set('bohoch_cart', id, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
+  if (!cartId) response.cookies.set(cookieName, id, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
   return response;
   });
 }
@@ -130,6 +141,33 @@ export async function PATCH(request: Request) {
     const cartItems = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
     const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const shipping = calculateShipping(subtotal, cartItems.map((item) => item.product.slug));
-    return NextResponse.json({ item: result.item, totals: { subtotal, shipping, total: subtotal + shipping } });
+    const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    return NextResponse.json({ item: result.item, totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
+  });
+}
+
+export async function DELETE(request: Request) {
+  let body: { itemId?: string };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
+  }
+  if (!body.itemId || typeof body.itemId !== 'string') {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thiếu sản phẩm cần xóa' } }, { status: 400 });
+  }
+  const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];
+  if (!cartId) return NextResponse.json({ error: { code: 'CART_NOT_FOUND', message: 'Không tìm thấy giỏ hàng' } }, { status: 404 });
+  const decodedCartId = decodeURIComponent(cartId);
+
+  return withDatabase(async () => {
+    const deleted = await prisma.cartItem.deleteMany({ where: { id: body.itemId, cartId: decodedCartId } });
+    if (!deleted.count) return NextResponse.json({ error: { code: 'CART_ITEM_NOT_FOUND', message: 'Không tìm thấy sản phẩm trong giỏ hàng' } }, { status: 404 });
+
+    const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
+    const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const shipping = calculateShipping(subtotal, items.map((item) => item.product.slug));
+    const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    return NextResponse.json({ totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
   });
 }

@@ -1,36 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, orderFindUnique, orderCreate, cartItemDeleteMany, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, orderFindUnique, orderFindMany, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(),
-    orderFindUnique: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(),
+    cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
+    orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
+    productionLotUpdateMany: vi.fn(),
+    compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
   };
   const tx = {
     cart: { findUnique: mocks.cartFindUnique },
     product: { updateMany: mocks.productUpdateMany },
     productVariant: { updateMany: vi.fn() },
-    customer: { upsert: mocks.customerUpsert, create: vi.fn() },
+    customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
     user: { update: vi.fn() },
-    order: { findUnique: mocks.orderFindUnique, create: mocks.orderCreate },
+    order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, create: mocks.orderCreate },
+    productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
+    compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
   };
-  return { ...mocks, transaction: tx, prisma: { $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
+  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
 
+import { SESSION_COOKIE, createSessionToken } from '@/lib/auth';
 import { POST } from './route';
 
 describe('POST /api/orders checkout', () => {
   beforeEach(() => {
     cartFindUnique.mockReset().mockResolvedValue({
       items: [{
-        productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 169000,
-        product: { slug: 'hat-doi-rung-nep-thuong-hang' }, variant: null,
+        id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 169000,
+        product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 5 }, variant: null,
       }],
     });
     productUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     customerUpsert.mockReset().mockResolvedValue({ id: 'customer-1' });
+    customerCreate.mockReset().mockResolvedValue({ id: 'customer-1' });
     orderFindUnique.mockReset().mockResolvedValue(null);
+    productionLotFindFirst.mockReset().mockResolvedValue(null);
+    productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
+    compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
     cartItemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
   });
@@ -55,6 +66,173 @@ describe('POST /api/orders checkout', () => {
     expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'cart-1' } });
   });
 
+  it('applies GIAM10 to the merchandise subtotal before creating the order', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'Buyer', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'COD',
+        voucherCode: 'GIAM10',
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ subtotal: 169000, discountAmount: 16900, totalAmount: 152100 }),
+    }));
+  });
+
+  it('applies and consumes a valid one-time 50% compensation voucher', async () => {
+    compensationVoucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-1', customerPhone: '0762793244', discountPercent: 50,
+      redeemedAt: null, expiresAt: new Date(Date.now() + 60_000),
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'MKF50-ABCDEF12' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(compensationVoucherUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'voucher-1', customerPhone: '0762793244', redeemedAt: null, expiresAt: { gt: expect.any(Date) } },
+    }));
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ discountAmount: 84500, totalAmount: 84500 }),
+    }));
+  });
+
+  it('rejects expired or redeemed compensation vouchers without creating an order', async () => {
+    compensationVoucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-used', customerPhone: '0762793244', discountPercent: 50,
+      redeemedAt: new Date(), expiresAt: new Date(Date.now() + 60_000),
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'MKF50-ABCDEF12' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_VOUCHER');
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('applies FREESHIP to the server-calculated shipping fee', async () => {
+    cartFindUnique.mockResolvedValueOnce({
+      items: [{
+        id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Hạt Dổi', quantity: 1, unitPrice: 1,
+        product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 100000, stock: 5 }, variant: null,
+      }],
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'FREESHIP' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ subtotal: 100000, shippingFee: 35000, discountAmount: 35000, totalAmount: 100000 }),
+    }));
+  });
+
+  it('attaches the authenticated account id to the created order', async () => {
+    vi.stubEnv('AUTH_SECRET', 'test-secret-with-at-least-32-characters');
+    const sessionToken = createSessionToken({ userId: 'user-1', name: 'Buyer', email: 'buyer@example.com', role: 'CUSTOMER' });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `bohoch_cart=cart-1; ${SESSION_COOKIE}=${sessionToken}` },
+      body: JSON.stringify({ customer: { name: 'Buyer', email: 'buyer@example.com', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1' }) }));
+    vi.unstubAllEnvs();
+  });
+
+  it('persists an idempotency key, financial totals, and a 15-minute stock hold', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1', 'idempotency-key': 'checkout-attempt-001' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        idempotencyKey: 'checkout-attempt-001', grossAmount: 169000, netAmount: 169000, reconciled: false,
+        holdExpiresAt: expect.any(Date),
+      }),
+    }));
+  });
+
+  it('reserves an active production lot and records its code on the order line', async () => {
+    productionLotFindFirst.mockResolvedValueOnce({ id: 'lot-1', lotCode: 'LOT-MKF-2026-001' });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(productionLotUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'lot-1', availableQty: { gte: 1 } },
+      data: { availableQty: { decrement: 1 } },
+    });
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ lotCode: 'LOT-MKF-2026-001', items: { create: [expect.objectContaining({ lotCode: 'LOT-MKF-2026-001' })] } }),
+    }));
+  });
+
+  it('does not sell untraceably when active lots cannot cover the requested quantity', async () => {
+    productionLotFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'lot-1' });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe('INSUFFICIENT_STOCK');
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns the cached order for a repeated idempotency key without reserving stock again', async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1', 'idempotency-key': 'checkout-attempt-001' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ orderId: 'order-existing', orderCode: 'MKF-123456', duplicate: true });
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('checks out only from the isolated buy-now cart and expires its cookie', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=regular-cart; bohoch_buy_now=quick-cart' },
+      body: JSON.stringify({
+        customer: { name: 'A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'COD',
+        buyNow: true,
+        items: [{ id: 'cart-item-1', quantity: 1 }],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(cartFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'quick-cart' } }));
+    expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'quick-cart' } });
+    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
+  });
+
   it('rejects checkout when stock changed before the transaction', async () => {
     productUpdateMany.mockResolvedValue({ count: 0 });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
@@ -64,10 +242,95 @@ describe('POST /api/orders checkout', () => {
     }));
 
     expect(response.status).toBe(409);
+    expect((await response.json()).error.message).toContain('Hạt Dổi');
     expect(orderCreate).not.toHaveBeenCalled();
   });
 
-  it('returns a demo VietQR order when Prisma is unavailable', async () => {
+  it('rejects stale client prices before reserving inventory', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'COD',
+        items: [{ id: 'cart-item-1', quantity: 1, price: 1 }],
+      }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe('PRICE_MISMATCH');
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects a submitted quantity that no longer matches the database cart', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'COD',
+        items: [{ id: 'cart-item-1', quantity: 2 }],
+      }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.code).toBe('PRICE_MISMATCH');
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('calculates the order from current database prices instead of the cart price snapshot', async () => {
+    cartFindUnique.mockResolvedValueOnce({
+      items: [{
+        id: 'cart-item-1', productId: 'spice-1', productVariantId: null, productName: 'Old cart name', quantity: 1, unitPrice: 1,
+        product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 5 }, variant: null,
+      }],
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'A', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ subtotal: 169000, totalAmount: 169000, items: { create: [expect.objectContaining({ price: 169000, lineTotal: 169000, productName: 'Hạt Dổi' })] } }),
+    }));
+  });
+
+  it('rejects malformed phone values before opening a transaction', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'A', phone: 123 }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(cartFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns the existing order for an identical checkout within ten seconds', async () => {
+    orderFindMany.mockResolvedValueOnce([{
+      id: 'order-previous', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000,
+      customerName: 'A', address: 'Lai Chau', paymentMethod: 'COD', discountAmount: 0,
+      items: [{ productId: 'spice-1', productVariantId: null, quantity: 1, price: 169000 }],
+    }]);
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'A', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ orderId: 'order-previous', orderCode: 'MKF-123456' });
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('refuses to create a client-priced VietQR order when Prisma is unavailable', async () => {
     const databaseError = new Error('Environment variable not found: DATABASE_URL');
     databaseError.name = 'PrismaClientInitializationError';
     cartFindUnique.mockRejectedValueOnce(databaseError);
@@ -82,13 +345,67 @@ describe('POST /api/orders checkout', () => {
         fallbackTotal: 169000,
       }),
     }));
-    const result = await response.json() as { success: boolean; order: { code: string; total: number; paymentMethod: string }; redirectUrl: string };
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('30');
+    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
+  });
 
-    expect(response.status).toBe(200);
-    expect(result.success).toBe(true);
-    expect(result.order).toMatchObject({ total: 169000, paymentMethod: 'VIETQR' });
-    expect(result.order.code).toMatch(/^MKF-\d{6}$/);
-    expect(result.redirectUrl).toBe(`/checkout/vietqr/${result.order.code}?demo=1&amount=169000`);
+  it('refuses to create a client-priced MoMo order when the Prisma connection pool times out', async () => {
+    const databaseError = Object.assign(new Error('Timed out fetching a new connection from the connection pool.'), {
+      name: 'PrismaClientKnownRequestError',
+      code: 'P2024',
+    });
+    cartFindUnique.mockRejectedValueOnce(databaseError);
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'MOMO',
+        fallbackTotal: 360000,
+      }),
+    }));
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
+  });
+
+  it('does not create a MoMo payment redirect from a client-provided fallback total', async () => {
+    const databaseError = new Error('Neon connection timed out');
+    databaseError.name = 'PrismaClientInitializationError';
+    cartFindUnique.mockRejectedValueOnce(databaseError);
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'MOMO',
+        fallbackTotal: 360000,
+      }),
+    }));
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
+  });
+
+  it('does not create a COD demo order from a client-provided fallback total', async () => {
+    const databaseError = new Error('PostgreSQL connection unavailable');
+    databaseError.name = 'PrismaClientInitializationError';
+    cartFindUnique.mockRejectedValueOnce(databaseError);
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau' },
+        paymentMethod: 'COD',
+        fallbackTotal: 65000,
+      }),
+    }));
+    expect(response.status).toBe(503);
+    expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
   });
 
   it.each(['COD', 'VIETQR'])('creates a %s order without requiring a payment provider', async (paymentMethod) => {

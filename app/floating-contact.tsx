@@ -1,10 +1,16 @@
-import { MessageCircle, Phone } from 'lucide-react';
+'use client';
+
+import { MessageCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 export default function FloatingContact() {
-  const zaloUrl = process.env.NEXT_PUBLIC_SUPPORT_ZALO_URL;
-  const phone = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.replace(/[^\d+]/g, '');
-  const href = zaloUrl || (phone ? `tel:${phone}` : '/tra-cuu');
-  const label = zaloUrl ? 'Zalo CSKH' : phone ? 'Gọi hotline CSKH' : 'Tra cứu và hỗ trợ';
+  const pathname = usePathname();
+  if (pathname?.startsWith('/admin')) return null;
 
-  return <a className="floating-contact" href={href} aria-label={label} title={label} target={zaloUrl ? '_blank' : undefined} rel={zaloUrl ? 'noopener noreferrer' : undefined}>{zaloUrl ? <MessageCircle size={23} /> : phone ? <Phone size={21} /> : <MessageCircle size={23} />}<span>{label}</span></a>;
+  return (
+    <a className="floating-zalo" href="https://zalo.me/0762793244" aria-label="Chat Zalo với Quản lý: 0762.793.244" target="_blank" rel="noopener noreferrer">
+      <span className="floating-zalo-mark" aria-hidden="true"><MessageCircle size={24} /><b>Z</b></span>
+      <span className="floating-zalo-tooltip">Chat Zalo với Quản lý: 0762.793.244</span>
+    </a>
+  );
 }
