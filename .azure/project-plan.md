@@ -181,8 +181,7 @@ Admin Dashboard — revenue summary:
 │  │  ├─ products/[slug]/route.ts
 │  │  ├─ cart/route.ts
 │  │  ├─ orders/route.ts
-│  │  ├─ payments/payos/route.ts
-│  │  └─ webhooks/payos/route.ts
+│  │  └─ payment/sepay/webhook/route.ts
 │  ├─ globals.css
 │  └─ layout.tsx
 ├─ components/
@@ -195,7 +194,7 @@ Admin Dashboard — revenue summary:
 │  ├─ auth.ts
 │  ├─ prisma.ts
 │  ├─ utils.ts
-│  └─ payos.ts
+│  └─ payment-status-cache.ts
 ├─ prisma/
 │  ├─ schema.prisma
 │  └─ seed.ts
@@ -226,9 +225,8 @@ Admin Dashboard — revenue summary:
 | 4 | GET | `/api/cart` | Get active cart with line items and totals | — | `{ items, subtotal, shipping, total }` | 200 |
 | 5 | POST | `/api/cart/items` | Add or update cart item | `{ productId, variantId, quantity }` | `{ item, totals }` | 200, 400 |
 | 6 | POST | `/api/orders` | Create checkout order and reserve stock | `{ customer, delivery, items, paymentMethod }` | `{ orderId, status, total }` | 201, 400 |
-| 7 | POST | `/api/payments/payos/create` | Create PayOS/VietQR payment link | `{ orderId, amount, currency }` | `{ checkoutUrl, paymentId }` | 200, 400 |
-| 8 | POST | `/api/webhooks/payos` | Verify payment webhook and update order state | `PayOS webhook payload` | `{ received: true }` | 200, 400 |
-| 9 | GET | `/api/admin/reports/overview` | Aggregated revenue, order count, and inventory summary | — | `{ revenue, orders, lowStock, channelMix }` | 200, 403 |
+| 7 | POST | `/api/payment/sepay/webhook` | Acknowledge and reconcile SePay bank-transfer notifications | SePay transfer payload | `{ success: true }` | 200 |
+| 8 | GET | `/api/admin/reports/overview` | Aggregated revenue, order count, and inventory summary | — | `{ revenue, orders, lowStock, channelMix }` | 200, 403 |
 
 ---
 
@@ -241,8 +239,8 @@ Admin Dashboard — revenue summary:
 
 ## Integration Results (2026-10-13)
 
-- Added and applied Prisma migrations for products, variants, carts, customers, orders, payments, and PayOS order codes. The initial cloud schema was confirmed drift-free before its migration history was reconciled. No seed data was created by the integration workflow.
-- Replaced page-level catalog, cart, order, inventory, and report examples with live API requests; checkout now creates orders and redirects VietQR payments through PayOS.
+- Added and applied Prisma migrations for products, variants, carts, customers, orders, and payments. The initial cloud schema was confirmed drift-free before its migration history was reconciled. No seed data was created by the integration workflow.
+- Replaced page-level catalog, cart, order, inventory, and report examples with live API requests; checkout creates orders and displays dynamic VietQR payment details verified by SePay.
 - `npm run build`, `npm test`, Prisma client generation, and `npm run migrate:status` pass. Every API route was smoke-tested against Neon; storefront/admin pages returned HTTP 200 and server logs confirmed live API calls. Missing-product/order and invalid-webhook paths returned expected structured 4xx responses.
-- PayOS SDK integration uses the configured client/API/checksum keys. The invalid-signature path was verified. A successful payment link was not created because Neon contains no orders; no test orders or inventory changes were added.
+- SePay webhook handling validates the order code and transferred amount before marking an order paid. No test orders or inventory changes were added.
 - Neon currently contains no products or orders, so catalog, cart, and reports show live empty/zero values. Blob storage is not configured; application health reports `storage: not_configured`.

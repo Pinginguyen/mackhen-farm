@@ -23,8 +23,7 @@
 - GET /api/cart
 - POST /api/cart/items
 - POST /api/orders
-- POST /api/payments/payos/create
-- POST /api/webhooks/payos
+- POST /api/payment/sepay/webhook
 - GET /api/admin/reports/overview
 - GET /api/admin/orders
 - GET /api/admin/inventory
@@ -45,8 +44,8 @@
 - Enhancement: webhook validation, customer history, analytics drilldowns
 
 ## Integration Results
-- Initial schema migration was verified against Neon with a read-only diff, reconciled as applied, and the additive PayOS order-code migration was deployed. `npm run migrate:status` reports the database schema is up to date. No integration seed data was created.
+- Initial schema migration was verified against Neon with a read-only diff, reconciled as applied, and the payment order-code migration was deployed. `npm run migrate:status` reports the database schema is up to date. No integration seed data was created.
 - `npm run build`, `npm test`, and Prisma client generation pass. All 11 API routes were exercised against Neon without HTTP 500s; all available pages rendered successfully and made live API calls. Product detail returned the expected 404 because the catalog is empty.
-- PayOS SDK now creates hosted links for persisted orders and verifies webhook signatures with the configured checksum key. The invalid-signature response was verified; no valid order exists to exercise a successful payment redirect without adding test rows.
+- VietQR uses dynamic transfer details for persisted orders, and the SePay webhook confirms matching bank transfers. No valid order exists to exercise a successful payment redirect without adding test rows.
 - Neon currently has no product/order rows; live catalog/cart/report responses are empty/zero. Storage reports `not_configured` and remains outside this integration run.
 - Project status: Integrated. Local development handoff follows.

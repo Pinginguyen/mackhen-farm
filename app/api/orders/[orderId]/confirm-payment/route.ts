@@ -28,7 +28,7 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
     if (order.paymentMethod === 'VIETQR') {
       return NextResponse.json({
         confirmed: false,
-        message: 'Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật sau khi PayOS xác minh giao dịch.',
+        message: 'Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật tự động sau khi SePay xác minh giao dịch.',
       }, { status: 202 });
     }
 

@@ -45,7 +45,7 @@ describe('POST /api/orders/[orderId]/confirm-payment', () => {
 
     expect(response.status).toBe(202);
     expect(result.confirmed).toBe(false);
-    expect(result.message).toContain('PayOS xác minh');
+    expect(result.message).toBe('Chưa nhận được xác nhận chuyển khoản. Trạng thái sẽ cập nhật tự động sau khi SePay xác minh giao dịch.');
     expect(transaction).not.toHaveBeenCalled();
   });
 

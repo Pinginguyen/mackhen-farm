@@ -1,0 +1,6 @@
+{
+  "content": "Thanh toan don MKF-123456",
+  "transferAmount": 65000,
+  "referenceCode": "SEPAY-TEST-123456",
+  "gateway": "MBBank"
+}

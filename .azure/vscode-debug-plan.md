@@ -91,7 +91,7 @@ graph LR
 
 | Generate | Service | Description |
 |----------|---------|-------------|
-| [x] | BOHOCH Store | <details><summary>HTTP Endpoints (11)</summary><br>GET /api/health<br>GET /api/products<br>GET /api/products/:slug<br>GET /api/cart<br>POST /api/cart/items<br>POST /api/orders<br>POST /api/payments/payos/create<br>POST /api/webhooks/payos<br>GET /api/admin/inventory<br>GET /api/admin/orders<br>GET /api/admin/reports/overview</details> |
+| [x] | BOHOCH Store | <details><summary>HTTP Endpoints (10)</summary><br>GET /api/health<br>GET /api/products<br>GET /api/products/:slug<br>GET /api/cart<br>POST /api/cart/items<br>POST /api/orders<br>POST /api/payment/sepay/webhook<br>GET /api/admin/inventory<br>GET /api/admin/orders<br>GET /api/admin/reports/overview</details> |
 
 No authentication routes are currently implemented, despite API login being listed in the project plan.
 
