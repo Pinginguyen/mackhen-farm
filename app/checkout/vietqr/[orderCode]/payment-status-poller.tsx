@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-export default function PaymentStatusPoller({ orderCode, initiallyPaid = false, children }: { orderCode: string; initiallyPaid?: boolean; children: ReactNode }) {
+export default function PaymentStatusPoller({ orderCode, orderId, initiallyPaid = false, children }: { orderCode: string; orderId: string; initiallyPaid?: boolean; children: ReactNode }) {
   const router = useRouter();
   const [paid, setPaid] = useState(initiallyPaid);
 
@@ -24,10 +24,8 @@ export default function PaymentStatusPoller({ orderCode, initiallyPaid = false, 
 
   useEffect(() => {
     if (paid) {
-      const redirectTimer = window.setTimeout(() => {
-        router.replace(`/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`);
-      }, 2000);
-      return () => window.clearTimeout(redirectTimer);
+      router.push(`/order-success?orderId=${encodeURIComponent(orderId)}`);
+      return;
     }
 
     let active = true;
@@ -48,7 +46,7 @@ export default function PaymentStatusPoller({ orderCode, initiallyPaid = false, 
       active = false;
       window.clearInterval(interval);
     };
-  }, [orderCode, paid, router]);
+  }, [orderCode, orderId, paid, router]);
 
   return (
     <div className="payment-qr-layout" data-payment-paid={paid ? 'true' : undefined}>
@@ -56,7 +54,7 @@ export default function PaymentStatusPoller({ orderCode, initiallyPaid = false, 
         <CheckCircle2 size={78} strokeWidth={1.7} aria-hidden="true" />
         <h2>ĐÃ NHẬN THANH TOÁN THÀNH CÔNG!</h2>
         <p>Đơn hàng {orderCode} đang được xác nhận.</p>
-        <span>Tự động chuyển đến tra cứu đơn hàng...</span>
+        <span>Đang chuyển đến xác nhận đơn hàng...</span>
       </div>}
       {!paid && children}
     </div>
