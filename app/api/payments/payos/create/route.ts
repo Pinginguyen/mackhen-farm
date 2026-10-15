@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { withDatabase } from '@/lib/api-database';
 import { getPayOSClient } from '@/lib/payos';
 import { prisma } from '@/lib/prisma';
+import { resolveRequestBaseUrl } from '@/lib/request-url';
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -43,9 +44,7 @@ export async function POST(request: Request) {
     if (!payos) return NextResponse.json({ fallbackUrl });
 
     const requestHeaders = headers();
-    const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? 'localhost:3000';
-    const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http';
-    const baseUrl = process.env.APP_URL ?? `${protocol}://${host}`;
+    const baseUrl = resolveRequestBaseUrl(requestHeaders);
 
     try {
       const link = await payos.paymentRequests.create({

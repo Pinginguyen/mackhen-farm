@@ -6,6 +6,7 @@ import { LoaderCircle } from 'lucide-react';
 import { calculateVoucherDiscount } from '@/lib/vouchers';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import { getErrorMessage } from '@/lib/error-message';
+import { createAbortSignal } from '@/lib/request-timeout';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import VietnamAddressFields from './vietnam-address-fields';
 
@@ -147,48 +148,57 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
           : `mkf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         idempotencyBodyRef.current = requestBody;
       }
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKeyRef.current },
-        body: requestBody,
-        signal: AbortSignal.timeout(9_000),
-      });
-      const result = await response.json() as {
-        success?: boolean;
-        orderId?: string;
-        orderCode?: string;
-        redirectUrl?: string;
-        error?: unknown;
-      };
+      const requestTimeout = createAbortSignal(9_000);
+      try {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKeyRef.current },
+          body: requestBody,
+          signal: requestTimeout.signal,
+        });
+        const result = await response.json() as {
+          success?: boolean;
+          orderId?: string;
+          orderCode?: string;
+          redirectUrl?: string;
+          error?: unknown;
+        };
 
-      if (!response.ok) {
-        const retryable = response.status >= 500 || response.status === 408 || response.status === 429;
-        submitLock.current = false;
-        setSubmitting(false);
-        setRetryAvailable(retryable);
-        setMessage(retryable
-          ? getErrorMessage(result.error, 'Hệ thống đang xử lý đơn hàng. Chưa nhận được xác nhận; bấm kiểm tra trạng thái để thử lại an toàn, tránh gửi yêu cầu mới.')
-          : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
+        if (!response.ok) {
+          const retryable = response.status >= 500 || response.status === 408 || response.status === 429;
+          submitLock.current = false;
+          setSubmitting(false);
+          setRetryAvailable(retryable);
+          setMessage(retryable
+            ? getErrorMessage(result.error, 'Hệ thống đang xử lý đơn hàng. Chưa nhận được xác nhận; bấm kiểm tra trạng thái để thử lại an toàn, tránh gửi yêu cầu mới.')
+            : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
+          return;
+        }
+
+        if (result.success !== true || !result.orderId || !result.orderCode || !result.redirectUrl) {
+          throw new Error('Checkout response did not confirm a persisted order.');
+        }
+
+        const destination = new URL(result.redirectUrl, window.location.origin);
+        if (destination.origin !== window.location.origin) {
+          throw new Error('Checkout returned an unsafe redirect URL.');
+        }
+
+        rememberUserOrder(result.orderCode);
+        if (buyNow) clearBuyNowSnapshot();
+        router.push(`${destination.pathname}${destination.search}${destination.hash}`);
         return;
+      } finally {
+        requestTimeout.clear();
       }
-
-      if (result.success !== true || !result.orderId || !result.orderCode || !result.redirectUrl) {
-        throw new Error('Checkout response did not confirm a persisted order.');
-      }
-
-      const destination = new URL(result.redirectUrl, window.location.origin);
-      if (destination.origin !== window.location.origin) {
-        throw new Error('Checkout returned an unsafe redirect URL.');
-      }
-
-      rememberUserOrder(result.orderCode);
-      if (buyNow) clearBuyNowSnapshot();
-      router.push(`${destination.pathname}${destination.search}${destination.hash}`);
-    } catch {
+    } catch (error) {
+      const timeoutReached = error instanceof DOMException && error.name === 'AbortError';
       submitLock.current = false;
       setSubmitting(false);
       setRetryAvailable(true);
-      setMessage('Hệ thống đang xử lý đơn hàng nhưng phản hồi chậm. Đơn có thể đã được ghi nhận; hãy kiểm tra lại trạng thái bằng cùng mã yêu cầu, tránh tạo trùng.');
+      setMessage(timeoutReached
+        ? 'Yêu cầu thanh toán đã hết thời gian chờ. Đơn có thể đã được ghi nhận; hãy kiểm tra trạng thái hoặc thử lại bằng cùng mã yêu cầu để tránh tạo trùng.'
+        : 'Hệ thống đang xử lý đơn hàng nhưng phản hồi chậm. Đơn có thể đã được ghi nhận; hãy kiểm tra lại trạng thái bằng cùng mã yêu cầu, tránh tạo trùng.');
     }
   }
 

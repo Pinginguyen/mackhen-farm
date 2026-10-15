@@ -1,5 +1,7 @@
 import { cookies, headers } from 'next/headers';
 
+import { resolveRequestBaseUrl } from './request-url';
+
 export class ApiRequestError extends Error {
   constructor(readonly status: number, path: string) {
     super(`API request failed: ${status} ${path}`);
@@ -8,9 +10,7 @@ export class ApiRequestError extends Error {
 
 export async function fetchApi<T>(path: string): Promise<T> {
   const requestHeaders = headers();
-  const host = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host') ?? 'localhost:3000';
-  const protocol = requestHeaders.get('x-forwarded-proto') ?? 'http';
-  const baseUrl = process.env.APP_URL ?? `${protocol}://${host}`;
+  const baseUrl = resolveRequestBaseUrl(requestHeaders);
   const cookieHeader = cookies().toString();
   const response = await fetch(`${baseUrl}${path}`, {
     cache: 'no-store',
