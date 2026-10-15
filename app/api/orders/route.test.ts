@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, orderFindUnique, orderFindMany, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
+    userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
   };
@@ -12,12 +13,12 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, order
     product: { updateMany: mocks.productUpdateMany },
     productVariant: { updateMany: vi.fn() },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
-    user: { update: vi.fn() },
+    user: { update: mocks.userUpdate },
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, create: mocks.orderCreate },
     productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
   };
-  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
+  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
@@ -41,6 +42,7 @@ describe('POST /api/orders checkout', () => {
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
     compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
     orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
     cartItemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
@@ -167,6 +169,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: 'user-1' }) }));
+    expect(userUpdate).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { name: 'Buyer', phone: '0762793244', address: 'Lai Chau' } });
     vi.unstubAllEnvs();
   });
 
@@ -184,6 +187,7 @@ describe('POST /api/orders checkout', () => {
         holdExpiresAt: expect.any(Date),
       }),
     }));
+    expect(orderFindMany).not.toHaveBeenCalled();
   });
 
   it('reserves an active production lot and records its code on the order line', async () => {
@@ -228,6 +232,26 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ orderId: 'order-existing', orderCode: 'MKF-123456', duplicate: true });
     expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns the persisted buy-now order when a retry arrives after its cart cookie was cleared', async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'VIETQR',
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'checkout-attempt-001' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'VIETQR', buyNow: true }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      success: true, orderId: 'order-existing', orderCode: 'MKF-123456', totalAmount: 169000,
+      redirectUrl: '/checkout/vietqr/MKF-123456?amount=169000', duplicate: true,
+    });
+    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
+    expect(cartFindUnique).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
   });
 
@@ -482,6 +506,20 @@ describe('POST /api/orders checkout', () => {
     }));
     expect(response.status).toBe(503);
     expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
+  });
+
+  it('rejects an empty database cart without creating an order', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [] });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=empty-cart' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', items: [] }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('EMPTY_CART');
+    expect(orderCreate).not.toHaveBeenCalled();
+    expect(productUpdateMany).not.toHaveBeenCalled();
   });
 
   it.each(['COD', 'VIETQR'])('creates a %s order without requiring a payment provider', async (paymentMethod) => {

@@ -120,7 +120,6 @@ export async function POST(request: Request) {
   }
   const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
-  if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
 
@@ -131,18 +130,22 @@ export async function POST(request: Request) {
         select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
       });
       if (existingOrder) {
-        return NextResponse.json({
+        const response = NextResponse.json({
           success: true,
           orderId: existingOrder.id,
           orderCode: existingOrder.orderCode,
           numericCode: existingOrder.numericCode,
           status: existingOrder.orderStatus.toLowerCase(),
           total: existingOrder.totalAmount,
+          totalAmount: existingOrder.totalAmount,
           duplicate: true,
           redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
-        });
+        }, { status: 200 });
+        if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+        return response;
       }
     }
+    if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
     let order: CreatedOrder | null | CheckoutRejection;
     try {
@@ -181,7 +184,7 @@ export async function POST(request: Request) {
           return { rejected: 'PRICE_MISMATCH' as const };
         }
 
-        const recentOrders = await transaction.order.findMany({
+        const recentOrders = idempotencyKey ? [] : await transaction.order.findMany({
           where: { phone, createdAt: { gte: new Date(Date.now() - 3_000) } },
           include: { items: { select: { productId: true, productVariantId: true, quantity: true, price: true } } },
           orderBy: { createdAt: 'desc' },
@@ -242,17 +245,7 @@ export async function POST(request: Request) {
         const customer = email
           ? await transaction.customer.upsert({ where: { email }, create: { name, email, phone, address }, update: { name, phone, address } })
           : await transaction.customer.create({ data: { name, phone, address } });
-        if (session?.userId) await transaction.user.update({ where: { id: session.userId }, data: { name, phone, address } });
-        let numericCode = 0;
-        for (let attempt = 0; attempt < 8; attempt += 1) {
-          const candidate = randomInt(100000, 1000000);
-          const existingCode = await transaction.order.findUnique({ where: { numericCode: candidate }, select: { id: true } });
-          if (!existingCode) {
-            numericCode = candidate;
-            break;
-          }
-        }
-        if (!numericCode) throw new Error('ORDER_CODE_GENERATION_FAILED');
+        const numericCode = randomInt(100000, 1000000);
         const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
 
         return transaction.order.create({
@@ -293,16 +286,19 @@ export async function POST(request: Request) {
           select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
         });
         if (existingOrder) {
-          return NextResponse.json({
+          const response = NextResponse.json({
             success: true,
             orderId: existingOrder.id,
             orderCode: existingOrder.orderCode,
             numericCode: existingOrder.numericCode,
             status: existingOrder.orderStatus.toLowerCase(),
             total: existingOrder.totalAmount,
+            totalAmount: existingOrder.totalAmount,
             duplicate: true,
             redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
-          });
+          }, { status: 200 });
+          if (body.buyNow === true) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+          return response;
         }
       }
       if (prismaErrorCode === 'P2034') {
@@ -359,11 +355,17 @@ export async function POST(request: Request) {
       }, { status: invalidVoucher ? 400 : 409 });
     }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
-    try {
-      await prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } });
-    } catch (error) {
-      console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
+    const postCommitTasks: Promise<unknown>[] = [
+      prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } }).catch((error) => {
+        console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
+      }),
+    ];
+    if (session?.userId) {
+      postCommitTasks.push(prisma.user.update({ where: { id: session.userId }, data: { name, phone, address } }).catch((error) => {
+        console.error('Order was created but profile update failed.', error instanceof Error ? error.name : 'UnknownError');
+      }));
     }
+    await Promise.all(postCommitTasks);
     const response = NextResponse.json({
       success: true,
       orderId: order.id,
@@ -371,6 +373,7 @@ export async function POST(request: Request) {
       numericCode: order.numericCode,
       status: order.orderStatus.toLowerCase(),
       total: order.totalAmount,
+      totalAmount: order.totalAmount,
       redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR' | 'MOMO', order.orderCode, order.totalAmount),
       ...(order.duplicate ? { duplicate: true } : {}),
     }, { status: order.duplicate ? 200 : 201 });

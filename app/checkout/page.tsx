@@ -32,34 +32,49 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
           </div>
         </div>
 
-        <div className="checkout-layout">
-          <div>
-            {unavailable && <p className="checkout-service-notice" role="status">Chưa tải được giỏ hàng. Đơn chưa thể tạo; hãy thử tải lại trang sau ít phút.</p>}
-            <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} checkoutUnavailable={unavailable} buyNow={buyNow} />
-          </div>
-
-          <aside className="summary-card">
-            <h3>Đơn hàng</h3>
-            <div className="summary-list">
-              {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId}`}><span>{item.name} x{item.quantity}</span><strong>{item.total.toLocaleString('vi-VN')}đ</strong></div>)}
-              <div className="item">
-                <span>Vận chuyển</span>
-                <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
-              </div>
-              <div className="item">
-                <span>Tạm tính trước mã giảm giá</span>
-                <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
-              </div>
-            </div>
-            {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
-            {!freeShippingApplied && cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+        {unavailable || cart.items.length === 0 ? (
+          <div className="checkout-empty-state">
+            <p className={unavailable ? 'checkout-service-notice' : 'empty-state'} role="status">
+              {unavailable
+                ? 'Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy mở lại giỏ hàng hoặc thử tải lại sau ít phút.'
+                : 'Giỏ hàng hiện chưa có sản phẩm nên chưa thể tạo đơn.'}
+            </p>
+            {!unavailable && <p className="checkout-service-notice">Nếu bạn vừa xác nhận đơn nhưng chưa được chuyển trang, hãy tra cứu bằng số điện thoại trước khi thử đặt lại.</p>}
             <div className="cart-footer">
-              <Link href="/cart" className="secondary-action">
-                Quay lại giỏ hàng
-              </Link>
+              <Link href="/products" className="primary-action">Chọn sản phẩm</Link>
+              <Link href="/cart" className="secondary-action">Mở giỏ hàng</Link>
+              <Link href="/tra-cuu" className="secondary-action">Tra cứu đơn hàng</Link>
             </div>
-          </aside>
-        </div>
+          </div>
+        ) : (
+          <div className="checkout-layout">
+            <div>
+              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} />
+            </div>
+
+            <aside className="summary-card">
+              <h3>Đơn hàng</h3>
+              <div className="summary-list">
+                {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId}`}><span>{item.name} x{item.quantity}</span><strong>{item.total.toLocaleString('vi-VN')}đ</strong></div>)}
+                <div className="item">
+                  <span>Vận chuyển</span>
+                  <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
+                </div>
+                <div className="item">
+                  <span>Tạm tính trước mã giảm giá</span>
+                  <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
+                </div>
+              </div>
+              {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+              {!freeShippingApplied && cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+              <div className="cart-footer">
+                <Link href="/cart" className="secondary-action">
+                  Quay lại giỏ hàng
+                </Link>
+              </div>
+            </aside>
+          </div>
+        )}
       </section>
     </main>
   );

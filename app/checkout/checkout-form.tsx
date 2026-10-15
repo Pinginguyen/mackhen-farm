@@ -41,6 +41,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
   const formRef = useRef<HTMLFormElement>(null);
   const submitLock = useRef(false);
   const idempotencyKeyRef = useRef('');
+  const idempotencyBodyRef = useRef('');
   const [voucher, setVoucher] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState('');
   const [voucherFeedback, setVoucherFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -119,11 +120,6 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       return;
     }
     const form = new FormData(event.currentTarget);
-    if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `mkf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
     try {
       const requestBody = JSON.stringify({
         customerName: form.get('name'),
@@ -145,10 +141,17 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         })),
         buyNow,
       });
+      if (!idempotencyKeyRef.current || idempotencyBodyRef.current !== requestBody) {
+        idempotencyKeyRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `mkf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        idempotencyBodyRef.current = requestBody;
+      }
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKeyRef.current },
         body: requestBody,
+        signal: AbortSignal.timeout(9_000),
       });
       const result = await response.json() as {
         success?: boolean;
@@ -164,7 +167,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         setSubmitting(false);
         setRetryAvailable(retryable);
         setMessage(retryable
-          ? getErrorMessage(result.error, 'Hệ thống đang bận ghi nhận đơn hàng. Chưa nhận được xác nhận; vui lòng thử lại sau giây lát.')
+          ? getErrorMessage(result.error, 'Hệ thống đang xử lý đơn hàng. Chưa nhận được xác nhận; bấm kiểm tra trạng thái để thử lại an toàn, tránh gửi yêu cầu mới.')
           : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
         return;
       }
@@ -185,7 +188,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       submitLock.current = false;
       setSubmitting(false);
       setRetryAvailable(true);
-      setMessage('Chưa nhận được xác nhận từ hệ thống. Đơn có thể đã được ghi nhận; hãy thử lại để hệ thống kiểm tra bằng cùng mã yêu cầu, tránh tạo trùng. Chưa chuyển sang bước thanh toán.');
+      setMessage('Hệ thống đang xử lý đơn hàng nhưng phản hồi chậm. Đơn có thể đã được ghi nhận; hãy kiểm tra lại trạng thái bằng cùng mã yêu cầu, tránh tạo trùng.');
     }
   }
 
@@ -213,8 +216,8 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       <div className="field"><label htmlFor="notes">Ghi chú</label><textarea id="notes" name="notes" rows={4} /></div>
       <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
         {submitting
-          ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang xử lý và ghi nhận đơn hàng...</>
-          : retryAvailable ? 'Thử lại xác nhận đơn hàng' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
+          ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang khởi tạo giao dịch an toàn...</>
+          : retryAvailable ? 'Kiểm tra trạng thái / Thử lại an toàn' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
       </button>
       {message && <p className="checkout-inline-error" role={retryAvailable ? 'status' : 'alert'}>{message}</p>}
     </form>
