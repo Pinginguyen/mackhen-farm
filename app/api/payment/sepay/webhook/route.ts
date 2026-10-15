@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         orderStatus: true,
       },
     });
-    if (!order || order.paymentMethod !== 'VIETQR' || transferAmount < order.totalAmount) {
+    if (!order || !['VIETQR', 'MOMO'].includes(order.paymentMethod) || transferAmount < order.totalAmount) {
       return NextResponse.json({ success: true });
     }
 

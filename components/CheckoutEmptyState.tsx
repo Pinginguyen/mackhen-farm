@@ -1,22 +1,17 @@
 import React from 'react';
 import Link from 'next/link';
+import { ShoppingBag } from 'lucide-react';
 
 export default function CheckoutEmptyState({ unavailable, buyNow }: { unavailable: boolean; buyNow: boolean }) {
   return (
     <div className="checkout-empty-state">
-      <p className={unavailable ? 'checkout-service-notice' : 'empty-state'} role="status">
-        {unavailable
-          ? 'Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy thử tải lại sau ít phút.'
-          : buyNow
-            ? 'Chưa có sản phẩm nào trong đơn hàng. Phiên Mua ngay không còn dữ liệu; vui lòng quay lại chọn sản phẩm.'
-            : 'Giỏ hàng hiện chưa có sản phẩm nên chưa thể tạo đơn.'}
-      </p>
-      <div className="cart-footer">
-        <Link href="/products" className="primary-action">Quay lại mua sắm</Link>
-        <Link href="/cart" className="secondary-action">Mở giỏ hàng</Link>
-        <Link href="/tra-cuu" className="secondary-action">Tra cứu đơn hàng</Link>
-      </div>
-      <button className="primary-action" type="button" disabled aria-disabled="true">Không thể đặt đơn hàng trống</button>
+      <span className="checkout-empty-icon" aria-hidden="true"><ShoppingBag size={34} strokeWidth={1.7} /></span>
+      <h2>Giỏ hàng của bạn đang trống</h2>
+      <p className="checkout-empty-description">Có vẻ như bạn chưa chọn sản phẩm nào để đặt hàng. Hãy dạo một vòng cửa hàng và khám phá những đặc sản sấy Tây Bắc thơm ngon nhé!</p>
+      {unavailable && <p className="checkout-empty-notice" role="status">Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy thử tải lại sau ít phút.</p>}
+      {buyNow && <span className="sr-only">Phiên Mua ngay không còn sản phẩm.</span>}
+      <Link href="/products" className="checkout-empty-cta">Tiếp tục mua sắm</Link>
+      <p className="checkout-empty-secondary">Hoặc xem lại <Link href="/tra-cuu-don">Đơn hàng đã đặt</Link></p>
     </div>
   );
 }

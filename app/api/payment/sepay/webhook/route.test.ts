@@ -66,6 +66,19 @@ describe('POST /api/payment/sepay/webhook', () => {
     });
   });
 
+  it('accepts MoMo orders paid through the linked MB Bank QR', async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: 'order-1', numericCode: 123456, totalAmount: 65000,
+      paymentMethod: 'MOMO', paymentStatus: 'PENDING', orderStatus: 'PENDING',
+    });
+    const response = await POST(makeRequest({ content: 'MKF-123456', transferAmount: 65000 }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ paymentStatus: 'PAID' }),
+    }));
+  });
+
   it('extracts a hyphenated order code from description and creates a payment if needed', async () => {
     paymentFindFirst.mockResolvedValueOnce(null);
     const response = await POST(makeRequest({ description: 'MKF-123456', transferAmount: '65000' }));

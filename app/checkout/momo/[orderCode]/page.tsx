@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/store-data';
 import CopyPaymentDetails from '../../vietqr/copy-payment-details';
-import MomoPaymentActions from './payment-actions';
+import PaymentStatusPoller from '../../vietqr/[orderCode]/payment-status-poller';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +13,7 @@ const momoPhone = '0762793244';
 const momoAccountName = 'TRAN TRUNG CHAU';
 
 type MomoOrder = {
+  id: string;
   paymentMethod: string;
   paymentStatus: string;
   totalAmount: number;
@@ -36,7 +37,7 @@ export default async function MomoPaymentPage({
   try {
     const foundOrder = await prisma.order.findUnique({
       where: { orderCode },
-      select: { paymentMethod: true, paymentStatus: true, totalAmount: true },
+      select: { id: true, paymentMethod: true, paymentStatus: true, totalAmount: true },
     });
 
     if (foundOrder && foundOrder.paymentMethod !== 'MOMO') {
@@ -51,8 +52,10 @@ export default async function MomoPaymentPage({
 
   const amount = order?.totalAmount ?? queryAmount;
   const paymentComplete = order?.paymentStatus === 'PAID';
-  const resultFailed = searchParams?.resultCode !== undefined && searchParams.resultCode !== '0';
-  const resultMessage = searchParams?.message?.slice(0, 300);
+  const qrUrl = new URL('https://img.vietqr.io/image/MB-0762793244-compact2.png');
+  qrUrl.searchParams.set('amount', String(amount));
+  qrUrl.searchParams.set('addInfo', orderCode);
+  qrUrl.searchParams.set('accountName', momoAccountName);
 
   return (
     <main className="page-shell">
@@ -70,37 +73,28 @@ export default async function MomoPaymentPage({
           <div><span>SỐ TIỀN</span><strong>{formatCurrency(amount)}</strong></div>
         </div>
 
-        <div className="momo-payment-layout">
-          <div className="momo-qr-card">
-            <Image src="/products/momo-qr.jpg" alt="Mã QR MoMo chính chủ của TRAN TRUNG CHAU" width={420} height={420} sizes="(max-width: 768px) 90vw, 420px" />
-            <span className="momo-qr-caption"><span className="momo-brand-mark small" aria-hidden="true">M</span> Quét bằng Ví MoMo</span>
-          </div>
+        <PaymentStatusPoller orderCode={orderCode} orderId={order?.id ?? orderCode} initiallyPaid={paymentComplete}>
+          <div className="momo-payment-layout">
+            <div className="momo-qr-card">
+              <Image src={qrUrl.toString()} alt={`Mã QR chuyển khoản ${formatCurrency(amount)} cho đơn ${orderCode}`} width={420} height={420} sizes="(max-width: 768px) 90vw, 420px" unoptimized />
+              <span className="momo-qr-caption"><span className="momo-brand-mark small" aria-hidden="true">M</span> QR chuyển khoản MB Bank</span>
+            </div>
 
-          <div className="momo-payment-details">
-            <h2>Thông tin giao dịch</h2>
-            <dl>
-              <div><dt>Tên người thụ hưởng</dt><dd>{momoAccountName}</dd></div>
-              <div><dt>Số tiền cần chuyển</dt><dd className="momo-amount">{amount.toLocaleString('vi-VN')}đ</dd></div>
-              <div><dt>Nội dung chuyển tiền</dt><dd>{orderCode}</dd></div>
-            </dl>
-            <CopyPaymentDetails accountNumber={momoPhone} transferContent={orderCode} />
-            <ol className="momo-payment-steps">
-              <li><span>1</span><p>Mở ứng dụng MoMo trên điện thoại.</p></li>
-              <li><span>2</span><p>Chọn “Quét Mã” và hướng camera vào mã QR bên cạnh.</p></li>
-              <li><span>3</span><p>Nhập đúng số tiền và nội dung đơn hàng rồi bấm “Xác nhận”.</p></li>
-            </ol>
-            {paymentComplete ? (
-              <p className="momo-payment-success" role="status">Thanh toán MoMo đã được hệ thống xác nhận.</p>
-            ) : resultFailed ? (
-              <p className="momo-pending-note" role="status">Thanh toán MoMo chưa hoàn tất hoặc đã bị hủy.{resultMessage ? ` Lý do: ${resultMessage}` : ''} Đơn vẫn ở trạng thái chờ thanh toán.</p>
-            ) : searchParams?.resultCode === '0' ? (
-              <p className="momo-pending-note" role="status">MoMo trả về thành công nhưng hệ thống chưa nhận IPN hợp lệ. Đơn chưa được xác nhận; vui lòng kiểm tra lại sau.</p>
-            ) : (
-              <p className="momo-pending-note" role="status">Đơn đang chờ xác nhận từ IPN MoMo. Chưa quét hoặc chưa hoàn tất thanh toán sẽ không được tính là thành công.</p>
-            )}
-            <MomoPaymentActions orderCode={orderCode} mode={searchParams?.mode} paymentComplete={paymentComplete} />
+            <div className="momo-payment-details">
+              <h2>Thanh toán tự động</h2>
+              <p className="momo-scan-instructions">Mở ứng dụng MoMo hoặc App Ngân hàng <span aria-hidden="true">→</span> Chọn Quét mã <span aria-hidden="true">→</span> Số tiền và nội dung sẽ tự động điền 100%.</p>
+              <dl>
+                <div><dt>Ngân hàng</dt><dd>MB Bank</dd></div>
+                <div><dt>Số tài khoản</dt><dd>{momoPhone}</dd></div>
+                <div><dt>Tên người thụ hưởng</dt><dd>{momoAccountName}</dd></div>
+                <div><dt>Số tiền cần chuyển</dt><dd className="momo-amount">{amount.toLocaleString('vi-VN')}đ</dd></div>
+                <div><dt>Nội dung chuyển tiền</dt><dd>{orderCode}</dd></div>
+              </dl>
+              <CopyPaymentDetails accountNumber={momoPhone} transferContent={orderCode} />
+              <p className="momo-pending-note" role="status">Hệ thống tự động kiểm tra thanh toán mỗi 2 giây và sẽ chuyển trang ngay khi nhận được tiền.</p>
+            </div>
           </div>
-        </div>
+        </PaymentStatusPoller>
       </section>
     </main>
   );
