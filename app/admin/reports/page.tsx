@@ -1,9 +1,29 @@
 import Link from 'next/link';
-import { fetchApiWithFallback } from '@/lib/server-api';
+import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/store-data';
 
 export default async function AdminReportsPage() {
-  const { data: report, unavailable } = await fetchApiWithFallback('/api/admin/reports/overview', { revenue: 0, orders: 0, lowStock: 0 });
+  const now = new Date();
+  const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  const [revenue, orders, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue] = await Promise.all([
+    prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _sum: { totalAmount: true } }),
+    prisma.order.count(),
+    prisma.product.findMany({ where: { active: true, stock: { lt: 30 } }, select: { id: true, name: true, stock: true, unit: true }, orderBy: { stock: 'asc' } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'PAID', createdAt: { gte: currentPeriodStart } }, _sum: { totalAmount: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: 'PAID', createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } }, _sum: { totalAmount: true } }),
+  ]);
+
+  const report = {
+    revenue: revenue._sum.totalAmount ?? 0,
+    orders,
+    lowStock: lowStockProducts.length,
+    currentRevenue: currentPeriodRevenue._sum.totalAmount ?? 0,
+    previousRevenue: previousPeriodRevenue._sum.totalAmount ?? 0,
+  };
+
+  const unavailable = false;
   return (
     <main className="page-shell">
       <header className="topbar">

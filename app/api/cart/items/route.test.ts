@@ -105,7 +105,10 @@ describe('POST /api/cart/items buy now', () => {
     expect(result.item.quantity).toBe(2);
     expect(quickCartId).not.toBe('regular-cart');
     expect(itemDeleteMany).toHaveBeenCalledWith({ where: { cartId: quickCartId } });
-    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
+    const setCookie = response.headers.get('set-cookie') ?? '';
+    expect(setCookie).toContain('bohoch_buy_now=');
+    expect(setCookie).toMatch(/Path=\//i);
+    expect(setCookie).toMatch(/SameSite=Lax/i);
     expect(response.headers.get('set-cookie')).not.toContain('bohoch_cart=');
   });
 });

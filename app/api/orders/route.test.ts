@@ -508,8 +508,7 @@ describe('POST /api/orders checkout', () => {
     expect((await response.json()).error.code).toBe('CHECKOUT_TEMPORARILY_UNAVAILABLE');
   });
 
-  it('rejects an empty database cart without creating an order', async () => {
-    cartFindUnique.mockResolvedValueOnce({ items: [] });
+  it('rejects an empty submitted cart before querying the database', async () => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=empty-cart' },
@@ -518,6 +517,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(400);
     expect((await response.json()).error.code).toBe('EMPTY_CART');
+    expect(cartFindUnique).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
     expect(productUpdateMany).not.toHaveBeenCalled();
   });

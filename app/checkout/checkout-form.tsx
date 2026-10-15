@@ -15,6 +15,62 @@ type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: n
 
 type InitialCustomer = { name: string; email: string; phone: string; address: string };
 
+export function BuyNowCartRecovery({ items }: { items: CheckoutItem[] }) {
+  const router = useRouter();
+  const attempted = useRef(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (attempted.current) return;
+
+    let snapshot: BuyNowSnapshot | null = null;
+    try {
+      const rawSnapshot = window.sessionStorage.getItem('buy_now_item');
+      if (rawSnapshot) {
+        const parsed = JSON.parse(rawSnapshot) as Partial<BuyNowSnapshot>;
+        if (typeof parsed.productId === 'string' && parsed.productId && Number.isSafeInteger(parsed.quantity) && Number(parsed.quantity) > 0) {
+          snapshot = { productId: parsed.productId, variantId: parsed.variantId ?? null, quantity: Number(parsed.quantity) };
+        }
+      }
+    } catch {
+      snapshot = null;
+    }
+
+    if (!snapshot) {
+      if (items.length === 0) setMessage('Phiên Mua ngay không còn dữ liệu. Hãy quay lại chọn sản phẩm.');
+      return;
+    }
+
+    const cartMatchesSnapshot = items.length === 1
+      && items[0].productId === snapshot.productId
+      && items[0].variantId === snapshot.variantId
+      && items[0].quantity === snapshot.quantity;
+    if (cartMatchesSnapshot) return;
+
+    attempted.current = true;
+    let cancelled = false;
+    setMessage('Đang đồng bộ sản phẩm Mua ngay...');
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/cart/items', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ productId: snapshot.productId, variantId: snapshot.variantId ?? undefined, quantity: snapshot.quantity, buyNow: true }),
+        });
+        if (!response.ok) throw new Error('Unable to synchronize buy-now cart.');
+        if (!cancelled) router.refresh();
+      } catch {
+        if (!cancelled) setMessage('Không thể khôi phục sản phẩm Mua ngay. Hãy quay lại trang sản phẩm và chọn lại.');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [items, router]);
+
+  return message ? <p className="checkout-service-notice" role="status">{message}</p> : null;
+}
+
 function clearBuyNowSnapshot() {
   try {
     window.sessionStorage.removeItem('buy_now_item');
@@ -148,7 +204,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
           : `mkf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         idempotencyBodyRef.current = requestBody;
       }
-      const requestTimeout = createAbortSignal(9_000);
+      const requestTimeout = createAbortSignal(15_000);
       try {
         const response = await fetch('/api/checkout', {
           method: 'POST',
@@ -192,7 +248,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         requestTimeout.clear();
       }
     } catch (error) {
-      const timeoutReached = error instanceof DOMException && error.name === 'AbortError';
+      const timeoutReached = error instanceof DOMException && ['AbortError', 'TimeoutError'].includes(error.name);
       submitLock.current = false;
       setSubmitting(false);
       setRetryAvailable(true);

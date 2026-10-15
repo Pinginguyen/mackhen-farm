@@ -1,16 +1,15 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 
-import { fetchApiWithFallback } from '@/lib/server-api';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
-import CheckoutForm from './checkout-form';
+import { readCartSnapshot } from '@/lib/cart-server';
+import CheckoutForm, { BuyNowCartRecovery } from './checkout-form';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
-  const cartPath = buyNow ? '/api/cart?buyNow=1' : '/api/cart';
-  const { data: cart, unavailable } = await fetchApiWithFallback(cartPath, { items: [] as { id: string; productId: string; productSlug: string; variantId: string | null; name: string; quantity: number; unitPrice: number; total: number }[], subtotal: 0, shipping: 0, total: 0 });
+  const cart = await readCartSnapshot({ buyNow });
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   let profile = null;
   if (session) {
@@ -32,49 +31,59 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
           </div>
         </div>
 
-        {unavailable || cart.items.length === 0 ? (
-          <div className="checkout-empty-state">
-            <p className={unavailable ? 'checkout-service-notice' : 'empty-state'} role="status">
-              {unavailable
-                ? 'Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy mở lại giỏ hàng hoặc thử tải lại sau ít phút.'
-                : 'Giỏ hàng hiện chưa có sản phẩm nên chưa thể tạo đơn.'}
-            </p>
-            {!unavailable && <p className="checkout-service-notice">Nếu bạn vừa xác nhận đơn nhưng chưa được chuyển trang, hãy tra cứu bằng số điện thoại trước khi thử đặt lại.</p>}
-            <div className="cart-footer">
-              <Link href="/products" className="primary-action">Chọn sản phẩm</Link>
-              <Link href="/cart" className="secondary-action">Mở giỏ hàng</Link>
-              <Link href="/tra-cuu" className="secondary-action">Tra cứu đơn hàng</Link>
-            </div>
-          </div>
-        ) : (
-          <div className="checkout-layout">
-            <div>
+        {buyNow && <BuyNowCartRecovery items={cart.items} />}
+        <div className="checkout-layout">
+          <div>
+            {cart.unavailable || cart.items.length === 0 ? (
+              <div className="checkout-empty-state">
+                <p className={cart.unavailable ? 'checkout-service-notice' : 'empty-state'} role="status">
+                  {cart.unavailable
+                    ? 'Chưa tải được giỏ hàng. Đơn chưa được tạo; hãy thử tải lại sau ít phút.'
+                    : buyNow
+                      ? 'Đang kiểm tra và đồng bộ phiên Mua ngay. Nếu vẫn chưa có sản phẩm, hãy quay lại chọn sản phẩm.'
+                      : 'Giỏ hàng hiện chưa có sản phẩm nên chưa thể tạo đơn.'}
+                </p>
+                <div className="cart-footer">
+                  <Link href="/products" className="primary-action">Quay lại mua sắm</Link>
+                  <Link href="/cart" className="secondary-action">Mở giỏ hàng</Link>
+                  <Link href="/tra-cuu" className="secondary-action">Tra cứu đơn hàng</Link>
+                </div>
+                <button className="primary-action" type="button" disabled aria-disabled="true">Không thể đặt đơn hàng trống</button>
+              </div>
+            ) : (
               <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} />
-            </div>
-
-            <aside className="summary-card">
-              <h3>Đơn hàng</h3>
-              <div className="summary-list">
-                {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId}`}><span>{item.name} x{item.quantity}</span><strong>{item.total.toLocaleString('vi-VN')}đ</strong></div>)}
-                <div className="item">
-                  <span>Vận chuyển</span>
-                  <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 && cart.items.length ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
-                </div>
-                <div className="item">
-                  <span>Tạm tính trước mã giảm giá</span>
-                  <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
-                </div>
-              </div>
-              {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
-              {!freeShippingApplied && cart.items.length > 0 && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
-              <div className="cart-footer">
-                <Link href="/cart" className="secondary-action">
-                  Quay lại giỏ hàng
-                </Link>
-              </div>
-            </aside>
+            )}
           </div>
-        )}
+
+          <aside className="summary-card">
+            <h3>Đơn hàng</h3>
+            {!Array.isArray(cart.items) || cart.items.length === 0 ? (
+              <div className="summary-list">
+                <div className="item"><span>Chưa có sản phẩm nào trong đơn hàng.</span><strong>0đ</strong></div>
+                <Link href="/products" className="primary-action">Quay lại mua sắm</Link>
+              </div>
+            ) : (
+              <>
+                <div className="summary-list">
+                  {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId ?? 'single'}`}><span>{item.name ?? 'Sản phẩm'} x{item.quantity ?? 1}</span><strong>{(item.total ?? 0).toLocaleString('vi-VN')}đ</strong></div>)}
+                  <div className="item">
+                    <span>Vận chuyển</span>
+                    <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
+                  </div>
+                  <div className="item">
+                    <span>Tạm tính trước mã giảm giá</span>
+                    <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
+                  </div>
+                </div>
+                {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+                {!freeShippingApplied && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+                <div className="cart-footer">
+                  <Link href="/cart" className="secondary-action">Quay lại giỏ hàng</Link>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
       </section>
     </main>
   );

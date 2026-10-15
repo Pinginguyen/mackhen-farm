@@ -14,7 +14,10 @@ if (databaseUrl) {
 if (datasourceUrl) {
   const isPooler = datasourceUrl.hostname.includes('-pooler.') || datasourceUrl.searchParams.has('pgbouncer');
   if (isPooler || process.env.VERCEL) datasourceUrl.searchParams.set('pgbouncer', 'true');
-  if (process.env.VERCEL) datasourceUrl.searchParams.set('connection_limit', '1');
+  if (process.env.VERCEL) {
+    datasourceUrl.searchParams.set('connection_limit', '1');
+    if (!datasourceUrl.searchParams.has('pool_timeout')) datasourceUrl.searchParams.set('pool_timeout', '8');
+  }
 }
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient(

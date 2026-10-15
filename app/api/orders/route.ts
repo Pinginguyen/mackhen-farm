@@ -95,6 +95,9 @@ export async function POST(request: Request) {
   }
   if (!isRecord(payload)) return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
   const body = payload as CheckoutBody;
+  if (Array.isArray(body.items) && body.items.length === 0) {
+    return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Đơn hàng không có sản phẩm.' } }, { status: 400 });
+  }
   const submittedIdempotencyKey = request.headers.get('idempotency-key')
     ?? (typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '');
   const idempotencyKey = submittedIdempotencyKey.trim();
