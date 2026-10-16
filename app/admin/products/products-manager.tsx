@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { ImagePlus, Link2, PackagePlus, Pencil, Trash2, Upload, X } from 'lucide-react';
 
 import { getErrorMessage } from '@/lib/error-message';
+import type { NutritionFacts } from '@/lib/store-data';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import StockControl from './stock-control';
 
@@ -19,7 +20,23 @@ type ProductDraft = {
   stock: string;
   imageUrl: string;
   description: string;
+  badge: string;
+  nutritionFacts: NutritionFacts;
 };
+
+function defaultNutritionFacts(enabled: boolean, protein = ''): NutritionFacts {
+  return {
+    enabled,
+    servingSize: 'Trên 100g',
+    calories: 'Xem trên bao bì',
+    protein: protein || 'Xem trên bao bì',
+    fat: 'Xem trên bao bì',
+    cholesterol: '0 mg',
+    fiber: 'Xem trên bao bì',
+    carbohydrates: 'Xem trên bao bì',
+    sodium: 'Xem trên bao bì',
+  };
+}
 
 const emptyDraft: ProductDraft = {
   name: '',
@@ -31,9 +48,11 @@ const emptyDraft: ProductDraft = {
   stock: '0',
   imageUrl: '',
   description: '',
+  badge: '',
+  nutritionFacts: defaultNutritionFacts(true),
 };
 
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export default function ProductsManager({ initialProducts }: { initialProducts: AdminProduct[] }) {
@@ -57,7 +76,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      setFormError('Ảnh tải lên không được vượt quá 2 MB.');
+      setFormError('Ảnh tải lên không được vượt quá 5 MB.');
       return;
     }
 
@@ -91,6 +110,8 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       stock: String(product.stock),
       imageUrl: product.image,
       description: product.description,
+      badge: product.badge ?? '',
+      nutritionFacts: product.nutritionFacts ?? defaultNutritionFacts(product.category !== 'Gia vị Tây Bắc', product.protein ?? ''),
     });
     setFormError('');
     setNotice('');
@@ -118,6 +139,8 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           weight: String(draft.weight || '150g').trim(),
           protein: String(draft.protein).trim(),
           description: String(draft.description).trim(),
+          badge: draft.badge.trim() || null,
+          nutritionFacts: draft.nutritionFacts,
           imageUrl: draft.imageUrl || undefined,
         }),
       });
@@ -228,7 +251,10 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
 
             <form className="admin-new-product-form" onSubmit={saveProduct}>
               <label className="field admin-product-full-width">Tên sản phẩm<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} maxLength={160} required /></label>
-              <label className="field">Danh mục<select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value as ProductDraft['category'] })}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select></label>
+              <label className="field">Danh mục<select value={draft.category} onChange={(event) => {
+                const category = event.target.value as ProductDraft['category'];
+                setDraft((current) => ({ ...current, category, nutritionFacts: { ...current.nutritionFacts, enabled: category !== 'Gia vị' } }));
+              }}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select></label>
               <label className="field">Giá niêm yết (VNĐ)<input type="number" min={0} step="any" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} required /></label>
               <label className="field">Giá gốc (không bắt buộc)<input type="number" min={0} step="any" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
               <label className="field">Trọng lượng<input placeholder="150g" value={draft.weight} onChange={(event) => setDraft({ ...draft, weight: event.target.value })} required /></label>
@@ -260,7 +286,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                   <button className="admin-image-dropzone" type="button" onClick={() => imageInputRef.current?.click()}>
                     <span className="admin-image-upload-icon"><ImagePlus size={22} /><Upload size={15} /></span>
                     <strong>Bấm để chọn ảnh từ máy tính hoặc kéo thả ảnh vào đây</strong>
-                    <small>Định dạng JPG, PNG, WEBP · Tối đa 2 MB</small>
+                    <small>Định dạng JPG, PNG, WEBP · Tối đa 5 MB</small>
                   </button>
                 )}
                 <button className="admin-image-url-toggle" type="button" onClick={() => setShowImageUrl((visible) => !visible)}>
@@ -280,6 +306,21 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                   />
                 )}
               </div>
+              <label className="field admin-product-full-width">Nhãn nổi bật (Badge tag) - Tùy chọn<input value={draft.badge} onChange={(event) => setDraft({ ...draft, badge: event.target.value })} maxLength={60} placeholder="Ví dụ: Sản phẩm mới, Bán chạy, Giảm 15%..." /><small>Để trống nếu không muốn hiển thị nhãn đỏ trên ảnh sản phẩm.</small></label>
+              <fieldset className="admin-nutrition-fields admin-product-full-width">
+                <legend>Bảng giá trị dinh dưỡng (Nutrition Facts)</legend>
+                <label className="admin-nutrition-toggle"><input type="checkbox" checked={draft.nutritionFacts.enabled} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, enabled: event.target.checked } }))} /> Hiển thị bảng dinh dưỡng cho sản phẩm này</label>
+                <div className="admin-nutrition-grid">
+                  <label className="field">Khẩu phần<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.servingSize} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, servingSize: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Năng lượng<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.calories} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, calories: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Đạm thực vật<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.protein} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, protein: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Chất béo (Lipid)<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.fat} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, fat: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Cholesterol<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.cholesterol} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, cholesterol: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Chất xơ (Fiber)<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.fiber} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, fiber: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Carbohydrate<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.carbohydrates} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, carbohydrates: event.target.value } }))} maxLength={80} /></label>
+                  <label className="field">Natri (Sodium)<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.sodium} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, sodium: event.target.value } }))} maxLength={80} /></label>
+                </div>
+              </fieldset>
               <label className="field admin-product-full-width">Mô tả ngắn<textarea rows={3} maxLength={2000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
               {formError && <p className="admin-return-alert admin-product-full-width" role="alert">{formError}</p>}
               <footer className="admin-product-modal-actions admin-product-full-width">

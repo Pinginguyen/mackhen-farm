@@ -7,7 +7,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,9 +66,11 @@ function normalizeImage(value: unknown): string | null {
   if (value === undefined || value === null || value === '') return '/products/xe-soi.jpg';
   if (typeof value !== 'string') return null;
   if (value.startsWith('data:')) {
-    return value.length <= 2_800_000 && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
-      ? value
-      : null;
+    const match = value.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+    const encoded = match?.[2] ?? '';
+    const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+    const bytes = encoded ? Math.floor(encoded.length * 3 / 4) - padding : Infinity;
+    return encoded && encoded.length % 4 === 0 && bytes <= 5 * 1024 * 1024 ? value : null;
   }
   if (value.length > 2048) return null;
   if (value.startsWith('/') && !value.startsWith('//')) return value;
@@ -78,6 +80,19 @@ function normalizeImage(value: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function normalizeBadge(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || value.trim().length > 60) return null;
+  return value.trim() || null;
+}
+
+function normalizeNutritionFacts(value: unknown): Prisma.InputJsonValue | null {
+  if (!isRecord(value) || typeof value.enabled !== 'boolean') return null;
+  const fields = ['servingSize', 'calories', 'protein', 'fat', 'cholesterol', 'fiber', 'carbohydrates', 'sodium'] as const;
+  if (fields.some((field) => typeof value[field] !== 'string' || (value[field] as string).length > 80)) return null;
+  return Object.fromEntries([['enabled', value.enabled], ...fields.map((field) => [field, (value[field] as string).trim()])]);
 }
 
 export async function POST(request: Request) {
@@ -102,11 +117,14 @@ export async function POST(request: Request) {
   const category = normalizeCategory(body.category);
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
   const image = normalizeImage(body.imageUrl ?? body.image);
+  const badge = normalizeBadge(body.badge);
+  const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = numberValue(body.stock ?? 0);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
-    || !image || stock === null || stock < 0 || stock > 1000000) {
+    || !image || stock === null || stock < 0 || stock > 1000000
+    || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
@@ -128,6 +146,8 @@ export async function POST(request: Request) {
         description,
         image,
         highlight: typeof body.highlight === 'string' && body.highlight.trim() ? body.highlight.trim().slice(0, 40) : 'Sản phẩm mới',
+        badge,
+        nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
       } satisfies Prisma.ProductCreateInput,
     });
@@ -160,11 +180,14 @@ export async function PATCH(request: Request) {
   const category = normalizeCategory(body.category);
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
   const image = normalizeImage(body.imageUrl ?? body.image);
+  const badge = normalizeBadge(body.badge);
+  const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = numberValue(body.stock ?? 0);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
-    || !image || stock === null || stock < 0 || stock > 1000000) {
+    || !image || stock === null || stock < 0 || stock > 1000000
+    || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
@@ -185,6 +208,8 @@ export async function PATCH(request: Request) {
         description,
         image,
         images: [image],
+        badge,
+        nutritionFacts: nutritionFacts ?? Prisma.DbNull,
       },
       include: { variants: true },
     });

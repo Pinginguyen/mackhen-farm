@@ -91,7 +91,9 @@ model Product {
   description   String
   image         String
   highlight     String
+  badge         String?
   highlights    String[]         @default([])
+  nutritionFacts Json?
   active        Boolean          @default(true)
   variants      ProductVariant[]
   cartItems     CartItem[]

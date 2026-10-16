@@ -10,8 +10,8 @@ const issueTypes = [
   'Hàng có dấu hiệu ẩm mốc',
   'Khác',
 ];
-const maxEvidenceBytes = 2 * 1024 * 1024;
-const evidenceMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']);
+const maxEvidenceBytes = 5 * 1024 * 1024;
+const evidenceMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export default function ReturnRequestForm() {
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function ReturnRequestForm() {
       setImageUrl(null);
       setImageName('');
       event.currentTarget.value = '';
-      setFeedback({ type: 'error', text: 'Ảnh cần dùng định dạng JPEG, PNG, WebP, GIF hoặc AVIF.' });
+      setFeedback({ type: 'error', text: 'Ảnh cần dùng định dạng JPEG, PNG hoặc WebP.' });
       return;
     }
 
@@ -47,7 +47,7 @@ export default function ReturnRequestForm() {
       setImageUrl(null);
       setImageName('');
       event.currentTarget.value = '';
-      setFeedback({ type: 'error', text: 'Ảnh minh chứng cần có dung lượng tối đa 2MB.' });
+      setFeedback({ type: 'error', text: 'Ảnh minh chứng cần có dung lượng tối đa 5MB.' });
       return;
     }
 
@@ -218,11 +218,11 @@ export default function ReturnRequestForm() {
               id="return-evidence-file"
               name="evidence"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={selectEvidence}
             />
           </label>
-          <small className="return-evidence-help">Chọn ảnh từ thiết bị hoặc camera · Tối đa 2MB</small>
+          <small className="return-evidence-help">Chọn ảnh từ thiết bị hoặc camera · JPEG, PNG, WebP · Tối đa 5MB</small>
           {imageUrl && (
             <div className="return-upload-preview">
               <img src={imageUrl} alt="Xem trước ảnh minh chứng" />

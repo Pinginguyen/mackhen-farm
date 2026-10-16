@@ -26,7 +26,7 @@ async function readSession(token: string | undefined, secret: string | undefined
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isAdminApi = pathname.startsWith('/api/admin/');
+  const isAdminApi = pathname === '/api/admin' || pathname.startsWith('/api/admin/');
   const isAdminPage = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAccountPage = pathname === '/tai-khoan' || pathname.startsWith('/tai-khoan/');
   const token = request.cookies.get('mkf_session')?.value;
@@ -39,14 +39,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Truy cập bị từ chối' }, { status: 403 });
   }
 
-  if (isAdminPage && session?.role === 'CUSTOMER') {
-    const deniedUrl = new URL('/', request.url);
-    deniedUrl.searchParams.set('error', 'forbidden');
-    return NextResponse.redirect(deniedUrl);
-  }
   if (isAdminPage && session?.role === 'ADMIN') return NextResponse.next();
+  if (isAdminPage) {
+    const loginUrl = new URL('/dang-nhap', request.url);
+    loginUrl.searchParams.set('callbackUrl', '/admin');
+    return NextResponse.redirect(loginUrl);
+  }
   if (isAccountPage && session) return NextResponse.next();
-  if (!isAdminPage && !isAccountPage) return NextResponse.next();
+  if (!isAccountPage) return NextResponse.next();
 
   const loginUrl = new URL('/dang-nhap', request.url);
   loginUrl.searchParams.set('callbackUrl', isAdminPage ? '/admin' : '/tai-khoan');

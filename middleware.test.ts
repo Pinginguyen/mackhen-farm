@@ -35,9 +35,15 @@ describe('RBAC middleware', () => {
     expect(response.headers.get('location')).toBe('https://mackhen.example/dang-nhap?callbackUrl=%2Ftai-khoan');
   });
 
-  it('redirects customers away from admin with a forbidden notice', async () => {
+  it('redirects customers to login when they try to enter admin', async () => {
     const response = await middleware(makeRequest('/admin', 'CUSTOMER'));
-    expect(response.headers.get('location')).toBe('https://mackhen.example/?error=forbidden');
+    expect(response.headers.get('location')).toBe('https://mackhen.example/dang-nhap?callbackUrl=%2Fadmin');
+  });
+
+  it('returns 403 for a customer session calling an admin API', async () => {
+    const response = await middleware(makeRequest('/api/admin/orders', 'CUSTOMER'));
+
+    expect(response.status).toBe(403);
   });
 
   it('allows admin sessions into the admin portal', async () => {

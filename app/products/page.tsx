@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import { normalizeNutritionFacts } from '@/lib/store-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export default async function ProductsPage({ searchParams }: { searchParams?: { 
       orderBy: { createdAt: 'desc' },
     });
     if (databaseProducts.length) {
-      products = databaseProducts;
+      products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
     } else {
       console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
       products = DEFAULT_PRODUCTS;

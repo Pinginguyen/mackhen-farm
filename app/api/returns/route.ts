@@ -18,7 +18,7 @@ const issueTypes = [
 ] as const;
 
 const returnStatuses: ReturnRequestStatus[] = ['PENDING', 'REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REFUNDED', 'COMPLETED', 'REJECTED'];
-const maxEvidenceBytes = 2 * 1024 * 1024;
+const maxEvidenceBytes = 5 * 1024 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -70,12 +70,12 @@ export async function POST(request: Request) {
 
   if (imageUrl) {
     if (imageUrl.startsWith('data:')) {
-      const dataUrlMatch = imageUrl.match(/^data:image\/(jpeg|png|webp|gif|avif);base64,([A-Za-z0-9+/]+={0,2})$/i);
+      const dataUrlMatch = imageUrl.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i);
       const encodedImage = dataUrlMatch?.[2];
       const padding = encodedImage?.endsWith('==') ? 2 : encodedImage?.endsWith('=') ? 1 : 0;
       const imageBytes = encodedImage ? Math.floor(encodedImage.length * 3 / 4) - padding : Infinity;
       if (!encodedImage || encodedImage.length % 4 !== 0 || imageBytes > maxEvidenceBytes) {
-        return NextResponse.json({ error: 'Ảnh minh chứng không hợp lệ hoặc vượt quá 2MB.' }, { status: 400 });
+        return NextResponse.json({ error: 'Ảnh minh chứng phải là JPEG, PNG hoặc WebP và không vượt quá 5MB.' }, { status: 400 });
       }
     } else {
       try {

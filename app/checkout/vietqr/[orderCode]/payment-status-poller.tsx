@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-export default function PaymentStatusPoller({ orderCode, orderId, initiallyPaid = false, children }: { orderCode: string; orderId: string; initiallyPaid?: boolean; children: ReactNode }) {
+export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initiallyPaid = false, children }: { orderCode: string; orderId: string; canPoll: boolean; initiallyPaid?: boolean; children: ReactNode }) {
   const router = useRouter();
   const [paid, setPaid] = useState(initiallyPaid);
 
@@ -27,11 +27,17 @@ export default function PaymentStatusPoller({ orderCode, orderId, initiallyPaid 
       router.push(`/order-success?orderId=${encodeURIComponent(orderId)}`);
       return;
     }
+    if (!canPoll) return;
 
     let active = true;
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/api/orders/${encodeURIComponent(orderCode)}`, { cache: 'no-store' });
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderCode)}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({}),
+          cache: 'no-store',
+        });
         if (!response.ok) return;
         const result = await response.json() as { status?: string; paymentStatus?: string };
         if (active && (result.status === 'PAID' || result.paymentStatus === 'PAID')) setPaid(true);
@@ -46,7 +52,7 @@ export default function PaymentStatusPoller({ orderCode, orderId, initiallyPaid 
       active = false;
       window.clearInterval(interval);
     };
-  }, [orderCode, orderId, paid, router]);
+  }, [orderCode, orderId, canPoll, paid, router]);
 
   return (
     <div className="payment-qr-layout" data-payment-paid={paid ? 'true' : undefined}>

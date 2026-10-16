@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency, type Product } from '@/lib/store-data';
-import { FALLBACK_NUTRITION, NUTRITION_MAP } from '@/lib/nutritionData';
+import { formatCurrency, normalizeNutritionFacts, type Product } from '@/lib/store-data';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import AddToCart from './add-to-cart';
 import ProductImageGallery from './product-image-gallery';
@@ -32,6 +31,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
       product = {
         ...databaseProduct,
         highlights: databaseProduct.highlights ?? [],
+        nutritionFacts: normalizeNutritionFacts(databaseProduct.nutritionFacts),
         status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
         variants: databaseProduct.variants.map((variant) => ({
           ...variant,
@@ -71,7 +71,6 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   }
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
-  const nutrition = NUTRITION_MAP[product.slug] ?? FALLBACK_NUTRITION;
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   const ingredientSummary = isSeasoning
     ? product.slug === 'cham-cheo-uot-chuan-vi-dien-bien'
@@ -95,6 +94,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               </div>
               <div className="detail-header-tags">
                 <span className="pill">{product.category}</span>
+                {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
                 {product.protein && <span className="detail-protein-tag">{product.protein} Protein</span>}
                 <span className="pill">{product.highlight}</span>
               </div>
@@ -110,21 +110,21 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             </div>
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
-              <section className="product-info-block nutrition-facts">
+              {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts">
                 <h2>Bảng giá trị dinh dưỡng</h2>
-                <p>Trên 100g</p>
+                <p>{product.nutritionFacts.servingSize}</p>
                 <table>
                   <tbody>
-                    <tr><th>Năng lượng</th><td>{nutrition.calories}</td></tr>
-                    <tr><th>Đạm thực vật</th><td>{nutrition.protein}</td></tr>
-                    <tr><th>Chất béo (Lipid)</th><td>{nutrition.fat}</td></tr>
-                    <tr><th>Cholesterol</th><td>{nutrition.cholesterol}</td></tr>
-                    <tr><th>Chất xơ tiêu hóa</th><td>{nutrition.fiber}</td></tr>
-                    <tr><th>Carbohydrate</th><td>{nutrition.carbs}</td></tr>
-                    <tr><th>Natri</th><td>{nutrition.sodium}</td></tr>
+                    <tr><th>Năng lượng</th><td>{product.nutritionFacts.calories}</td></tr>
+                    <tr><th>Đạm thực vật</th><td>{product.nutritionFacts.protein}</td></tr>
+                    <tr><th>Chất béo (Lipid)</th><td>{product.nutritionFacts.fat}</td></tr>
+                    <tr><th>Cholesterol</th><td>{product.nutritionFacts.cholesterol}</td></tr>
+                    <tr><th>Chất xơ (Fiber)</th><td>{product.nutritionFacts.fiber}</td></tr>
+                    <tr><th>Carbohydrate</th><td>{product.nutritionFacts.carbohydrates}</td></tr>
+                    <tr><th>Natri (Sodium)</th><td>{product.nutritionFacts.sodium}</td></tr>
                   </tbody>
                 </table>
-              </section>
+              </section>}
               <section className="product-info-block">
                 <h2>Thành phần &amp; nguồn gốc nguyên liệu</h2>
                 <p>{ingredientSummary}</p>

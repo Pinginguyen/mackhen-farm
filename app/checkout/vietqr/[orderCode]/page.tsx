@@ -82,7 +82,7 @@ export default async function VietQrOrderPage({
           <strong className="payment-total">{formatCurrency(amount)}</strong>
         </div>
         {isLocalOnly && <p className="payment-order-unavailable" role="status">Đơn chưa được lưu hoặc xác minh trực tuyến. Thông tin này chỉ để tra cứu; vui lòng liên hệ cửa hàng để đối soát trước khi chuyển khoản.</p>}
-        <PaymentStatusPoller orderCode={orderCode} orderId={order?.id ?? orderCode} initiallyPaid={order?.paymentStatus === 'PAID'}>
+        <PaymentStatusPoller orderCode={orderCode} orderId={order?.id ?? orderCode} canPoll={Boolean(order)} initiallyPaid={order?.paymentStatus === 'PAID'}>
           <div className="payment-qr-panel"><Image src={qrUrl} alt={`Mã VietQR thanh toán ${formatCurrency(amount)}`} width={520} height={520} sizes="(max-width: 768px) 90vw, 520px" unoptimized /></div>
           <div className="payment-information">
             <dl>

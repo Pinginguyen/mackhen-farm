@@ -34,6 +34,8 @@ const validProduct = {
   description: 'Mô tả sản phẩm mới.',
   imageUrl: '/products/xe-soi.jpg',
   stock: 15,
+  badge: 'Bán chạy',
+  nutritionFacts: { enabled: true, servingSize: 'Trên 100g', calories: '320 kcal', protein: '22g', fat: '2.5g', cholesterol: '0 mg', fiber: '4g', carbohydrates: '15g', sodium: '420 mg' },
 };
 
 describe('/api/products', () => {
@@ -124,7 +126,7 @@ describe('/api/products', () => {
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({
       where: { id: 'product-1' },
-      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl] }),
+      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl], badge: validProduct.badge, nutritionFacts: validProduct.nutritionFacts }),
       include: { variants: true },
     });
   });
@@ -148,9 +150,18 @@ describe('/api/products', () => {
         description: validProduct.description,
         image: validProduct.imageUrl,
         images: [validProduct.imageUrl],
+        badge: validProduct.badge,
+        nutritionFacts: validProduct.nutritionFacts,
         active: true,
       }),
     });
+  });
+
+  it('allows the optional badge to be left blank', async () => {
+    const response = await POST(makeRequest('POST', { ...validProduct, badge: '  ' }));
+
+    expect(response.status).toBe(201);
+    expect(productCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ badge: null }) });
   });
 
   it('accepts a supported base64 image uploaded from the admin form', async () => {
@@ -161,6 +172,14 @@ describe('/api/products', () => {
     expect(productCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ image: imageUrl, images: [imageUrl] }),
     });
+  });
+
+  it('rejects uploaded images larger than 5 MB', async () => {
+    const imageUrl = `data:image/png;base64,${'A'.repeat(7_000_000)}`;
+    const response = await POST(makeRequest('POST', { ...validProduct, imageUrl }));
+
+    expect(response.status).toBe(400);
+    expect(productCreate).not.toHaveBeenCalled();
   });
 
   it('accepts a seasoning product without protein and with a short description', async () => {
@@ -181,10 +200,12 @@ describe('/api/products', () => {
     const invalidPrice = await POST(makeRequest('POST', { ...validProduct, price: -1 }));
     const unsafeImage = await POST(makeRequest('POST', { ...validProduct, imageUrl: 'javascript:alert(1)' }));
     const unsupportedDataImage = await POST(makeRequest('POST', { ...validProduct, imageUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }));
+    const invalidNutrition = await POST(makeRequest('POST', { ...validProduct, nutritionFacts: { enabled: true, calories: { raw: '320' } } }));
 
     expect(invalidPrice.status).toBe(400);
     expect(unsafeImage.status).toBe(400);
     expect(unsupportedDataImage.status).toBe(400);
+    expect(invalidNutrition.status).toBe(400);
     expect(productCreate).not.toHaveBeenCalled();
   });
 });

@@ -86,6 +86,17 @@ function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: stri
   return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
 }
 
+function setPaymentVerificationCookie(response: NextResponse, paymentMethod: string, orderCode: string, phone: string) {
+  if (paymentMethod !== 'VIETQR') return;
+  response.cookies.set(`mkf_payment_${orderCode}`, phone, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: `/api/orders/${orderCode}`,
+    maxAge: 15 * 60,
+  });
+}
+
 export async function POST(request: Request) {
   let payload: unknown;
   try {
@@ -135,9 +146,10 @@ export async function POST(request: Request) {
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
         where: { idempotencyKey },
-        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
       });
       if (existingOrder) {
+        if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
         const response = NextResponse.json({
           success: true,
           orderId: existingOrder.id,
@@ -149,6 +161,7 @@ export async function POST(request: Request) {
           duplicate: true,
           redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
         }, { status: 200 });
+        setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
         if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
         return response;
       }
@@ -325,9 +338,10 @@ export async function POST(request: Request) {
       if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
         const existingOrder = await prisma.order.findUnique({
           where: { idempotencyKey },
-          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
         });
         if (existingOrder) {
+          if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
           const response = NextResponse.json({
             success: true,
             orderId: existingOrder.id,
@@ -339,6 +353,7 @@ export async function POST(request: Request) {
             duplicate: true,
             redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
           }, { status: 200 });
+          setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
           if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
           return response;
         }
@@ -429,6 +444,7 @@ export async function POST(request: Request) {
       redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR', order.orderCode, order.totalAmount),
       ...(order.duplicate ? { duplicate: true } : {}),
     }, { status: order.duplicate ? 200 : 201 });
+    setPaymentVerificationCookie(response, paymentMethod, order.orderCode, phone);
     if (body.buyNow === true && paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
     return response;
   }, 'Lỗi đặt hàng:');

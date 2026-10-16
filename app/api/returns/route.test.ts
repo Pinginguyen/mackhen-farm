@@ -125,10 +125,20 @@ describe('/api/returns', () => {
 
   it('rejects unsupported or malformed Base64 data URLs', async () => {
     const unsupportedType = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: 'data:image/svg+xml;base64,PHN2Zy8+' }));
+    const unsupportedGif = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA==' }));
     const malformedData = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: 'data:image/png;base64,not base64' }));
 
     expect(unsupportedType.status).toBe(400);
+    expect(unsupportedGif.status).toBe(400);
     expect(malformedData.status).toBe(400);
+  });
+
+  it('rejects evidence larger than 5 MB', async () => {
+    const oversizedImage = `data:image/png;base64,${'A'.repeat(7_000_000)}`;
+    const response = await POST(makeRequest('POST', { ...validReturnRequest, imageUrl: oversizedImage }));
+
+    expect(response.status).toBe(400);
+    expect(returnCreate).not.toHaveBeenCalled();
   });
 
   it('rejects malformed values without throwing', async () => {

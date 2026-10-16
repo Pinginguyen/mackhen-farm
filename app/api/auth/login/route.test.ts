@@ -50,6 +50,9 @@ describe('POST /api/auth/login', () => {
     const sessionToken = cookie?.match(/mkf_session=([^;]+)/)?.[1];
 
     expect(response.status).toBe(200);
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('SameSite=lax');
+    expect(cookie).toContain('Path=/');
     expect(update).toHaveBeenCalledWith({
       where: { id: 'admin-1' },
       data: { role: 'ADMIN' },

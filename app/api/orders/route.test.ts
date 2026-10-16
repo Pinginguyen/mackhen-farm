@@ -322,7 +322,7 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('returns the cached order for a repeated idempotency key without reserving stock again', async () => {
-    orderFindUnique.mockResolvedValueOnce({ id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
+    orderFindUnique.mockResolvedValueOnce({ id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, phone: '0762793244' });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1', 'idempotency-key': 'checkout-attempt-001' },
@@ -337,7 +337,7 @@ describe('POST /api/orders checkout', () => {
 
   it('returns the persisted buy-now order when a retry arrives after its cart cookie was cleared', async () => {
     orderFindUnique.mockResolvedValueOnce({
-      id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'VIETQR',
+      id: 'order-existing', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'VIETQR', phone: '0762793244',
     });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
@@ -350,7 +350,7 @@ describe('POST /api/orders checkout', () => {
       success: true, orderId: 'order-existing', orderCode: 'MKF-123456', totalAmount: 169000,
       redirectUrl: '/checkout/vietqr/MKF-123456?amount=169000', duplicate: true,
     });
-    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(response.headers.get('set-cookie')).toContain('mkf_payment_MKF-123456=0762793244');
     expect(cartFindUnique).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
   });
@@ -472,7 +472,7 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('recovers a concurrent serializable conflict with the committed idempotent order', async () => {
-    const existingOrder = { id: 'order-winner', orderCode: 'MKF-654321', numericCode: 654321, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'COD' };
+    const existingOrder = { id: 'order-winner', orderCode: 'MKF-654321', numericCode: 654321, orderStatus: 'PENDING', totalAmount: 169000, paymentMethod: 'COD', phone: '0762793244' };
     orderFindUnique.mockReset().mockResolvedValueOnce(null).mockResolvedValueOnce(existingOrder);
     prisma.$transaction.mockRejectedValueOnce(Object.assign(new Error('Transaction failed due to a write conflict'), { code: 'P2034' }));
 
@@ -607,5 +607,13 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentMethod }) }));
+    if (paymentMethod === 'VIETQR') {
+      const cookie = response.headers.get('set-cookie') ?? '';
+      expect(cookie).toContain('mkf_payment_MKF-123456=0762793244');
+      expect(cookie).toContain('HttpOnly');
+      expect(cookie).toContain('SameSite=lax');
+      expect(cookie).toContain('Path=/api/orders/MKF-123456');
+      expect(cookie).toContain('Max-Age=900');
+    }
   });
 });

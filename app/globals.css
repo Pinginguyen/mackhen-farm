@@ -144,8 +144,9 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
+  white-space: nowrap;
 }
 
 .live-product-search {
@@ -376,14 +377,16 @@ textarea {
 
 .account-menu summary {
   display: grid;
-  width: 42px;
-  height: 42px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid #e7e5e4;
   border-radius: 999px;
   background: #f5f5f4;
   cursor: pointer;
   list-style: none;
+  white-space: nowrap;
 }
 
 .account-menu summary::-webkit-details-marker {
@@ -397,13 +400,14 @@ textarea {
 
 .account-avatar {
   display: grid;
-  width: 100%;
-  height: 100%;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: 50%;
   color: #57534e;
-  font-size: 0.72rem;
-  font-weight: 850;
+  font-size: 0.875rem;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .account-dropdown {
@@ -481,6 +485,46 @@ textarea {
   cursor: pointer;
   font: inherit;
   text-align: left;
+}
+
+.admin-header-link {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: #8b1e1e;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 180ms ease;
+  white-space: nowrap;
+}
+
+.admin-header-link:hover {
+  background: #721919;
+}
+
+.site-header-actions > a,
+.site-header-actions > details,
+.site-header-actions .account-menu summary,
+.site-header-actions .account-avatar {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.site-header .brand-wrap,
+.site-header .brand-wrap > span,
+.site-header .main-nav a,
+.site-header .site-brand-name,
+.site-header .eyebrow {
+  white-space: nowrap;
+}
+
+.site-header .site-brand-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .validated-phone-input {
@@ -1021,6 +1065,20 @@ textarea {
 
 .detail-header-tags .pill {
   white-space: nowrap;
+}
+
+.product-highlight-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #8b1e1e;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .detail-media,
@@ -6882,13 +6940,7 @@ body {
     grid-column: 1;
     grid-row: 2;
     justify-content: flex-start;
-    flex-wrap: wrap;
     gap: 8px;
-  }
-
-  .site-header .admin-role-badge,
-  .site-header .site-header-actions a[href="/admin"] {
-    display: none;
   }
 
   .site-header-actions .cta-link {
@@ -8862,6 +8914,41 @@ body {
   grid-column: 1 / -1;
 }
 
+.admin-nutrition-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-nutrition-fields legend {
+  padding: 0 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.admin-nutrition-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 13px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.admin-nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-nutrition-grid .field {
+  margin: 0;
+}
+
 .admin-new-product-form .field {
   display: grid;
   min-width: 0;
@@ -9054,6 +9141,10 @@ body {
   }
 
   .admin-new-product-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-nutrition-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

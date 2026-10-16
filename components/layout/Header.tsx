@@ -16,6 +16,7 @@ export default async function Header() {
       user = null;
     }
   }
+  const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
     <header className="topbar site-header sticky top-0 z-50 w-full bg-[#FDFBF7]/90 backdrop-blur-md border-b border-stone-200/80 shadow-sm transition-all duration-200">
@@ -43,18 +44,17 @@ export default async function Header() {
         ) : (
           <>
             {user.role === 'ADMIN' && (
-              <>
-                <span className="admin-role-badge">Quản trị viên</span>
-                <Link className="cta-link" href="/admin">Vào trang Quản trị</Link>
-              </>
+              <Link className="admin-header-link" href="/admin">Vào trang Quản trị</Link>
             )}
             <details className="account-menu">
-              <summary>
-                {user.name}<span aria-hidden="true">⌄</span>
+              <summary aria-label={`Tài khoản ${user.name}`} title={user.name}>
+                <span className="account-avatar" aria-hidden="true">{initials || 'MK'}</span>
               </summary>
               <div className="account-dropdown">
+                <div className="account-dropdown-heading"><span>Đang đăng nhập</span><strong>{user.name}</strong></div>
+                <span className="account-dropdown-divider" />
                 <Link href="/tai-khoan">Thông tin tài khoản</Link>
-                <Link href="/tai-khoan?tab=orders">Đơn mua của tôi</Link>
+                <Link href="/tai-khoan?tab=orders">Đơn mua</Link>
                 {user.role === 'ADMIN' && <Link href="/admin">Khu vực quản trị</Link>}
                 <LogoutButton />
               </div>

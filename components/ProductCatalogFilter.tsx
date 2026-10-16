@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
+import type { NutritionFacts } from '@/lib/store-data';
 
 export type CatalogProduct = {
   id: string;
@@ -21,6 +22,8 @@ export type CatalogProduct = {
   image: string;
   images?: string[];
   highlight: string;
+  badge?: string | null;
+  nutritionFacts?: NutritionFacts | null;
 };
 
 export default function ProductCatalogFilter({ products, initialQuery = '' }: { products: CatalogProduct[]; initialQuery?: string }) {
@@ -68,6 +71,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
               <div className="product-badges">
                 {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
                 {product.protein != null && <span className="product-badge nutrition-badge">{product.protein} Protein</span>}
+                {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
                 <span className="product-badge">{product.highlight}</span>
               </div>
             </div>

@@ -24,6 +24,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
         <div className="product-badges">
           {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
           {product.protein != null && <span className="product-badge nutrition-badge">{product.protein} Protein</span>}
+          {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
           <span className="product-badge">{product.highlight}</span>
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`Xem nhanh ${product.name}`}><Eye size={16} />Xem nhanh</button>}

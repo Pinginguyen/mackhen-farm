@@ -250,7 +250,7 @@ export default function TrackingForm() {
           <label htmlFor="tracking-code">Mã đơn hàng</label>
           <input id="tracking-code" name="orderCode" placeholder="MKF-123456" defaultValue={searchParams.get('orderCode') ?? ''} required />
         </div>
-        <span>hoặc</span>
+        <span>và</span>
         <div className="field">
           <label htmlFor="tracking-phone">Số điện thoại</label>
           <input id="tracking-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
