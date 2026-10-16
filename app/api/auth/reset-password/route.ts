@@ -6,42 +6,41 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 
 export async function POST(request: Request) {
-  let body: { email?: string; otp?: string; newPassword?: string };
+  let body: { token?: string; newPassword?: string; confirmPassword?: string };
   try {
     body = await request.json() as typeof body;
   } catch {
     return NextResponse.json({ error: 'Yêu cầu không hợp lệ.' }, { status: 400 });
   }
 
-  const email = body.email?.trim().toLowerCase();
-  const otp = body.otp?.trim();
+  const token = body.token?.trim();
   const newPassword = body.newPassword;
-  if (!email || !/^\S+@\S+\.\S+$/.test(email) || !otp || !/^\d{6}$/.test(otp) || !newPassword || newPassword.length < 10 || newPassword.length > 100) {
-    return NextResponse.json({ error: 'Nhập email, mã OTP 6 số và mật khẩu mới từ 10 đến 100 ký tự.' }, { status: 400 });
+  if (!token || !/^[a-f0-9]{64}$/i.test(token) || !newPassword || newPassword.length < 10 || newPassword.length > 100 || body.confirmPassword !== newPassword) {
+    return NextResponse.json({ error: 'Liên kết không hợp lệ hoặc mật khẩu xác nhận không khớp. Mật khẩu cần từ 10 đến 100 ký tự.' }, { status: 400 });
   }
 
-  const token = createHash('sha256').update(`${email}:${otp}`).digest('hex');
+  const tokenHash = createHash('sha256').update(token).digest('hex');
   return withDatabase(async () => {
     const validToken = await prisma.passwordResetToken.findFirst({
-      where: { email, token, expiresAt: { gt: new Date() } },
-      select: { id: true },
+      where: { token: tokenHash, expiresAt: { gt: new Date() } },
+      select: { id: true, email: true },
     });
-    if (!validToken) return NextResponse.json({ error: 'Mã OTP không đúng hoặc đã hết hạn.' }, { status: 400 });
+    if (!validToken) return NextResponse.json({ error: 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.' }, { status: 400 });
 
     const password = await hash(newPassword, 12);
     const changed = await prisma.$transaction(async (transaction) => {
       const resetToken = await transaction.passwordResetToken.findFirst({
-        where: { email, token, expiresAt: { gt: new Date() } },
+        where: { token: tokenHash, expiresAt: { gt: new Date() } },
         select: { id: true },
       });
       if (!resetToken) return false;
 
-      await transaction.user.update({ where: { email }, data: { password } });
-      await transaction.passwordResetToken.deleteMany({ where: { email } });
+      await transaction.user.update({ where: { email: validToken.email }, data: { password } });
+      await transaction.passwordResetToken.deleteMany({ where: { email: validToken.email } });
       return true;
     });
 
-    if (!changed) return NextResponse.json({ error: 'Mã OTP không đúng hoặc đã hết hạn.' }, { status: 400 });
+    if (!changed) return NextResponse.json({ error: 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.' }, { status: 400 });
     return NextResponse.json({ message: 'Đổi mật khẩu thành công.' });
   });
 }
