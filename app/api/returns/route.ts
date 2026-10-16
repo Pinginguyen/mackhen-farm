@@ -25,6 +25,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isMissingReturnVoucherRelationColumn(error: unknown): boolean {
+  return isRecord(error)
+    && error.code === 'P2022'
+    && isRecord(error.meta)
+    && typeof error.meta.column === 'string'
+    && error.meta.column.includes('returnRequestId');
+}
+
 function normalizePhone(value: string): string {
   const digits = value.replace(/\D/g, '');
   if (digits.startsWith('0084')) return `0${digits.slice(4)}`;
@@ -124,23 +132,35 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' },
       });
     } catch (error) {
-      const missingVoucherRelation = isRecord(error)
-        && error.code === 'P2022'
-        && isRecord(error.meta)
-        && typeof error.meta.column === 'string'
-        && error.meta.column.includes('returnRequestId');
-      if (!missingVoucherRelation) throw error;
+      if (!isMissingReturnVoucherRelationColumn(error)) throw error;
 
       console.error('Admin return list is missing the issued voucher relation column; apply pending migrations.', error);
       const requestsWithoutIssuedVoucher = await prisma.returnRequest.findMany({
         include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
         orderBy: { createdAt: 'desc' },
       });
-      const items = requestsWithoutIssuedVoucher.map((item) => ({ ...item, issuedVoucher: null }));
+      const voucherNames = requestsWithoutIssuedVoucher.map((item) => `Voucher đền bù đơn ${item.order.orderCode}`);
+      const issuedVouchers = voucherNames.length
+        ? await prisma.voucher.findMany({ where: { name: { in: voucherNames } } })
+        : [];
+      const voucherByName = new Map(issuedVouchers.map((voucher) => [voucher.name, voucher]));
+      const items = requestsWithoutIssuedVoucher.map((item) => ({
+        ...item,
+        issuedVoucher: voucherByName.get(`Voucher đền bù đơn ${item.order.orderCode}`) ?? null,
+      }));
       items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
         || right.createdAt.getTime() - left.createdAt.getTime());
       return NextResponse.json({ items });
     }
+      const requestsMissingVoucherLink = items.filter((item) => item.status === 'VOUCHER_ISSUED' && !item.issuedVoucher);
+      if (requestsMissingVoucherLink.length) {
+        const voucherNames = requestsMissingVoucherLink.map((item) => `Voucher đền bù đơn ${item.order.orderCode}`);
+        const issuedVouchers = await prisma.voucher.findMany({ where: { name: { in: voucherNames } } });
+        const voucherByName = new Map(issuedVouchers.map((voucher) => [voucher.name, voucher]));
+        items = items.map((item) => item.issuedVoucher || item.status !== 'VOUCHER_ISSUED'
+          ? item
+          : { ...item, issuedVoucher: voucherByName.get(`Voucher đền bù đơn ${item.order.orderCode}`) ?? null });
+      }
     items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
       || right.createdAt.getTime() - left.createdAt.getTime());
     return NextResponse.json({ items });
@@ -205,39 +225,52 @@ export async function PATCH(request: Request) {
     }
     const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
     if (status === 'VOUCHER_ISSUED' && current.status === 'VOUCHER_ISSUED') {
-      const existing = await prisma.returnRequest.findUnique({ where: { id }, include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true } });
-      if (existing) return NextResponse.json({ item: existing, duplicate: true });
+      const existing = await prisma.returnRequest.findUnique({ where: { id }, include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true } });
+      if (existing) {
+        const issuedVoucher = await prisma.voucher.findFirst({ where: { name: `Voucher đền bù đơn ${current.order.orderCode}` } });
+        return NextResponse.json({ item: { ...existing, issuedVoucher }, duplicate: true });
+      }
     }
     const refundCompleted = ['REFUNDED', 'COMPLETED'].includes(status);
     const item = status === 'VOUCHER_ISSUED' && resolutionMethod === 'VOUCHER'
-      ? await prisma.$transaction(async (transaction) => {
-        const baseCode = `COMP-${current.order.orderCode}`;
-        const codeExists = await transaction.voucher.findUnique({ where: { code: baseCode }, select: { id: true } });
-        const code = codeExists ? `${baseCode}-${randomBytes(2).toString('hex').toUpperCase()}` : baseCode;
-        const voucher = await transaction.voucher.create({
-          data: {
-            code,
-            name: `Voucher đền bù đơn ${current.order.orderCode}`,
-            discountType: 'FIXED',
-            value: Number(voucherValue),
-            maxDiscount: null,
-            minSpend: 0,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            isActive: true,
-            usageLimit: 1,
-            freeShipping: false,
-            firstOrderOnly: false,
-            showOnPromoPage: false,
-            returnRequestId: id,
-          },
+      ? await (async () => {
+        const createVoucher = (includeReturnRequestRelation: boolean) => prisma.$transaction(async (transaction) => {
+          const baseCode = `COMP-${current.order.orderCode}`;
+          const codeExists = await transaction.voucher.findUnique({ where: { code: baseCode }, select: { id: true } });
+          const code = codeExists ? `${baseCode}-${randomBytes(2).toString('hex').toUpperCase()}` : baseCode;
+          const voucher = await transaction.voucher.create({
+            data: {
+              code,
+              name: `Voucher đền bù đơn ${current.order.orderCode}`,
+              discountType: 'FIXED',
+              value: Number(voucherValue),
+              maxDiscount: null,
+              minSpend: 0,
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              isActive: true,
+              usageLimit: 1,
+              freeShipping: false,
+              firstOrderOnly: false,
+              showOnPromoPage: false,
+              ...(includeReturnRequestRelation ? { returnRequestId: id } : {}),
+            },
+          });
+          const updated = await transaction.returnRequest.update({
+            where: { id },
+            data: { status: 'VOUCHER_ISSUED', adminNote },
+            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+          });
+          return { ...updated, issuedVoucher: voucher };
         });
-        const updated = await transaction.returnRequest.update({
-          where: { id },
-          data: { status: 'VOUCHER_ISSUED', adminNote },
-          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
-        });
-        return { ...updated, issuedVoucher: voucher };
-      })
+
+        try {
+          return await createVoucher(true);
+        } catch (error) {
+          if (!isMissingReturnVoucherRelationColumn(error)) throw error;
+          console.error('Issuing a return voucher without the optional returnRequestId relation; apply pending migrations.', error);
+          return createVoucher(false);
+        }
+      })()
       : status === 'VOUCHER_ISSUED'
       ? await prisma.$transaction(async (transaction) => {
         await transaction.compensationVoucher.create({
@@ -254,7 +287,7 @@ export async function PATCH(request: Request) {
         return transaction.returnRequest.update({
           where: { id },
           data: { status, adminNote },
-          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
         });
       })
       : refundCompleted
@@ -264,7 +297,7 @@ export async function PATCH(request: Request) {
           const updatedReturn = await transaction.returnRequest.update({
             where: { id },
             data: { status: status as ReturnRequestStatus, adminNote, refundTransferReference, refundCompletedBy: adminEmail },
-            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
           });
           await transaction.order.update({
             where: { id: current.orderId },
@@ -280,7 +313,7 @@ export async function PATCH(request: Request) {
           ...(status === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
           ...(['REFUNDED', 'COMPLETED'].includes(status) ? { refundTransferReference, refundCompletedBy: adminEmail } : {}),
         },
-        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
       });
     if (refundCompleted) revalidateTag('admin-dashboard');
     await writeAuditLog(request, {
@@ -289,7 +322,7 @@ export async function PATCH(request: Request) {
       targetEntity: 'ReturnRequest',
       targetId: id,
       oldValue: current,
-      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' ? item.issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
+      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' && 'issuedVoucher' in item ? item.issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
     });
     return NextResponse.json({ item });
   }, 'Return request update failed');

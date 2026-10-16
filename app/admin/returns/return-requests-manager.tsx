@@ -129,6 +129,16 @@ export default function ReturnRequestsManager() {
 
       const updated = result.item;
       setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
+      if (status === 'VOUCHER_ISSUED') {
+        setSelected(null);
+        setToast(updated.issuedVoucher
+          ? `Đã phát hành voucher ${updated.issuedVoucher.code} trị giá ${updated.issuedVoucher.value.toLocaleString('vi-VN')}đ.`
+          : updated.compensationVoucher
+            ? `Đã phát hành voucher ${updated.compensationVoucher.code}.`
+            : 'Đã phát hành voucher đền bù.');
+        window.setTimeout(() => setToast(''), 4000);
+        return;
+      }
       if (['REFUNDED', 'COMPLETED'].includes(status)) {
         setSelected(null);
         setToast('Đã xác nhận hoàn tiền thành công');

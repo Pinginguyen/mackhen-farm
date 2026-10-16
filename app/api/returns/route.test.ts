@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherCreate, requireAdmin, writeAuditLog, transaction, prismaTransaction } = vi.hoisted(() => {
+const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, transaction, prismaTransaction } = vi.hoisted(() => {
   const mocks = {
     orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
-    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
+    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
   };
   const transaction = {
     order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
     returnRequest: { update: mocks.returnUpdate },
     compensationVoucher: { create: mocks.compensationVoucherCreate },
-    voucher: { findUnique: mocks.voucherFindUnique, create: mocks.voucherCreate },
+    voucher: { findUnique: mocks.voucherFindUnique, findMany: mocks.voucherFindMany, findFirst: mocks.voucherFindFirst, create: mocks.voucherCreate },
   };
   const prismaTransaction = vi.fn((operation: (tx: typeof transaction) => Promise<unknown>) => operation(transaction));
   return {
@@ -24,7 +24,7 @@ vi.mock('@/lib/prisma', () => ({
     order: { findFirst: orderFindFirst, findUnique: orderFindUnique, update: orderUpdate },
     returnRequest: { create: returnCreate, findMany: returnFindMany, findUnique: returnFindUnique, update: returnUpdate },
     compensationVoucher: {},
-    voucher: { findUnique: voucherFindUnique, create: voucherCreate },
+    voucher: { findUnique: voucherFindUnique, findMany: voucherFindMany, findFirst: voucherFindFirst, create: voucherCreate },
     $transaction: prismaTransaction,
   },
 }));
@@ -62,6 +62,8 @@ describe('/api/returns', () => {
     returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'COMPLETED' });
     compensationVoucherCreate.mockReset().mockResolvedValue({ id: 'voucher-1', code: 'MKF50-ABCDEF12' });
     voucherFindUnique.mockReset().mockResolvedValue(null);
+    voucherFindMany.mockReset().mockResolvedValue([]);
+    voucherFindFirst.mockReset().mockResolvedValue(null);
     voucherCreate.mockReset().mockResolvedValue({ id: 'voucher-2', code: 'COMP-MKF-123456', value: 50000, expiresAt: new Date() });
     requireAdmin.mockReset().mockResolvedValue(null);
     writeAuditLog.mockReset().mockResolvedValue(undefined);
@@ -205,6 +207,7 @@ describe('/api/returns', () => {
       expect(response.status).toBe(200);
       expect(result.items).toEqual([expect.objectContaining({ ...requestItem, createdAt: requestItem.createdAt.toISOString(), issuedVoucher: null })]);
       expect(returnFindMany).toHaveBeenCalledTimes(2);
+      expect(voucherFindMany).toHaveBeenCalledWith({ where: { name: { in: ['Voucher đền bù đơn MKF-123456'] } } });
       expect(logError).toHaveBeenCalledWith(expect.stringContaining('apply pending migrations.'), expect.objectContaining({ code: 'P2022' }));
     } finally {
       logError.mockRestore();
@@ -220,10 +223,31 @@ describe('/api/returns', () => {
     expect(returnUpdate).toHaveBeenCalledWith({
       where: { id: 'return-1' },
       data: { status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123', refundCompletedBy: 'unknown-admin' },
-      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
     });
     expect(orderUpdate).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { paymentStatus: 'REFUNDED', refundAmount: 169000, refundedAt: expect.any(Date) } });
   });
+
+  it.each(['REPLACEMENT_APPROVED', 'REFUND_APPROVED', 'REJECTED'] as const)(
+    'updates %s without selecting the un-migrated issued-voucher relation',
+    async (status) => {
+      returnFindUnique.mockResolvedValueOnce({
+        status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
+        refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A',
+        refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+        order: { orderCode: 'MKF-123456', totalAmount: 169000 },
+      });
+      returnUpdate.mockResolvedValueOnce({
+        id: 'return-1', status,
+        order: { orderCode: 'MKF-123456', customerName: 'Buyer', totalAmount: 169000 },
+      });
+
+      const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status }));
+
+      expect(response.status).toBe(200);
+      expect(returnUpdate.mock.calls[0][0].include).not.toHaveProperty('issuedVoucher');
+    },
+  );
 
   it('requires a transfer reference before confirming a refund', async () => {
     returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
@@ -284,12 +308,37 @@ describe('/api/returns', () => {
     expect(returnUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'return-1' },
       data: { status: 'VOUCHER_ISSUED', adminNote: null },
-      include: expect.objectContaining({ issuedVoucher: true }),
+      include: expect.objectContaining({ compensationVoucher: true }),
     }));
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({
       action: 'ISSUE_COMPENSATION_VOUCHER', targetEntity: 'ReturnRequest', targetId: 'return-1',
       newValue: expect.objectContaining({ voucherCode: 'COMP-MKF-123456', voucherValue: 50000, resolutionMethod: 'VOUCHER' }),
     }));
+  });
+
+  it('retries voucher issuance without the optional relation when its database column is missing', async () => {
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'REFUND_APPROVED', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A',
+      refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000 },
+    });
+    voucherCreate
+      .mockRejectedValueOnce({ code: 'P2022', meta: { column: 'Voucher.returnRequestId' } })
+      .mockResolvedValueOnce({ id: 'voucher-2', code: 'COMP-MKF-123456', value: 50000 });
+    returnUpdate.mockResolvedValueOnce({
+      id: 'return-1', status: 'VOUCHER_ISSUED',
+      order: { orderCode: 'MKF-123456', customerName: 'Buyer', totalAmount: 169000 },
+    });
+    const response = await PATCH(makeRequest('PATCH', {
+      id: 'return-1', status: 'VOUCHER_ISSUED', resolutionMethod: 'VOUCHER', voucherValue: 50000,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(prismaTransaction).toHaveBeenCalledTimes(2);
+    expect(voucherCreate.mock.calls[0][0].data).toHaveProperty('returnRequestId', 'return-1');
+    expect(voucherCreate.mock.calls[1][0].data).not.toHaveProperty('returnRequestId');
+    expect(returnUpdate).toHaveBeenCalledOnce();
   });
 
   it('requires human approval with refund details before allowing refund completion', async () => {
