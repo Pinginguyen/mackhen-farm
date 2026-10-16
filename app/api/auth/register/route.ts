@@ -10,8 +10,8 @@ export async function POST(request: Request) {
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
     const password = body.password;
-    if (!name || !email || !password || name.length > 100 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 10 || password.length > 100) {
-      return NextResponse.json({ error: 'Nhập họ tên, email hợp lệ và mật khẩu từ 10 ký tự.' }, { status: 400 });
+    if (!name || !email || !password || name.length > 100 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8 || password.length > 100) {
+      return NextResponse.json({ error: 'Nhập họ tên, email hợp lệ và mật khẩu từ 8 ký tự.' }, { status: 400 });
     }
     if (email === ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Email quản trị được khởi tạo riêng, không thể tự đăng ký.' }, { status: 403 });

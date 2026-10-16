@@ -27,7 +27,6 @@ export default function SiteFooter() {
           <Link href="/tra-cuu">Tra cứu hành trình đơn hàng</Link>
           <Link href="/tra-cuu#return-request-form">Chính sách bảo hành vị giác (Đổi mới trong 24h)</Link>
           <Link href="/products">Danh mục sản phẩm khô bò &amp; gia vị</Link>
-          <Link href="/admin/returns">Cổng quản trị dành cho Admin</Link>
         </nav>
         <section className="site-footer-column">
           <h2>TIÊU CHUẨN &amp; PHÁP LÝ</h2>

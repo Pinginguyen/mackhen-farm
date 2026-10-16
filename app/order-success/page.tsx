@@ -26,7 +26,7 @@ export default async function OrderSuccessPage({ searchParams }: { searchParams:
         <h1>Thanh toán thành công</h1>
         <p>{orderCode ? `Đơn hàng ${orderCode} đã được ghi nhận thanh toán.` : 'Đơn hàng đã được ghi nhận thanh toán.'} Cảm ơn bạn đã mua sắm tại Mắc Khén Farm.</p>
         <div className="hero-actions">
-          {orderCode && <Link className="primary-action" href={`/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`}>Tra cứu đơn hàng</Link>}
+          {orderCode && <Link className="order-success-track-button" href={`/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`}>Theo dõi đơn hàng</Link>}
           <Link className="secondary-action" href="/">Về trang chủ</Link>
         </div>
       </section>
