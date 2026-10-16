@@ -153,6 +153,17 @@ describe('/api/admin/orders', () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
+  it('allows a same-state shipping update to save current carrier and tracking data', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX-OLD', deliveredAt: null, phone: '0762793244', address: 'Lai Chau', note: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'SHIPPING', carrier: 'SPX', trackingCode: 'SPX-NEW' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'SHIPPING', trackingCode: 'SPX-NEW' }) }));
+  });
+
   it('does not allow a returned order to resume shipping', async () => {
     orderFindUnique.mockResolvedValueOnce({ orderStatus: 'RETURNED', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {

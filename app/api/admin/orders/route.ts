@@ -128,7 +128,7 @@ export async function PATCH(request: Request) {
       if (['CANCELLED', 'RETURNED'].includes(currentOrder.orderStatus) && targetStatus !== currentOrder.orderStatus) {
         return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc chuyển hoàn là trạng thái cuối, không thể tiếp tục xử lý.' } }, { status: 409 });
       }
-      if (currentOrder.orderStatus === 'SHIPPING' && !['DELIVERED', 'RETURNED'].includes(targetStatus)) {
+      if (currentOrder.orderStatus === 'SHIPPING' && targetStatus !== currentOrder.orderStatus && !['DELIVERED', 'RETURNED'].includes(targetStatus)) {
         return NextResponse.json({ error: { message: 'Đơn đang giao chỉ có thể cập nhật thành đã giao hoặc chuyển hoàn.' } }, { status: 409 });
       }
       if (['DELIVERED', 'COMPLETED'].includes(targetStatus) && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID') {
