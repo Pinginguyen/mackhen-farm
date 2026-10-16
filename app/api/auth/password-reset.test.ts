@@ -41,7 +41,10 @@ function post(url: string, body: object) {
 
 describe('password reset APIs', () => {
   beforeEach(() => {
-    vi.stubEnv('RESEND_API_KEY', '');
+    vi.stubEnv('SMTP_USER', '');
+    vi.stubEnv('SMTP_PASSWORD', '');
+    vi.stubEnv('EMAIL_USER', '');
+    vi.stubEnv('EMAIL_PASS', '');
     vi.stubEnv('NEXT_PUBLIC_APP_URL', '');
     userFindUnique.mockReset().mockResolvedValue({ id: 'user-1', email: 'user@example.com' });
     tokenFindFirst.mockReset().mockResolvedValue(null);

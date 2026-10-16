@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
           <div className="field"><label htmlFor="reset-email">Email tài khoản</label><input id="reset-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
           <button className="primary-action" type="submit" disabled={submitting}>{submitting ? 'Đang gửi...' : 'Gửi liên kết đặt lại mật khẩu'}</button>
           {error && <p className="form-error" role="alert">{error}</p>}
-        </form> : <div className="password-reset-sent" role="status"><h2>Hãy kiểm tra email</h2><p>Nếu email này đã đăng ký, hướng dẫn đặt lại mật khẩu sẽ được gửi trong ít phút. Liên kết có hiệu lực trong 15 phút.</p><button type="button" className="secondary-action" onClick={() => { setSent(false); setError(''); }}>Gửi lại liên kết</button></div>}
+        </form> : <div className="password-reset-sent" role="status"><h2>Hãy kiểm tra email</h2><p>Nếu email này đã đăng ký, hướng dẫn đặt lại mật khẩu sẽ được gửi trong ít phút. Liên kết có hiệu lực trong 15 phút.</p><p>💡 Mẹo: Nếu không thấy trong Hộp thư đến, bạn vui lòng kiểm tra thêm trong thư mục Thư rác (Spam) hoặc Quảng cáo nhé.</p><button type="button" className="secondary-action" onClick={() => { setSent(false); setError(''); }}>Gửi lại liên kết</button></div>}
         <p><Link href="/dang-nhap">Quay lại đăng nhập</Link></p>
       </section>
     </main>

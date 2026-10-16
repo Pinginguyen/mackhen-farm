@@ -6819,8 +6819,7 @@ body {
   flex-wrap: wrap;
 }
 
-.admin-reconciliation-actions button,
-.admin-sentiment-button {
+.admin-reconciliation-actions button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -6848,32 +6847,9 @@ body {
   color: #b42318;
 }
 
-.admin-reconciliation-actions button:disabled,
-.admin-sentiment-button:disabled {
+.admin-reconciliation-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.admin-sentiment-button {
-  border-color: rgba(139, 30, 30, 0.25);
-  color: var(--primary);
-}
-
-.admin-return-risk {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 0.73rem;
-  font-weight: 700;
-}
-
-.admin-return-risk.urgent {
-  color: #b42318;
-}
-
-.admin-return-urgent-row {
-  background: #fff6f4;
 }
 
 @media (max-width: 760px) {

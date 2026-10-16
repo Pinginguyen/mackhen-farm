@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Check, Clock3, Copy, Image as ImageIcon, LoaderCircle, PackageCheck, Sparkles, Wallet, X, XCircle } from 'lucide-react';
+import { Check, Clock3, Copy, Image as ImageIcon, LoaderCircle, PackageCheck, Wallet, X, XCircle } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-message';
 
 type ReturnStatus = 'PENDING' | 'REPLACEMENT_APPROVED' | 'VOUCHER_ISSUED' | 'REFUND_APPROVED' | 'REFUNDED' | 'COMPLETED' | 'REJECTED';
 
@@ -20,7 +21,6 @@ type ReturnRequest = {
   refundApprovedBy: string | null;
   refundApprovedAt: string | null;
   refundTransferReference: string | null;
-  riskTag: string | null;
   compensationVoucher?: { code: string; discountPercent: number; expiresAt: string; redeemedAt: string | null } | null;
   createdAt: string;
   order: { orderCode: string; customerName: string };
@@ -61,7 +61,6 @@ export default function ReturnRequestsManager() {
   const [notice, setNotice] = useState('');
   const [toast, setToast] = useState('');
   const [copiedRefundField, setCopiedRefundField] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -69,11 +68,11 @@ export default function ReturnRequestsManager() {
     async function loadRequests() {
       try {
         const response = await fetch('/api/returns', { cache: 'no-store' });
-        const result = await response.json() as { items?: ReturnRequest[]; error?: string };
-        if (!response.ok) throw new Error(result.error ?? 'Không thể tải yêu cầu đổi trả.');
+        const result = await response.json() as { items?: ReturnRequest[]; error?: unknown };
+        if (!response.ok) throw new Error(getErrorMessage(result.error ?? result, 'Không thể tải yêu cầu đổi trả.'));
         if (active) setRequests(result.items ?? []);
       } catch (loadError) {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Không thể tải yêu cầu đổi trả.');
+        if (active) setError(getErrorMessage(loadError, 'Không thể tải yêu cầu đổi trả.'));
       } finally {
         if (active) setLoading(false);
       }
@@ -114,8 +113,8 @@ export default function ReturnRequestsManager() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id: selected.id, status, adminNote, refundTransferReference }),
       });
-      const result = await response.json() as { item?: ReturnRequest; error?: string };
-      if (!response.ok || !result.item) throw new Error(result.error ?? 'Không thể cập nhật yêu cầu.');
+      const result = await response.json() as { item?: ReturnRequest; error?: unknown };
+      if (!response.ok || !result.item) throw new Error(getErrorMessage(result.error ?? result, 'Không thể cập nhật yêu cầu.'));
 
       const updated = result.item;
       setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
@@ -137,7 +136,7 @@ export default function ReturnRequestsManager() {
       setRefundTransferReference(updated.refundTransferReference ?? '');
       setNotice(`Đã cập nhật yêu cầu ${updated.order.orderCode}: ${statusLabels[updated.status]}.`);
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : 'Không thể cập nhật yêu cầu.');
+      setError(getErrorMessage(updateError, 'Không thể cập nhật yêu cầu.'));
     } finally {
       busyRef.current = false;
       setBusy(false);
@@ -156,32 +155,9 @@ export default function ReturnRequestsManager() {
     }
   }
 
-  async function analyzeSentiment() {
-    setAnalyzing(true);
-    setError('');
-    setNotice('');
-    try {
-      const response = await fetch('/api/admin/ai-sentiment', { method: 'POST' });
-      const result = await response.json() as { message?: string; source?: string; error?: string };
-      if (!response.ok) throw new Error(result.error ?? 'Không thể phân tích nội dung mới.');
-      const refreshed = await fetch('/api/returns', { cache: 'no-store' });
-      const queue = await refreshed.json() as { items?: ReturnRequest[]; error?: string };
-      if (!refreshed.ok) throw new Error(queue.error ?? 'Đã phân tích nhưng không tải lại được hàng đợi.');
-      setRequests(queue.items ?? []);
-      setNotice(`${result.message ?? 'Đã phân tích hàng đợi.'} Nguồn: ${result.source === 'gemini' ? 'Gemini' : 'từ khóa dự phòng'}.`);
-    } catch (analysisError) {
-      setError(analysisError instanceof Error ? analysisError.message : 'Không thể phân tích nội dung mới.');
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
   return (
     <div className="admin-return-manager">
       <div className="admin-return-toolbar">
-        <button className="admin-sentiment-button" type="button" onClick={() => void analyzeSentiment()} disabled={analyzing || busy}>
-          <Sparkles size={16} />{analyzing ? 'Đang phân tích...' : 'Phân tích phản hồi mới'}
-        </button>
         <div className="admin-return-tabs" role="tablist" aria-label="Lọc trạng thái yêu cầu đổi trả">
           {statusTabs.map((tab) => {
             const count = tab.id === 'ALL' ? requests.length : requests.filter((request) => tab.id === 'COMPLETED' ? ['COMPLETED', 'REFUNDED'].includes(request.status) : request.status === tab.id).length;
@@ -216,7 +192,6 @@ export default function ReturnRequestsManager() {
               <th>Mã đơn hàng</th>
               <th>Khách hàng</th>
               <th>Loại sự cố</th>
-              <th>Ưu tiên</th>
               <th>Ảnh minh chứng</th>
               <th>Thời gian gửi</th>
               <th>Trạng thái</th>
@@ -225,14 +200,13 @@ export default function ReturnRequestsManager() {
           </thead>
           <tbody>
             {visibleRequests.map((request) => (
-              <tr key={request.id} className={request.riskTag === 'URGENT_QUALITY_RISK' ? 'admin-return-urgent-row' : undefined}>
+              <tr key={request.id}>
                 <td><strong>{request.order.orderCode}</strong></td>
                 <td>
                   <span className="admin-return-customer">{request.order.customerName}</span>
                   <small>{request.customerPhone}</small>
                 </td>
                 <td>{request.issueType}</td>
-                <td>{request.riskTag === 'URGENT_QUALITY_RISK' ? <span className="admin-return-risk urgent"><AlertTriangle size={14} /> Khẩn cấp · nguy cơ chất lượng</span> : request.riskTag === 'ROUTINE' ? <span className="admin-return-risk">Thông thường</span> : <span className="admin-return-risk">Chưa phân tích</span>}</td>
                 <td>
                   {request.imageUrl ? (
                     <button className="admin-return-thumbnail" type="button" onClick={() => setImagePreview(request.imageUrl)} aria-label={`Phóng to ảnh minh chứng đơn ${request.order.orderCode}`}>
@@ -246,9 +220,9 @@ export default function ReturnRequestsManager() {
               </tr>
             ))}
             {!loading && !visibleRequests.length && (
-              <tr><td className="admin-return-empty" colSpan={8}>{requests.length ? 'Không có yêu cầu phù hợp bộ lọc.' : 'Chưa có yêu cầu đổi trả nào.'}</td></tr>
+              <tr><td className="admin-return-empty" colSpan={7}>{requests.length ? 'Không có yêu cầu phù hợp bộ lọc.' : 'Chưa có yêu cầu đổi trả nào.'}</td></tr>
             )}
-            {loading && <tr><td className="admin-return-empty" colSpan={8}>Đang tải yêu cầu...</td></tr>}
+            {loading && <tr><td className="admin-return-empty" colSpan={7}>Đang tải yêu cầu...</td></tr>}
           </tbody>
         </table>
       </div>
