@@ -20,10 +20,10 @@ if (datasourceUrl) {
     datasourceUrl.searchParams.set('pgbouncer', 'true');
   }
   const isPooler = datasourceUrl.hostname.includes('-pooler.') || datasourceUrl.searchParams.has('pgbouncer');
-  if (isPooler || process.env.VERCEL) datasourceUrl.searchParams.set('pgbouncer', 'true');
-  if (process.env.VERCEL) {
-    datasourceUrl.searchParams.set('connection_limit', '1');
-    if (!datasourceUrl.searchParams.has('pool_timeout')) datasourceUrl.searchParams.set('pool_timeout', '8');
+  if (isPooler || process.env.VERCEL) {
+    datasourceUrl.searchParams.set('pgbouncer', 'true');
+    datasourceUrl.searchParams.set('connection_limit', '10');
+    datasourceUrl.searchParams.set('pool_timeout', '10');
   }
 }
 

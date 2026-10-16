@@ -1,68 +1,123 @@
 import { NextResponse } from 'next/server';
+import { unstable_cache } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { requireAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
+const DASHBOARD_METRIC_TIMEOUT_MS = 2500;
+
+type PaidSummary = {
+  _sum: { totalAmount: number | null; grossAmount: number | null; netAmount: number | null };
+  _count: number;
+  _avg: { totalAmount: number | null };
+};
+
+type RevenueSummary = { _sum: { totalAmount: number | null } };
+
+function cachedMetric<T>(key: string, query: () => Promise<T>) {
+  return unstable_cache(query, ['admin-dashboard', key], { revalidate: 60 })();
+}
+
+async function loadMetric<T>(key: string, query: () => Promise<T>, fallback: T, partialMetrics: string[]): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      cachedMetric(key, query),
+      new Promise<T>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('Dashboard metric timed out')), DASHBOARD_METRIC_TIMEOUT_MS);
+      }),
+    ]);
+  } catch (error) {
+    console.error(`Admin dashboard metric failed (${key}):`, error);
+    partialMetrics.push(key);
+    return fallback;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 export async function GET(request: Request) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
   return withDatabase(async () => {
-  const now = new Date();
-  const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-  const [revenue, paidFinancials, cancelledFinancials, refundedFinancials, orders, paidOrders, pending, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, delivered, closedOrders, cancelled, recentOrders] = await Promise.all([
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _sum: { totalAmount: true } }),
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _sum: { grossAmount: true, netAmount: true } }),
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID', orderStatus: 'CANCELLED' }, _sum: { netAmount: true } }),
-    prisma.refundOperation.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }),
-    prisma.order.count(),
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _count: true, _avg: { totalAmount: true } }),
-    prisma.order.count({ where: { orderStatus: 'PENDING' } }),
-    prisma.product.findMany({ where: { active: true, stock: { lt: 30 } }, select: { id: true, name: true, stock: true, unit: true }, orderBy: { stock: 'asc' } }),
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID', createdAt: { gte: currentPeriodStart } }, _sum: { totalAmount: true } }),
-    prisma.order.aggregate({ where: { paymentStatus: 'PAID', createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } }, _sum: { totalAmount: true } }),
-    prisma.order.count({ where: { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } } }),
-    prisma.order.count({ where: { orderStatus: { in: ['DELIVERED', 'COMPLETED', 'CANCELLED'] } } }),
-    prisma.order.count({ where: { orderStatus: 'CANCELLED' } }),
-    prisma.order.findMany({
+    const now = new Date();
+    const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const partialMetrics: string[] = [];
+    const paidSummaryFallback: PaidSummary = { _sum: { totalAmount: null, grossAmount: null, netAmount: null }, _count: 0, _avg: { totalAmount: null } };
+    const revenueFallback: RevenueSummary = { _sum: { totalAmount: null } };
+    const [paidSummary, cancelledFinancials, refunds, orderStatusCounts, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, recentOrders] = await Promise.all([
+      loadMetric<PaidSummary>('paid-summary', () => prisma.order.aggregate({
+        where: { paymentStatus: 'PAID' },
+        _sum: { totalAmount: true, grossAmount: true, netAmount: true },
+        _count: true,
+        _avg: { totalAmount: true },
+      }), paidSummaryFallback, partialMetrics),
+      loadMetric('cancelled-deductions', () => prisma.order.aggregate({
+        where: { paymentStatus: 'PAID', orderStatus: 'CANCELLED' },
+        _sum: { netAmount: true },
+      }), { _sum: { netAmount: null } }, partialMetrics),
+      loadMetric('refunds', () => prisma.refundOperation.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }), { _sum: { amount: null } }, partialMetrics),
+      loadMetric('order-status-counts', () => prisma.order.groupBy({ by: ['orderStatus'], _count: { _all: true } }), [], partialMetrics),
+      loadMetric('low-stock-products', () => prisma.product.findMany({
+        where: { active: true, stock: { lt: 30 } },
+        select: { id: true, name: true, stock: true, unit: true },
+        orderBy: { stock: 'asc' },
+      }), [], partialMetrics),
+      loadMetric<RevenueSummary>('current-period-revenue', () => prisma.order.aggregate({
+        where: { paymentStatus: 'PAID', createdAt: { gte: currentPeriodStart } },
+        _sum: { totalAmount: true },
+      }), revenueFallback, partialMetrics),
+      loadMetric<RevenueSummary>('previous-period-revenue', () => prisma.order.aggregate({
+        where: { paymentStatus: 'PAID', createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } },
+        _sum: { totalAmount: true },
+      }), revenueFallback, partialMetrics),
+      loadMetric('recent-orders', () => prisma.order.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' },
       select: { orderCode: true, customerName: true, phone: true, totalAmount: true, orderStatus: true, paymentMethod: true, paymentStatus: true, createdAt: true },
-    }),
-  ]);
+      }), [], partialMetrics),
+    ]);
 
-  const currentRevenue = currentPeriodRevenue._sum.totalAmount ?? 0;
-  const previousRevenue = previousPeriodRevenue._sum.totalAmount ?? 0;
-  const gmvGrowthPercent = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue ? null : 0;
-  const deliverySuccessRate = closedOrders ? (delivered / closedOrders) * 100 : null;
-  const cancelledRate = closedOrders ? (cancelled / closedOrders) * 100 : null;
-  const grossSales = paidFinancials._sum.grossAmount ?? revenue._sum.totalAmount ?? 0;
-  const cancelledDeductions = cancelledFinancials._sum.netAmount ?? 0;
-  const refundDeductions = refundedFinancials._sum.amount ?? 0;
-  const marketplaceFees: number | null = null;
-  const netRevenue = Math.max(0, (paidFinancials._sum.netAmount ?? revenue._sum.totalAmount ?? 0) - cancelledDeductions - refundDeductions);
+    const statusCounts = new Map(orderStatusCounts.map((item) => [item.orderStatus, item._count._all]));
+    const orders = [...statusCounts.values()].reduce((sum, count) => sum + count, 0);
+    const pending = statusCounts.get('PENDING') ?? 0;
+    const delivered = (statusCounts.get('DELIVERED') ?? 0) + (statusCounts.get('COMPLETED') ?? 0);
+    const cancelled = statusCounts.get('CANCELLED') ?? 0;
+    const closedOrders = delivered + cancelled;
+    const currentRevenue = currentPeriodRevenue._sum.totalAmount ?? 0;
+    const previousRevenue = previousPeriodRevenue._sum.totalAmount ?? 0;
+    const gmvGrowthPercent = previousRevenue ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 : currentRevenue ? null : 0;
+    const deliverySuccessRate = closedOrders ? (delivered / closedOrders) * 100 : null;
+    const cancelledRate = closedOrders ? (cancelled / closedOrders) * 100 : null;
+    const revenue = paidSummary._sum.totalAmount ?? 0;
+    const grossSales = paidSummary._sum.grossAmount ?? revenue;
+    const cancelledDeductions = cancelledFinancials._sum.netAmount ?? 0;
+    const refundDeductions = refunds._sum.amount ?? 0;
+    const marketplaceFees: number | null = null;
+    const netRevenue = Math.max(0, (paidSummary._sum.netAmount ?? revenue) - cancelledDeductions - refundDeductions);
 
-  return NextResponse.json({
-    revenue: revenue._sum.totalAmount ?? 0,
-    grossSales,
-    cancelledDeductions,
-    refundDeductions,
-    marketplaceFees,
-    netRevenue,
-    orders,
-    pending,
-    paidOrders: paidOrders._count,
-    averageOrderValue: Math.round(paidOrders._avg.totalAmount ?? 0),
-    gmvGrowthPercent,
-    deliverySuccessRate,
-    cancelledRate,
-    lowStock: lowStockProducts.length,
-    lowStockProducts,
-    recentOrders,
-    channelMix: { web: 0, social: 0, retail: 0 },
-  });
+    return NextResponse.json({
+      revenue,
+      grossSales,
+      cancelledDeductions,
+      refundDeductions,
+      marketplaceFees,
+      netRevenue,
+      orders,
+      pending,
+      paidOrders: paidSummary._count,
+      averageOrderValue: Math.round(paidSummary._avg.totalAmount ?? 0),
+      gmvGrowthPercent,
+      deliverySuccessRate,
+      cancelledRate,
+      lowStock: lowStockProducts.length,
+      lowStockProducts,
+      recentOrders,
+      partialMetrics,
+      channelMix: { web: 0, social: 0, retail: 0 },
+    });
   });
 }

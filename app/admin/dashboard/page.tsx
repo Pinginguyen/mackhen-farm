@@ -4,6 +4,17 @@ import { ArrowDownRight, ArrowUpRight, CheckCircle2, ClipboardList, Package, Rot
 import { fetchApiWithFallback } from '@/lib/server-api';
 import { formatCurrency } from '@/lib/store-data';
 
+const dashboardMetricLabels: Record<string, string> = {
+  'paid-summary': 'doanh thu và giá trị đơn trung bình',
+  'cancelled-deductions': 'khấu trừ đơn hủy',
+  refunds: 'hoàn tiền',
+  'order-status-counts': 'tổng số và trạng thái đơn',
+  'low-stock-products': 'tồn kho thấp',
+  'current-period-revenue': 'doanh thu 30 ngày',
+  'previous-period-revenue': 'doanh thu kỳ trước',
+  'recent-orders': 'đơn hàng gần đây',
+};
+
 export default async function AdminDashboardPage() {
   const [{ data: report, unavailable }, { data: returnData, unavailable: returnsUnavailable }, { data: health, unavailable: healthUnavailable }] = await Promise.all([
     fetchApiWithFallback<{
@@ -21,6 +32,7 @@ export default async function AdminDashboardPage() {
     deliverySuccessRate: number | null;
     cancelledRate: number | null;
     lowStock: number;
+    partialMetrics?: string[];
     lowStockProducts: { id: string; name: string; stock: number; unit: string | null }[];
     recentOrders: { orderCode: string; customerName: string; phone: string; totalAmount: number; orderStatus: string; paymentMethod: string; paymentStatus: string; createdAt: string }[];
     }>('/api/admin/reports/overview', {
@@ -62,6 +74,7 @@ export default async function AdminDashboardPage() {
 
       <section className="admin-dashboard">
         {unavailable && <p className="empty-state" role="status">Không thể tải báo cáo vì cơ sở dữ liệu hiện không khả dụng.</p>}
+        {!unavailable && report.partialMetrics?.length ? <p className="empty-state" role="status">Một số chỉ số chưa tải được: {report.partialMetrics.map((metric) => dashboardMetricLabels[metric] ?? metric).join(', ')}. Các chỉ số còn lại vẫn được cập nhật.</p> : null}
         {returnsUnavailable && <p className="empty-state" role="status">Chưa thể đồng bộ yêu cầu đổi trả.</p>}
         <div className="page-title">
           <div>
