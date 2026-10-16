@@ -101,6 +101,7 @@ export default function AccountDashboard({ profile, orders, initialTab }: { prof
         <div id="orders-panel" role="tabpanel" aria-labelledby="orders-tab">
           {orderList.length ? (
             <div className="table-card account-order-table">
+              <div className="mobile-table-scroll w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
               <table>
                 <thead><tr><th>Mã đơn</th><th>Ngày mua</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Trạng thái</th><th>Chi tiết</th></tr></thead>
                 <tbody>{orderList.map((order) => (
@@ -119,6 +120,7 @@ export default function AccountDashboard({ profile, orders, initialTab }: { prof
                   </tr>
                 ))}</tbody>
               </table>
+              </div>
             </div>
           ) : <p>Chưa tìm thấy đơn hàng gắn với hồ sơ. Bạn có thể tra cứu đơn khách vãng lai bằng mã đơn và số điện thoại.</p>}
         </div>

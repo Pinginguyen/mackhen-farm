@@ -19,6 +19,7 @@ export type CatalogProduct = {
   rating: number;
   stock: number;
   description: string;
+  ingredients?: string | null;
   image: string;
   images?: string[];
   highlight: string;

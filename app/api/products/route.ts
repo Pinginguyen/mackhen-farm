@@ -116,13 +116,14 @@ export async function POST(request: Request) {
   const protein = typeof body.protein === 'string' ? body.protein.trim().replace(/\s+protein$/i, '') : '';
   const category = normalizeCategory(body.category);
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
+  const ingredients = body.ingredients == null ? null : typeof body.ingredients === 'string' ? body.ingredients.trim() || null : undefined;
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = numberValue(body.stock ?? 0);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
-    || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
+    || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
         rating: 0,
         stock,
         description,
+        ingredients,
         image,
         highlight: typeof body.highlight === 'string' && body.highlight.trim() ? body.highlight.trim().slice(0, 40) : 'Sản phẩm mới',
         badge,
@@ -179,13 +181,14 @@ export async function PATCH(request: Request) {
   const protein = typeof body.protein === 'string' ? body.protein.trim().replace(/\s+protein$/i, '') : '';
   const category = normalizeCategory(body.category);
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
+  const ingredients = body.ingredients === undefined ? undefined : body.ingredients == null ? null : typeof body.ingredients === 'string' ? body.ingredients.trim() || null : null;
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = numberValue(body.stock ?? 0);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
-    || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
+    || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || (body.ingredients != null && typeof body.ingredients !== 'string') || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
@@ -206,6 +209,7 @@ export async function PATCH(request: Request) {
         protein: protein || null,
         stock,
         description,
+        ...(ingredients !== undefined ? { ingredients } : {}),
         image,
         images: [image],
         badge,

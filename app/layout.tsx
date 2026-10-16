@@ -40,12 +40,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="vi">
       <body className={beVietnamPro.variable}>
         <SmoothScroll>
-          <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
-          {children}
-          <SiteFooter />
-          <FloatingContact />
-          <CartToast />
-          <ExitIntentPopup />
+          <div className="app-viewport overflow-x-hidden">
+            <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
+            {children}
+            <SiteFooter />
+            <FloatingContact />
+            <CartToast />
+            <ExitIntentPopup />
+          </div>
         </SmoothScroll>
       </body>
     </html>

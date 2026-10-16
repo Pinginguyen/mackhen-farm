@@ -11,6 +11,7 @@ export type DefaultProduct = {
   rating: number;
   stock: number;
   description: string;
+  ingredients: string;
   image: string;
   images: string[];
   highlight: string;
@@ -31,6 +32,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 4.9,
     stock: 120,
     description: 'Khô thực vật xé sợi dai, đậm vị mắc khén và hạt dổi; giàu đạm thực vật.',
+    ingredients: 'Bã đậu nành upcycled, bột củ năng, hạt mắc khén, hạt dổi nướng, mật mía và gia vị Tây Bắc.',
     image: '/products/xe-soi.jpg',
     images: ['/products/xe-soi.jpg'],
     highlight: 'Cay nồng',
@@ -49,6 +51,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 4.8,
     stock: 110,
     description: 'Khô thực vật dạng miếng dẻo, phối vị mật mía và tiêu rừng Tây Bắc.',
+    ingredients: 'Bã đậu nành upcycled, bột củ năng, mật mía, tiêu rừng, hạt mắc khén và gia vị Tây Bắc.',
     image: '/products/mieng-deo.jpg',
     images: ['/products/mieng-deo.jpg'],
     highlight: 'Tiêu rừng',
@@ -67,6 +70,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 5,
     stock: 90,
     description: 'Khô thực vật giòn cay kết hợp tỏi phi và gia vị mắc khén đặc trưng.',
+    ingredients: 'Bã đậu nành upcycled, bột củ năng, tỏi phi, hạt mắc khén, hạt dổi nướng, mật mía và gia vị.',
     image: '/products/chay-toi.jpg',
     images: ['/products/chay-toi.jpg'],
     highlight: 'Tỏi giòn',
@@ -85,6 +89,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 4.9,
     stock: 60,
     description: 'Hộp quà đủ ba hương vị khô thực vật, tổng khối lượng 450g.',
+    ingredients: 'Gồm các vị khô thực vật: bã đậu nành upcycled, bột củ năng, hạt mắc khén, hạt dổi nướng, mật mía, tiêu rừng và tỏi phi.',
     image: '/products/combo.jpg',
     images: ['/products/combo.jpg'],
     highlight: 'Combo quà',
@@ -103,6 +108,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 0,
     stock: 100,
     description: 'Chẳm chéo ướt đậm vị gia vị vùng Điện Biên, dùng chấm món luộc, nướng và rau củ.',
+    ingredients: 'Ớt tươi Điện Biên, tỏi nếp, rau thơm Tây Bắc, hạt dổi, mắc khén và gia vị.',
     image: '/products/cham-cheo.jpg',
     images: ['/products/cham-cheo.jpg'],
     highlight: 'Điện Biên',
@@ -121,6 +127,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 0,
     stock: 100,
     description: 'Hạt mắc khén rừng sao khô, gia vị đặc trưng dùng làm chẳm chéo và nêm món ăn.',
+    ingredients: '100% hạt mắc khén rừng tự nhiên Tây Bắc, sàng lọc sạch cuống.',
     image: '/products/hat-mac-khen.jpg',
     images: ['/products/hat-mac-khen.jpg'],
     highlight: 'Sơn La',
@@ -139,6 +146,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 0,
     stock: 100,
     description: 'Hạt dổi rừng tuyển chọn, hương thơm đặc trưng để làm gia vị chấm và nêm món nướng.',
+    ingredients: '100% hạt dổi rừng tự nhiên Tây Bắc, sàng lọc sạch cuống.',
     image: '/products/hat-doi.jpg',
     images: ['/products/hat-doi.jpg'],
     highlight: 'Thượng hạng',
@@ -157,6 +165,7 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     rating: 0,
     stock: 100,
     description: 'Muối chẳm chéo rang khô cùng hạt dổi, tiện nêm nếm và chấm món ăn.',
+    ingredients: 'Muối, ớt, hạt dổi rang, mắc khén và rau thơm Tây Bắc; phối trộn và rang khô.',
     image: '/products/muoi-cham-cheo.jpg',
     images: ['/products/muoi-cham-cheo.jpg'],
     highlight: 'Hạt dổi rang',

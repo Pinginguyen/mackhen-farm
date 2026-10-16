@@ -106,7 +106,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
         <div className="admin-table-scroll"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Điện thoại</th></tr></thead><tbody>{affectedCustomers.map((customer) => <tr key={`${customer.orderCode}-${customer.phone}`}><td>{customer.orderCode}</td><td>{customer.customerName}</td><td><a href={`tel:${customer.phone}`}>{customer.phone}</a></td></tr>)}</tbody></table></div>
       </section>}
 
-      <section className="table-card" aria-label="Tồn kho và lô sản xuất">
+      <section className="table-card mobile-table-scroll" aria-label="Tồn kho và lô sản xuất">
         <table>
           <thead><tr><th>Sản phẩm</th><th>Tồn hệ thống</th><th>Trạng thái</th><th>Lô sản xuất / khả dụng</th></tr></thead>
           <tbody>{initialInventory.map((item) => <tr key={item.id}>

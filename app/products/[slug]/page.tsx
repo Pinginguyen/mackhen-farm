@@ -81,18 +81,8 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
-  const ingredientSummary = isSeasoning
-    ? product.slug === 'cham-cheo-uot-chuan-vi-dien-bien'
-      ? 'Chẳm chéo ướt theo công thức Điện Biên; xem thành phần chi tiết trên nhãn sản phẩm.'
-      : product.slug === 'hat-mac-khen-rung-sao-kho-son-la'
-        ? 'Hạt mắc khén rừng sao khô Sơn La.'
-        : product.slug === 'hat-doi-rung-nep-thuong-hang'
-          ? 'Hạt dổi rừng nếp tuyển chọn.'
-          : 'Muối chẳm chéo và hạt dổi rang khô.'
-    : 'Phụ phẩm bã đậu nành upcycled, bột củ năng, hạt mắc khén, hạt dổi nướng và mật mía tự nhiên.';
-
   return (
-    <main className="page-shell">
+    <main className="page-shell product-detail-page">
       <section className="detail-section">
         <div className="detail-grid">
           <ProductImageGallery image={product.image} images={product.images ?? []} name={product.name} />
@@ -122,6 +112,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts">
                 <h2>Bảng giá trị dinh dưỡng</h2>
                 <p>{product.nutritionFacts.servingSize}</p>
+                <div className="mobile-table-scroll w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
                 <table>
                   <tbody>
                     <tr><th>Năng lượng</th><td>{product.nutritionFacts.calories}</td></tr>
@@ -133,12 +124,12 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
                     <tr><th>Natri (Sodium)</th><td>{product.nutritionFacts.sodium}</td></tr>
                   </tbody>
                 </table>
+                </div>
               </section>}
-              <section className="product-info-block">
+              {product.ingredients?.trim() && <section className="product-info-block">
                 <h2>Thành phần &amp; nguồn gốc nguyên liệu</h2>
-                <p>{ingredientSummary}</p>
-                {!isSeasoning && <p>Không sử dụng chất bảo quản hóa học tổng hợp hoặc mỡ động vật.</p>}
-              </section>
+                <p className="whitespace-pre-line">{product.ingredients.trim()}</p>
+              </section>}
               <section className="product-info-block">
                 <h2>Quy chuẩn đóng gói &amp; bảo quản</h2>
                 <p>Quy cách: {product.unit ?? 'Theo thông tin trên bao bì'}.</p>

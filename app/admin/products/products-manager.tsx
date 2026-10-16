@@ -20,6 +20,7 @@ type ProductDraft = {
   stock: string;
   imageUrl: string;
   description: string;
+  ingredients: string;
   badge: string;
   nutritionFacts: NutritionFacts;
 };
@@ -48,6 +49,7 @@ const emptyDraft: ProductDraft = {
   stock: '0',
   imageUrl: '',
   description: '',
+  ingredients: '',
   badge: '',
   nutritionFacts: defaultNutritionFacts(true),
 };
@@ -110,6 +112,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       stock: String(product.stock),
       imageUrl: product.image,
       description: product.description,
+      ingredients: product.ingredients ?? '',
       badge: product.badge ?? '',
       nutritionFacts: product.nutritionFacts ?? defaultNutritionFacts(product.category !== 'Gia vị Tây Bắc', product.protein ?? ''),
     });
@@ -139,6 +142,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           weight: String(draft.weight || '150g').trim(),
           protein: String(draft.protein).trim(),
           description: String(draft.description).trim(),
+          ingredients: String(draft.ingredients).trim(),
           badge: draft.badge.trim() || null,
           nutritionFacts: draft.nutritionFacts,
           imageUrl: draft.imageUrl || undefined,
@@ -203,7 +207,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
         </button>
       </div>
 
-      <div className="table-card admin-products-table">
+      <div className="table-card admin-products-table mobile-table-scroll">
         <table>
           <thead>
             <tr>
@@ -321,6 +325,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                   <label className="field">Natri (Sodium)<input disabled={!draft.nutritionFacts.enabled} value={draft.nutritionFacts.sodium} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, sodium: event.target.value } }))} maxLength={80} /></label>
                 </div>
               </fieldset>
+              <label className="field admin-product-full-width">Thành phần &amp; nguồn gốc nguyên liệu<textarea rows={4} maxLength={5000} value={draft.ingredients} onChange={(event) => setDraft({ ...draft, ingredients: event.target.value })} placeholder="Ví dụ: 100% hạt mắc khén rừng Tây Bắc thu hoạch tự nhiên, phơi sấy tiêu chuẩn..." /></label>
               <label className="field admin-product-full-width">Mô tả ngắn<textarea rows={3} maxLength={2000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
               {formError && <p className="admin-return-alert admin-product-full-width" role="alert">{formError}</p>}
               <footer className="admin-product-modal-actions admin-product-full-width">

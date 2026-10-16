@@ -32,6 +32,7 @@ const validProduct = {
   protein: '22g/100g Protein',
   category: 'Khô bò thực vật',
   description: 'Mô tả sản phẩm mới.',
+  ingredients: 'Bã đậu nành upcycled, mắc khén và hạt dổi.',
   imageUrl: '/products/xe-soi.jpg',
   stock: 15,
   badge: 'Bán chạy',
@@ -51,13 +52,16 @@ describe('/api/products', () => {
 
   it('returns the complete default catalog when the database catalog is empty', async () => {
     const response = await GET();
-    const result = await response.json() as { items: { id: string; slug: string }[]; pagination: { total: number } };
+    const result = await response.json() as { items: { id: string; slug: string; ingredients: string }[]; pagination: { total: number } };
 
     expect(response.status).toBe(200);
     expect(result.items).toHaveLength(8);
     expect(result.pagination.total).toBe(8);
     expect(result.items[0].slug).toBe('mac-khen-xe-soi-cay-nong');
     expect(result.items.some((product) => product.slug === 'cham-cheo-uot-chuan-vi-dien-bien')).toBe(true);
+    expect(result.items.find((product) => product.slug === 'mac-khen-xe-soi-cay-nong')?.ingredients).toContain('Bã đậu nành upcycled');
+    expect(result.items.find((product) => product.slug === 'cham-cheo-uot-chuan-vi-dien-bien')?.ingredients).toContain('Ớt tươi Điện Biên');
+    expect(result.items.find((product) => product.slug === 'hat-mac-khen-rung-sao-kho-son-la')?.ingredients).toContain('sàng lọc sạch cuống');
   });
 
   it('returns active products from the database when available', async () => {
@@ -126,7 +130,7 @@ describe('/api/products', () => {
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({
       where: { id: 'product-1' },
-      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl], badge: validProduct.badge, nutritionFacts: validProduct.nutritionFacts }),
+      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl], badge: validProduct.badge, nutritionFacts: validProduct.nutritionFacts, ingredients: validProduct.ingredients }),
       include: { variants: true },
     });
   });
@@ -148,6 +152,7 @@ describe('/api/products', () => {
         protein: '22g/100g',
         stock: 15,
         description: validProduct.description,
+        ingredients: validProduct.ingredients,
         image: validProduct.imageUrl,
         images: [validProduct.imageUrl],
         badge: validProduct.badge,
@@ -162,6 +167,17 @@ describe('/api/products', () => {
 
     expect(response.status).toBe(201);
     expect(productCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ badge: null }) });
+  });
+
+  it('allows ingredients to be cleared and normalizes whitespace', async () => {
+    const cleared = await POST(makeRequest('POST', { ...validProduct, ingredients: '  ' }));
+    expect(cleared.status).toBe(201);
+    expect(productCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ ingredients: null }) });
+
+    await PATCH(makeRequest('PATCH', { id: 'product-1', ...validProduct, ingredients: '  Ớt tươi Điện Biên  ' }));
+    expect(productUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ ingredients: 'Ớt tươi Điện Biên' }),
+    }));
   });
 
   it('accepts a supported base64 image uploaded from the admin form', async () => {
@@ -201,11 +217,15 @@ describe('/api/products', () => {
     const unsafeImage = await POST(makeRequest('POST', { ...validProduct, imageUrl: 'javascript:alert(1)' }));
     const unsupportedDataImage = await POST(makeRequest('POST', { ...validProduct, imageUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }));
     const invalidNutrition = await POST(makeRequest('POST', { ...validProduct, nutritionFacts: { enabled: true, calories: { raw: '320' } } }));
+    const invalidIngredients = await POST(makeRequest('POST', { ...validProduct, ingredients: 'x'.repeat(5001) }));
+    const invalidIngredientsType = await PATCH(makeRequest('PATCH', { id: 'product-1', ...validProduct, ingredients: { value: 'not text' } }));
 
     expect(invalidPrice.status).toBe(400);
     expect(unsafeImage.status).toBe(400);
     expect(unsupportedDataImage.status).toBe(400);
     expect(invalidNutrition.status).toBe(400);
+    expect(invalidIngredients.status).toBe(400);
+    expect(invalidIngredientsType.status).toBe(400);
     expect(productCreate).not.toHaveBeenCalled();
   });
 });

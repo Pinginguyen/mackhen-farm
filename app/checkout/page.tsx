@@ -22,8 +22,19 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
   }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
   const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
+  const orderSummary = <>
+    <h3>Đơn hàng</h3>
+    <div className="summary-list">
+      {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId ?? 'single'}`}><span>{item.name ?? 'Sản phẩm'} x{item.quantity ?? 1}</span><strong>{(item.total ?? 0).toLocaleString('vi-VN')}đ</strong></div>)}
+      <div className="item"><span>Vận chuyển</span><strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong></div>
+      <div className="item"><span>Tạm tính trước mã giảm giá</span><strong>{cart.total.toLocaleString('vi-VN')}đ</strong></div>
+    </div>
+    {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
+    {!freeShippingApplied && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
+    <div className="cart-footer"><Link href="/cart" className="secondary-action">Quay lại giỏ hàng</Link></div>
+  </>;
   return (
-    <main className="page-shell">
+    <main className="page-shell checkout-page">
       <section className="page-card">
         <div className="page-title">
           <div>
@@ -38,29 +49,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
             {cart.unavailable || cart.items.length === 0 ? (
               <CheckoutEmptyState unavailable={cart.unavailable} buyNow={buyNow} />
             ) : (
-              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} />
+              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
             )}
           </div>
 
-          {!cart.unavailable && cart.items.length > 0 && <aside className="summary-card">
-            <h3>Đơn hàng</h3>
-            <div className="summary-list">
-              {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId ?? 'single'}`}><span>{item.name ?? 'Sản phẩm'} x{item.quantity ?? 1}</span><strong>{(item.total ?? 0).toLocaleString('vi-VN')}đ</strong></div>)}
-              <div className="item">
-                <span>Vận chuyển</span>
-                <strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong>
-              </div>
-              <div className="item">
-                <span>Tạm tính trước mã giảm giá</span>
-                <strong>{cart.total.toLocaleString('vi-VN')}đ</strong>
-              </div>
-            </div>
-            {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
-            {!freeShippingApplied && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
-            <div className="cart-footer">
-              <Link href="/cart" className="secondary-action">Quay lại giỏ hàng</Link>
-            </div>
-          </aside>}
+          {!cart.unavailable && cart.items.length > 0 && <aside className="summary-card checkout-desktop-summary">{orderSummary}</aside>}
         </div>
       </section>
     </main>

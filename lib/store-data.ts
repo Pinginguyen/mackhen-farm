@@ -53,6 +53,7 @@ export type Product = {
   stock: number;
   status: 'Còn hàng' | 'Sắp hết';
   description: string;
+  ingredients?: string | null;
   image: string;
   highlight: string;
   badge?: string | null;

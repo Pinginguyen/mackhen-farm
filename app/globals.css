@@ -1652,6 +1652,10 @@ textarea {
   line-height: 1.6;
 }
 
+.product-info-block .whitespace-pre-line {
+  white-space: pre-line;
+}
+
 .nutrition-facts table {
   width: 100%;
   margin-top: 10px;
@@ -10789,5 +10793,364 @@ body {
 
   .admin-order-toolbar-actions > * {
     flex: 1 1 calc(50% - 7px);
+  }
+}
+
+.app-viewport {
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.mobile-search-trigger,
+.mobile-account-trigger {
+  display: none;
+}
+
+.header-desktop-auth {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-table-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.checkout-mobile-summary {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 16px 12px;
+  }
+
+  .site-header .brand-wrap {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .site-header .brand-wrap .eyebrow {
+    display: none;
+  }
+
+  .site-header .site-brand-name {
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  .site-header-actions {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .site-header .live-product-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 0;
+  }
+
+  .site-header .main-nav {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 18px;
+    overflow-x: auto;
+    padding: 2px 0 4px;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+
+  .site-header .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-search-trigger,
+  .mobile-account-trigger {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+  }
+
+  .header-desktop-auth,
+  .site-header-actions > .admin-header-link {
+    display: none;
+  }
+
+  .site-header-actions .header-cart,
+  .site-header-actions .account-menu summary {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .page-shell.product-detail-page {
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .product-detail-page + .site-footer {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .floating-zalo {
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    z-index: 40;
+  }
+
+  .ai-chat-widget {
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(148px + env(safe-area-inset-bottom));
+    z-index: 40;
+  }
+
+  .checkout-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .checkout-layout > *,
+  .checkout-layout > div {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .checkout-desktop-summary {
+    display: none;
+  }
+
+  .checkout-mobile-summary {
+    display: block;
+    min-width: 0;
+    margin: 4px 0;
+  }
+
+  .checkout-page input,
+  .checkout-page select,
+  .checkout-page textarea,
+  .voucher-picker-dialog input,
+  .warranty-modal input,
+  .admin-return-modal input,
+  .admin-return-modal textarea,
+  .admin-product-modal input,
+  .admin-product-modal select,
+  .admin-product-modal textarea,
+  .admin-manual-payment-dialog input {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .checkout-page form > .primary-action {
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .mobile-table-scroll > table,
+  .mobile-table-scroll .admin-return-table,
+  .admin-table-scroll > table,
+  .table-card.admin-audit-table > table {
+    min-width: 620px;
+  }
+
+  .nutrition-facts .mobile-table-scroll > table {
+    min-width: 360px;
+  }
+
+  .account-order-table td:first-child,
+  .admin-return-table td:first-child,
+  .admin-table-scroll td:first-child {
+    overflow-wrap: anywhere;
+  }
+
+  .site-footer-column,
+  .site-footer-bottom,
+  .page-card,
+  .page-title,
+  .summary-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .voucher-picker-backdrop,
+  .quick-view-backdrop,
+  .admin-return-modal-backdrop,
+  .admin-product-modal-backdrop,
+  .admin-manual-payment-backdrop,
+  .warranty-modal-backdrop,
+  .exit-intent-backdrop {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .voucher-picker-dialog,
+  .quick-view-modal,
+  .admin-return-modal,
+  .admin-product-modal,
+  .admin-manual-payment-dialog,
+  .warranty-modal,
+  .exit-intent-modal {
+    position: fixed;
+    inset: auto 12px calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(85dvh, calc(100dvh - 24px - env(safe-area-inset-bottom)));
+    margin: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 16px;
+    padding: 20px 16px calc(18px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .quick-view-backdrop {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .quick-view-modal {
+    max-height: min(85dvh, calc(100dvh - 24px - env(safe-area-inset-bottom)));
+  }
+
+  .quick-view-close {
+    position: sticky;
+    top: 0;
+    right: auto;
+    margin: 0 12px -40px auto;
+  }
+
+  .admin-return-modal-header,
+  .admin-product-modal-header,
+  .admin-manual-payment-dialog > header,
+  .voucher-picker-dialog > header,
+  .warranty-modal > header {
+    position: sticky;
+    top: -20px;
+    z-index: 3;
+    margin: -20px -16px 12px;
+    padding: 16px 16px 12px;
+    background: var(--card);
+  }
+
+  .admin-return-modal-actions {
+    position: sticky;
+    bottom: -18px;
+    z-index: 2;
+    margin: 0 -16px -18px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: var(--card);
+  }
+
+  .admin-return-modal-actions > button {
+    flex: 1 1 100%;
+    min-height: 46px;
+  }
+
+  .admin-return-modal-actions .secondary-action {
+    margin-left: 0;
+  }
+
+  .admin-product-modal-actions {
+    position: sticky;
+    bottom: -18px;
+    margin: 0 -16px -18px;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+    background: var(--card);
+  }
+
+  .product-image-lightbox {
+    padding: max(56px, env(safe-area-inset-top)) 12px calc(68px + env(safe-area-inset-bottom));
+  }
+
+  .product-image-lightbox-close {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    right: 12px;
+    z-index: 5;
+  }
+
+  .table-card:has(> table),
+  .admin-customers-table-wrap,
+  .admin-voucher-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-return-image-viewer {
+    width: 100%;
+    max-height: 85dvh;
+    padding: 48px 12px 12px;
+  }
+
+  .admin-return-image-viewer > img {
+    max-height: calc(85dvh - 60px);
+  }
+
+  .review-form-panel,
+  .review-form,
+  .review-form-short-fields {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .site-header {
+    padding-inline: 12px;
+  }
+
+  .site-header .site-brand-name {
+    font-size: 0.92rem;
+  }
+
+  .site-header-actions {
+    gap: 4px;
+  }
+
+  .mobile-search-trigger,
+  .mobile-account-trigger,
+  .site-header-actions .header-cart,
+  .site-header-actions .account-menu summary {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    flex-basis: 36px;
+  }
+
+  .mobile-table-scroll > table,
+  .mobile-table-scroll .admin-return-table,
+  .admin-table-scroll > table,
+  .table-card.admin-audit-table > table {
+    min-width: 560px;
+  }
+
+  .nutrition-facts .mobile-table-scroll > table {
+    min-width: 340px;
   }
 }

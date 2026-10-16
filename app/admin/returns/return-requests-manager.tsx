@@ -208,7 +208,7 @@ export default function ReturnRequestsManager() {
       {notice && !selected && <p className="admin-return-notice" role="status">{notice}</p>}
       {toast && <p className="admin-return-toast" role="status">{toast}</p>}
 
-      <div className="admin-return-table-wrap">
+      <div className="admin-return-table-wrap mobile-table-scroll">
         <table className="admin-return-table">
           <thead>
             <tr>

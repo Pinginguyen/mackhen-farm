@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { Gift } from 'lucide-react';
+import { Gift, Search, UserRound } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import LogoutButton from '@/app/logout-button';
@@ -37,11 +37,15 @@ export default async function Header() {
       </nav>
       <LiveProductSearch />
       <div className="site-header-actions">
+        <Link className="mobile-search-trigger" href="/products" aria-label="Tìm sản phẩm"><Search size={19} /></Link>
         <CartLink />
         {!user ? (
           <>
-            <Link className="header-login" href="/dang-nhap">Đăng nhập</Link>
-            <Link className="cta-link" href="/dang-ky">Đăng ký</Link>
+            <Link className="mobile-account-trigger" href="/dang-nhap" aria-label="Đăng nhập"><UserRound size={19} /></Link>
+            <div className="header-desktop-auth">
+              <Link className="header-login" href="/dang-nhap">Đăng nhập</Link>
+              <Link className="cta-link" href="/dang-ky">Đăng ký</Link>
+            </div>
           </>
         ) : (
           <>
