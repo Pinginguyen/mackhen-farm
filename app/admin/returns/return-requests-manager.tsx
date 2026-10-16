@@ -22,8 +22,9 @@ type ReturnRequest = {
   refundApprovedAt: string | null;
   refundTransferReference: string | null;
   compensationVoucher?: { code: string; discountPercent: number; expiresAt: string; redeemedAt: string | null } | null;
+  issuedVoucher?: { code: string; value: number; expiresAt: string | null; usedCount: number; usageLimit: number | null } | null;
   createdAt: string;
-  order: { orderCode: string; customerName: string };
+  order: { orderCode: string; customerName: string; totalAmount: number };
 };
 
 const statusTabs: { id: 'ALL' | ReturnStatus; label: string }[] = [
@@ -39,7 +40,7 @@ const statusTabs: { id: 'ALL' | ReturnStatus; label: string }[] = [
 const statusLabels: Record<ReturnStatus, string> = {
   PENDING: 'Chờ duyệt',
   REPLACEMENT_APPROVED: 'Đã duyệt gửi bù',
-  VOUCHER_ISSUED: 'Đã phát hành voucher 50%',
+  VOUCHER_ISSUED: 'Đã phát hành voucher đền bù',
   REFUND_APPROVED: 'Đã duyệt · chờ chuyển tiền',
   REFUNDED: 'Đã hoàn tiền',
   COMPLETED: 'Đã hoàn tiền',
@@ -53,6 +54,8 @@ export default function ReturnRequestsManager() {
   const [selected, setSelected] = useState<ReturnRequest | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [refundTransferReference, setRefundTransferReference] = useState('');
+  const [resolutionMethod, setResolutionMethod] = useState<'REFUND' | 'VOUCHER'>('REFUND');
+  const [voucherValue, setVoucherValue] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -93,14 +96,22 @@ export default function ReturnRequestsManager() {
     setSelected(request);
     setAdminNote(request.adminNote ?? '');
     setRefundTransferReference(request.refundTransferReference ?? '');
+    setResolutionMethod('REFUND');
+    setVoucherValue(String(request.order.totalAmount || ''));
     setError('');
     setNotice('');
   }
 
-  async function updateStatus(status: ReturnStatus) {
+  async function updateStatus(status: ReturnStatus, selectedResolution: 'REFUND' | 'VOUCHER' = 'REFUND') {
     if (!selected || busyRef.current) return;
     if (['REFUNDED', 'COMPLETED'].includes(status) && !refundTransferReference.trim()) {
       setError('Vui lòng nhập mã tham chiếu giao dịch để xác nhận chuyển hoàn.');
+      return;
+    }
+    const numericVoucherValue = Number(voucherValue);
+    if (status === 'VOUCHER_ISSUED' && selectedResolution === 'VOUCHER'
+      && (!Number.isSafeInteger(numericVoucherValue) || numericVoucherValue <= 0 || numericVoucherValue > 100_000_000)) {
+      setError('Mệnh giá voucher phải từ 1 đến 100.000.000đ.');
       return;
     }
     busyRef.current = true;
@@ -111,7 +122,7 @@ export default function ReturnRequestsManager() {
       const response = await fetch('/api/returns', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: selected.id, status, adminNote, refundTransferReference }),
+        body: JSON.stringify({ id: selected.id, status, adminNote, refundTransferReference, ...(status === 'VOUCHER_ISSUED' && selectedResolution === 'VOUCHER' ? { resolutionMethod: selectedResolution, voucherValue: numericVoucherValue } : {}) }),
       });
       const result = await response.json() as { item?: ReturnRequest; error?: unknown };
       if (!response.ok || !result.item) throw new Error(getErrorMessage(result.error ?? result, 'Không thể cập nhật yêu cầu.'));
@@ -134,7 +145,9 @@ export default function ReturnRequestsManager() {
       setSelected(updated);
       setAdminNote(updated.adminNote ?? '');
       setRefundTransferReference(updated.refundTransferReference ?? '');
-      setNotice(`Đã cập nhật yêu cầu ${updated.order.orderCode}: ${statusLabels[updated.status]}.`);
+      setNotice(status === 'VOUCHER_ISSUED' && updated.issuedVoucher
+        ? `Đã phát hành voucher ${updated.issuedVoucher.code} trị giá ${updated.issuedVoucher.value.toLocaleString('vi-VN')}đ.`
+        : `Đã cập nhật yêu cầu ${updated.order.orderCode}: ${statusLabels[updated.status]}.`);
     } catch (updateError) {
       setError(getErrorMessage(updateError, 'Không thể cập nhật yêu cầu.'));
     } finally {
@@ -243,7 +256,12 @@ export default function ReturnRequestsManager() {
               <div className="admin-return-detail-pair"><span>Số điện thoại</span><a href={`tel:${selected.customerPhone}`}>{selected.customerPhone}</a></div>
               <div className="admin-return-detail-pair"><span>Loại sự cố</span><strong>{selected.issueType}</strong></div>
               <div className="admin-return-detail-pair"><span>Thời gian gửi</span><strong>{new Date(selected.createdAt).toLocaleString('vi-VN')}</strong></div>
-              <section className="admin-return-refund-info" aria-labelledby="admin-return-refund-title">
+              {selected.status === 'REFUND_APPROVED' && <fieldset className="admin-return-resolution-options">
+                <legend>Phương thức xử lý</legend>
+                <label><input type="radio" name="return-resolution" checked={resolutionMethod === 'REFUND'} onChange={() => setResolutionMethod('REFUND')} /> Hoàn tiền qua Ngân hàng</label>
+                <label><input type="radio" name="return-resolution" checked={resolutionMethod === 'VOUCHER'} onChange={() => setResolutionMethod('VOUCHER')} /> Đền bù bằng Voucher (Store Credit)</label>
+              </fieldset>}
+              {(selected.status !== 'REFUND_APPROVED' || resolutionMethod === 'REFUND') && <section className="admin-return-refund-info" aria-labelledby="admin-return-refund-title">
                 <div>
                   <h3 id="admin-return-refund-title">Thông tin nhận hoàn tiền</h3>
                   <p>Chỉ dùng khi xử lý hoàn tiền cho yêu cầu này.</p>
@@ -268,12 +286,21 @@ export default function ReturnRequestsManager() {
                 ) : (
                   <p className="admin-return-refund-empty">Khách chưa cung cấp đủ thông tin nhận hoàn tiền.</p>
                 )}
-              </section>
-              {selected.compensationVoucher && <section className="admin-return-refund-info" aria-label="Voucher bồi thường đã phát hành">
+              </section>}
+              {selected.status === 'REFUND_APPROVED' && resolutionMethod === 'VOUCHER' && <label className="admin-return-admin-note admin-return-voucher-value">
+                Mệnh giá Voucher đền bù (VNĐ)
+                <input type="number" min="1" max="100000000" step="1000" required value={voucherValue} onChange={(event) => setVoucherValue(event.target.value)} aria-label="Mệnh giá Voucher đền bù (VNĐ)" />
+                <small>Gợi ý theo giá trị đơn hàng: {selected.order.totalAmount.toLocaleString('vi-VN')}đ · Voucher dùng một lần, hết hạn sau 30 ngày.</small>
+              </label>}
+              {selected.issuedVoucher && <section className="admin-return-refund-info" aria-label="Voucher đền bù đã phát hành">
+                <div><h3>Voucher đền bù</h3><p>Giảm {selected.issuedVoucher.value.toLocaleString('vi-VN')}đ · hết hạn {selected.issuedVoucher.expiresAt ? new Date(selected.issuedVoucher.expiresAt).toLocaleDateString('vi-VN') : 'không thời hạn'}</p></div>
+                <div className="admin-return-refund-field"><strong>{selected.issuedVoucher.code}</strong><button className="admin-return-copy-button" type="button" onClick={() => void copyRefundField('Mã voucher', selected.issuedVoucher!.code)}><Copy size={15} /><span>Sao chép mã</span></button></div>
+              </section>}
+              {selected.compensationVoucher && <section className="admin-return-refund-info" aria-label="Voucher bồi thường 50% đã phát hành">
                 <div><h3>Voucher bồi thường {selected.compensationVoucher.discountPercent}%</h3><p>Đơn dùng một lần · hết hạn {new Date(selected.compensationVoucher.expiresAt).toLocaleDateString('vi-VN')}</p></div>
                 <div className="admin-return-refund-field"><strong>{selected.compensationVoucher.code}</strong><button className="admin-return-copy-button" type="button" onClick={() => void copyRefundField('Mã voucher', selected.compensationVoucher!.code)}><Copy size={15} /><span>Sao chép mã</span></button></div>
               </section>}
-              {selected.status === 'REFUND_APPROVED' && <>
+              {selected.status === 'REFUND_APPROVED' && resolutionMethod === 'REFUND' && <>
                 <p className="admin-return-action-note">Đã được {selected.refundApprovedBy ?? 'Admin'} phê duyệt{selected.refundApprovedAt ? ` lúc ${new Date(selected.refundApprovedAt).toLocaleString('vi-VN')}` : ''}. Hãy thực hiện chuyển khoản ngoài hệ thống, sau đó nhập mã tham chiếu để xác nhận hoàn tất.</p>
                 <label className="admin-return-admin-note">Mã tham chiếu giao dịch (bắt buộc)<input value={refundTransferReference} onChange={(event) => setRefundTransferReference(event.target.value)} maxLength={160} required aria-invalid={Boolean(error && !refundTransferReference.trim())} placeholder="Mã giao dịch ngân hàng / ví" /></label>
               </>}
@@ -315,10 +342,12 @@ export default function ReturnRequestsManager() {
                 </>
               ) : selected.status === 'REFUND_APPROVED' ? (
                 <>
-                  <span className="admin-return-processed"><Clock3 size={16} /> Đã duyệt · chờ xác nhận chuyển khoản</span>
-                  <button className="admin-return-refund" type="button" onClick={() => void updateStatus('COMPLETED')} disabled={busy}>
+                  <span className="admin-return-processed"><Clock3 size={16} /> Đã duyệt · chờ xử lý</span>
+                  {resolutionMethod === 'REFUND' ? <button className="admin-return-refund" type="button" onClick={() => void updateStatus('COMPLETED')} disabled={busy}>
                     {busy ? <LoaderCircle size={17} className="is-spinning" /> : <Wallet size={17} />} {busy ? 'Đang xác nhận...' : 'Xác nhận đã chuyển hoàn'}
-                  </button>
+                  </button> : <button className="admin-return-approve" type="button" onClick={() => void updateStatus('VOUCHER_ISSUED', 'VOUCHER')} disabled={busy}>
+                    {busy ? <LoaderCircle size={17} className="is-spinning" /> : <Wallet size={17} />} {busy ? 'Đang phát hành...' : 'Xác nhận & Phát hành Voucher'}
+                  </button>}
                 </>
               ) : (
                 <span className="admin-return-processed"><Check size={16} /> {statusLabels[selected.status]}</span>

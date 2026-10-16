@@ -1,29 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, requireAdmin, transaction } = vi.hoisted(() => {
+const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherCreate, requireAdmin, writeAuditLog, transaction, prismaTransaction } = vi.hoisted(() => {
   const mocks = {
-    orderFindFirst: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
-    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), requireAdmin: vi.fn(),
+    orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
+    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
   };
+  const transaction = {
+    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
+    returnRequest: { update: mocks.returnUpdate },
+    compensationVoucher: { create: mocks.compensationVoucherCreate },
+    voucher: { findUnique: mocks.voucherFindUnique, create: mocks.voucherCreate },
+  };
+  const prismaTransaction = vi.fn((operation: (tx: typeof transaction) => Promise<unknown>) => operation(transaction));
   return {
     ...mocks,
-    transaction: {
-      returnRequest: { update: mocks.returnUpdate },
-      compensationVoucher: { create: mocks.compensationVoucherCreate },
-    },
+    transaction,
+    prismaTransaction,
   };
 });
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    order: { findFirst: orderFindFirst },
+    order: { findFirst: orderFindFirst, findUnique: orderFindUnique, update: orderUpdate },
     returnRequest: { create: returnCreate, findMany: returnFindMany, findUnique: returnFindUnique, update: returnUpdate },
     compensationVoucher: {},
-    $transaction: (operation: (transaction: unknown) => Promise<unknown>) => operation(transaction),
+    voucher: { findUnique: voucherFindUnique, create: voucherCreate },
+    $transaction: prismaTransaction,
   },
 }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
+vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
+vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 
 import { GET, PATCH, POST } from './route';
 
@@ -46,12 +54,18 @@ function makeRequest(method: string, body?: unknown) {
 describe('/api/returns', () => {
   beforeEach(() => {
     orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', phone: '0762 793 244' });
+    orderFindUnique.mockReset().mockResolvedValue({ totalAmount: 169000, refundedAt: null });
+    orderUpdate.mockReset().mockResolvedValue({});
     returnCreate.mockReset().mockResolvedValue({ id: 'return-1', status: 'PENDING' });
     returnFindMany.mockReset().mockResolvedValue([]);
     returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
     returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'COMPLETED' });
     compensationVoucherCreate.mockReset().mockResolvedValue({ id: 'voucher-1', code: 'MKF50-ABCDEF12' });
+    voucherFindUnique.mockReset().mockResolvedValue(null);
+    voucherCreate.mockReset().mockResolvedValue({ id: 'voucher-2', code: 'COMP-MKF-123456', value: 50000, expiresAt: new Date() });
     requireAdmin.mockReset().mockResolvedValue(null);
+    writeAuditLog.mockReset().mockResolvedValue(undefined);
+    prismaTransaction.mockClear();
   });
 
   it('creates a pending request for a matching order and phone', async () => {
@@ -172,25 +186,27 @@ describe('/api/returns', () => {
     expect(response.status).toBe(200);
     expect(result.items).toHaveLength(1);
     expect(returnFindMany).toHaveBeenCalledWith({
-      include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
+      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
       orderBy: { createdAt: 'desc' },
     });
   });
 
   it('updates a request status and admin note for an admin', async () => {
-    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
+    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
     const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' }));
 
     expect(response.status).toBe(200);
+    expect(prismaTransaction).toHaveBeenCalledOnce();
     expect(returnUpdate).toHaveBeenCalledWith({
       where: { id: 'return-1' },
       data: { status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123', refundCompletedBy: 'unknown-admin' },
-      include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
+      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
     });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { paymentStatus: 'REFUNDED', refundAmount: 169000, refundedAt: expect.any(Date) } });
   });
 
   it('requires a transfer reference before confirming a refund', async () => {
-    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
+    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
     const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'COMPLETED', adminNote: '' }));
 
     expect(response.status).toBe(400);
@@ -223,12 +239,45 @@ describe('/api/returns', () => {
     }));
   });
 
+  it('issues a private fixed-value voucher after refund approval in the same transaction', async () => {
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'REFUND_APPROVED', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A',
+      refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000 },
+    });
+    returnUpdate.mockResolvedValueOnce({
+      id: 'return-1', status: 'VOUCHER_ISSUED',
+      issuedVoucher: { code: 'COMP-MKF-123456', value: 50000 },
+      order: { orderCode: 'MKF-123456', customerName: 'Buyer', totalAmount: 169000 },
+    });
+    const response = await PATCH(makeRequest('PATCH', {
+      id: 'return-1', status: 'VOUCHER_ISSUED', resolutionMethod: 'VOUCHER', voucherValue: 50000,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(voucherCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      code: 'COMP-MKF-123456', discountType: 'FIXED', value: 50000,
+      minSpend: 0, usageLimit: 1, isActive: true, showOnPromoPage: false,
+      returnRequestId: 'return-1', expiresAt: expect.any(Date),
+    }) });
+    expect(returnUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'return-1' },
+      data: { status: 'VOUCHER_ISSUED', adminNote: null },
+      include: expect.objectContaining({ issuedVoucher: true }),
+    }));
+    expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({
+      action: 'ISSUE_COMPENSATION_VOUCHER', targetEntity: 'ReturnRequest', targetId: 'return-1',
+      newValue: expect.objectContaining({ voucherCode: 'COMP-MKF-123456', voucherValue: 50000, resolutionMethod: 'VOUCHER' }),
+    }));
+  });
+
   it('requires human approval with refund details before allowing refund completion', async () => {
     const approval = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUND_APPROVED', adminNote: 'Đã đối chiếu chứng từ.' }));
     expect(approval.status).toBe(200);
     expect(returnUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'REFUND_APPROVED', refundApprovedBy: 'unknown-admin', refundApprovedAt: expect.any(Date) }) }));
 
-    returnFindUnique.mockResolvedValueOnce({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
+    returnFindUnique.mockResolvedValueOnce({ status: 'PENDING', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
     const withoutApproval = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', refundTransferReference: 'REF-1' }));
     expect(withoutApproval.status).toBe(409);
   });

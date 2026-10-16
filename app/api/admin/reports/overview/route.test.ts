@@ -28,7 +28,7 @@ vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('next/cache', () => ({
-  unstable_cache: (query: () => Promise<unknown>, keyParts: string[], options: { revalidate: number }) => {
+  unstable_cache: (query: () => Promise<unknown>, keyParts: string[], options: { revalidate: number; tags?: string[] }) => {
     unstableCache(keyParts, options);
     return query;
   },
@@ -43,7 +43,9 @@ function request() {
 describe('GET /api/admin/reports/overview', () => {
   beforeEach(() => {
     orderAggregate.mockReset().mockImplementation((args) => {
-      if (args.where.orderStatus === 'CANCELLED') return Promise.resolve({ _sum: { netAmount: 20000 } });
+      if (args.where.orderStatus === 'CANCELLED') return Promise.resolve({ _sum: { totalAmount: 20000 } });
+      if (args.where.paymentStatus === 'REFUNDED') return Promise.resolve({ _sum: { refundAmount: 30000 } });
+      if (args.where.paymentStatus === 'REFUNDED') return Promise.resolve({ _sum: { refundAmount: 30000 } });
       if (args.where.createdAt?.lt) return Promise.resolve({ _sum: { totalAmount: 200000 } });
       if (args.where.createdAt) return Promise.resolve({ _sum: { totalAmount: 400000 } });
       return Promise.resolve({
@@ -76,20 +78,31 @@ describe('GET /api/admin/reports/overview', () => {
       paidOrders: 2,
       averageOrderValue: 250000,
       cancelledDeductions: 20000,
-      refundDeductions: 10000,
-      netRevenue: 450000,
+      refundDeductions: 40000,
+      grossSales: 500000,
+      netRevenue: 460000,
       gmvGrowthPercent: 100,
       lowStock: 0,
       partialMetrics: [],
     });
-    expect(orderAggregate).toHaveBeenCalledTimes(4);
+    expect(orderAggregate).toHaveBeenCalledTimes(6);
+    expect(orderAggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { paymentStatus: 'REFUNDED' },
+      _sum: { refundAmount: true },
+    }));
+    expect(orderAggregate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { OR: [
+        { paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' } },
+        { paymentStatus: 'REFUNDED' },
+      ] },
+    }));
     expect(orderGroupBy).toHaveBeenCalledOnce();
     expect(orderFindMany).toHaveBeenCalledWith(expect.objectContaining({
       take: 5,
       select: expect.objectContaining({ orderCode: true, totalAmount: true }),
     }));
-    expect(unstableCache).toHaveBeenCalledTimes(8);
-    expect(unstableCache).toHaveBeenCalledWith(expect.any(Array), { revalidate: 60 });
+    expect(unstableCache).toHaveBeenCalledTimes(9);
+    expect(unstableCache).toHaveBeenCalledWith(expect.any(Array), { revalidate: 60, tags: ['admin-dashboard'] });
   });
 
   it('keeps other dashboard metrics available when one metric fails', async () => {

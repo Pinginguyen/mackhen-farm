@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
@@ -117,7 +118,7 @@ export async function GET(request: Request) {
 
   return withDatabase(async () => {
     const items = await prisma.returnRequest.findMany({
-      include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
+      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
       orderBy: { createdAt: 'desc' },
     });
     items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
@@ -142,8 +143,16 @@ export async function PATCH(request: Request) {
   const status = typeof body.status === 'string' ? body.status : '';
   const adminNote = typeof body.adminNote === 'string' ? body.adminNote.trim() || null : body.adminNote == null ? null : undefined;
   const refundTransferReference = typeof body.refundTransferReference === 'string' ? body.refundTransferReference.trim() : '';
+  const resolutionMethod = body.resolutionMethod;
+  const voucherValue = body.voucherValue;
   if (!id || !returnStatuses.includes(status as ReturnRequestStatus) || (adminNote?.length ?? 0) > 4000 || adminNote === undefined || refundTransferReference.length > 160) {
     return NextResponse.json({ error: 'Mã yêu cầu hoặc trạng thái không hợp lệ.' }, { status: 400 });
+  }
+  if (resolutionMethod !== undefined && resolutionMethod !== 'REFUND' && resolutionMethod !== 'VOUCHER') {
+    return NextResponse.json({ error: 'Phương thức xử lý không hợp lệ.' }, { status: 400 });
+  }
+  if (resolutionMethod === 'VOUCHER' && (!Number.isSafeInteger(voucherValue) || Number(voucherValue) <= 0 || Number(voucherValue) > 100_000_000)) {
+    return NextResponse.json({ error: 'Mệnh giá voucher phải từ 1 đến 100.000.000đ.' }, { status: 400 });
   }
   if (['REFUNDED', 'COMPLETED'].includes(status) && !refundTransferReference) {
     return NextResponse.json({ error: 'Vui lòng nhập mã tham chiếu giao dịch trước khi xác nhận đã chuyển hoàn.' }, { status: 400 });
@@ -152,28 +161,64 @@ export async function PATCH(request: Request) {
   return withDatabase(async () => {
     const current = await prisma.returnRequest.findUnique({
       where: { id },
-      select: { status: true, orderId: true, customerPhone: true, refundBankName: true, refundAccountNumber: true, refundAccountHolder: true, refundApprovedBy: true, refundApprovedAt: true, refundTransferReference: true },
+      select: { status: true, orderId: true, customerPhone: true, refundBankName: true, refundAccountNumber: true, refundAccountHolder: true, refundApprovedBy: true, refundApprovedAt: true, refundTransferReference: true, order: { select: { orderCode: true, totalAmount: true } } },
     });
     if (!current) return NextResponse.json({ error: 'Không tìm thấy yêu cầu đổi trả.' }, { status: 404 });
     const allowedTransition = status === current.status
       || (current.status === 'PENDING' && ['REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REJECTED'].includes(status))
-      || (current.status === 'REFUND_APPROVED' && ['REFUNDED', 'COMPLETED'].includes(status));
+      || (current.status === 'REFUND_APPROVED' && ['REFUNDED', 'COMPLETED', 'VOUCHER_ISSUED'].includes(status));
     if (!allowedTransition) return NextResponse.json({ error: 'Trạng thái không hợp lệ với vòng đời xử lý hiện tại.' }, { status: 409 });
     if (status === 'REFUND_APPROVED' && (current.status !== 'PENDING' || !current.refundBankName || !current.refundAccountNumber || !current.refundAccountHolder)) {
       return NextResponse.json({ error: 'Chỉ phê duyệt hoàn tiền khi yêu cầu đang chờ và khách đã cung cấp đủ thông tin nhận tiền.' }, { status: 409 });
     }
-    if (status === 'VOUCHER_ISSUED' && current.status !== 'PENDING') {
+    if (status === 'VOUCHER_ISSUED' && current.status !== 'PENDING' && !(current.status === 'REFUND_APPROVED' && resolutionMethod === 'VOUCHER')) {
       return NextResponse.json({ error: 'Chỉ phát hành voucher cho yêu cầu đang chờ xử lý.' }, { status: 409 });
     }
     if (['REFUNDED', 'COMPLETED'].includes(status) && current.status !== 'REFUND_APPROVED') {
       return NextResponse.json({ error: 'Cần có phê duyệt của Admin trước khi ghi nhận đã hoàn tiền.' }, { status: 409 });
     }
+    if (resolutionMethod === 'VOUCHER' && (status !== 'VOUCHER_ISSUED' || current.status !== 'REFUND_APPROVED')) {
+      return NextResponse.json({ error: 'Chỉ phát hành voucher sau khi yêu cầu đã được duyệt xử lý.' }, { status: 409 });
+    }
+    if (status === 'VOUCHER_ISSUED' && current.status === 'REFUND_APPROVED' && resolutionMethod !== 'VOUCHER') {
+      return NextResponse.json({ error: 'Chọn phương thức voucher và nhập mệnh giá cần phát hành.' }, { status: 400 });
+    }
     const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
     if (status === 'VOUCHER_ISSUED' && current.status === 'VOUCHER_ISSUED') {
-      const existing = await prisma.returnRequest.findUnique({ where: { id }, include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true } });
+      const existing = await prisma.returnRequest.findUnique({ where: { id }, include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true } });
       if (existing) return NextResponse.json({ item: existing, duplicate: true });
     }
-    const item = status === 'VOUCHER_ISSUED'
+    const refundCompleted = ['REFUNDED', 'COMPLETED'].includes(status);
+    const item = status === 'VOUCHER_ISSUED' && resolutionMethod === 'VOUCHER'
+      ? await prisma.$transaction(async (transaction) => {
+        const baseCode = `COMP-${current.order.orderCode}`;
+        const codeExists = await transaction.voucher.findUnique({ where: { code: baseCode }, select: { id: true } });
+        const code = codeExists ? `${baseCode}-${randomBytes(2).toString('hex').toUpperCase()}` : baseCode;
+        const voucher = await transaction.voucher.create({
+          data: {
+            code,
+            name: `Voucher đền bù đơn ${current.order.orderCode}`,
+            discountType: 'FIXED',
+            value: Number(voucherValue),
+            maxDiscount: null,
+            minSpend: 0,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            isActive: true,
+            usageLimit: 1,
+            freeShipping: false,
+            firstOrderOnly: false,
+            showOnPromoPage: false,
+            returnRequestId: id,
+          },
+        });
+        const updated = await transaction.returnRequest.update({
+          where: { id },
+          data: { status: 'VOUCHER_ISSUED', adminNote },
+          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+        });
+        return { ...updated, issuedVoucher: voucher };
+      })
+      : status === 'VOUCHER_ISSUED'
       ? await prisma.$transaction(async (transaction) => {
         await transaction.compensationVoucher.create({
           data: {
@@ -189,10 +234,25 @@ export async function PATCH(request: Request) {
         return transaction.returnRequest.update({
           where: { id },
           data: { status, adminNote },
-          include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
+          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
         });
       })
-      : await prisma.returnRequest.update({
+      : refundCompleted
+        ? await prisma.$transaction(async (transaction) => {
+          const order = await transaction.order.findUnique({ where: { id: current.orderId }, select: { totalAmount: true, refundedAt: true } });
+          if (!order) throw new Error('Refund order not found.');
+          const updatedReturn = await transaction.returnRequest.update({
+            where: { id },
+            data: { status: status as ReturnRequestStatus, adminNote, refundTransferReference, refundCompletedBy: adminEmail },
+            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+          });
+          await transaction.order.update({
+            where: { id: current.orderId },
+            data: { paymentStatus: 'REFUNDED', refundAmount: order.totalAmount, refundedAt: order.refundedAt ?? new Date() },
+          });
+          return updatedReturn;
+        })
+        : await prisma.returnRequest.update({
         where: { id },
         data: {
           status: status as ReturnRequestStatus,
@@ -200,15 +260,16 @@ export async function PATCH(request: Request) {
           ...(status === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
           ...(['REFUNDED', 'COMPLETED'].includes(status) ? { refundTransferReference, refundCompletedBy: adminEmail } : {}),
         },
-        include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
+        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
       });
+    if (refundCompleted) revalidateTag('admin-dashboard');
     await writeAuditLog(request, {
       adminEmail,
       action: status === 'REFUND_APPROVED' ? 'APPROVE_REFUND' : ['REFUNDED', 'COMPLETED'].includes(status) ? 'COMPLETE_REFUND' : status === 'VOUCHER_ISSUED' ? 'ISSUE_COMPENSATION_VOUCHER' : 'UPDATE_RETURN_REQUEST',
       targetEntity: 'ReturnRequest',
       targetId: id,
       oldValue: current,
-      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
+      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' ? item.issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
     });
     return NextResponse.json({ item });
   }, 'Return request update failed');

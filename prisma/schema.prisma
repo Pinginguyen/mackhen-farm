@@ -24,6 +24,7 @@ enum OrderStatus {
 enum PaymentStatus {
   PENDING
   PAID
+  REFUNDED
   FAILED
   CANCELLED
 }
@@ -199,6 +200,8 @@ model Order {
   orderStatus   OrderStatus          @default(PENDING) @map("status")
   paymentMethod CheckoutPaymentMethod @default(COD)
   paymentStatus PaymentStatus        @default(PENDING)
+  refundAmount  Int                  @default(0)
+  refundedAt    DateTime?
   subtotal      Int
   shippingFee   Float                @map("shipping")
   discountAmount Float               @default(0)
@@ -331,6 +334,7 @@ model ReturnRequest {
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   refundOperations RefundOperation[]
   compensationVoucher CompensationVoucher?
+  issuedVoucher Voucher?
 
   @@index([status, createdAt])
   @@index([orderId])
@@ -406,6 +410,8 @@ model Voucher {
   freeShipping   Boolean             @default(false)
   firstOrderOnly Boolean             @default(false)
   showOnPromoPage Boolean            @default(false)
+  returnRequestId String?             @unique
+  returnRequest   ReturnRequest?      @relation(fields: [returnRequestId], references: [id], onDelete: SetNull)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 

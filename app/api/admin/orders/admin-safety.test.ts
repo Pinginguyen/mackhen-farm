@@ -23,6 +23,7 @@ vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('@/lib/auth', () => ({ getRequestSession: () => ({ email: 'admin@example.com' }) }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
+vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 
 import { PATCH as patchOrder } from './route';
 import { PATCH as patchReturn } from '../../returns/route';

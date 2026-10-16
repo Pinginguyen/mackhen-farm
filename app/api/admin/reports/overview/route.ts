@@ -15,9 +15,10 @@ type PaidSummary = {
 };
 
 type RevenueSummary = { _sum: { totalAmount: number | null } };
+type RefundSummary = { _sum: { amount: number | null } };
 
 function cachedMetric<T>(key: string, query: () => Promise<T>) {
-  return unstable_cache(query, ['admin-dashboard', key], { revalidate: 60 })();
+  return unstable_cache(query, ['admin-dashboard', key], { revalidate: 60, tags: ['admin-dashboard'] })();
 }
 
 async function loadMetric<T>(key: string, query: () => Promise<T>, fallback: T, partialMetrics: string[]): Promise<T> {
@@ -48,18 +49,32 @@ export async function GET(request: Request) {
     const partialMetrics: string[] = [];
     const paidSummaryFallback: PaidSummary = { _sum: { totalAmount: null, grossAmount: null, netAmount: null }, _count: 0, _avg: { totalAmount: null } };
     const revenueFallback: RevenueSummary = { _sum: { totalAmount: null } };
-    const [paidSummary, cancelledFinancials, refunds, orderStatusCounts, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, recentOrders] = await Promise.all([
+    const refundFallback: RefundSummary = { _sum: { amount: null } };
+    const [grossSalesSummary, paidSummary, cancelledFinancials, refunds, orderStatusCounts, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, recentOrders] = await Promise.all([
+      loadMetric<RevenueSummary>('gross-sales', () => prisma.order.aggregate({
+        where: { orderStatus: { not: 'CANCELLED' } },
+        _sum: { totalAmount: true },
+      }), revenueFallback, partialMetrics),
       loadMetric<PaidSummary>('paid-summary', () => prisma.order.aggregate({
-        where: { paymentStatus: 'PAID' },
+        where: { OR: [
+          { paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' } },
+          { paymentStatus: 'REFUNDED' },
+        ] },
         _sum: { totalAmount: true, grossAmount: true, netAmount: true },
         _count: true,
         _avg: { totalAmount: true },
       }), paidSummaryFallback, partialMetrics),
       loadMetric('cancelled-deductions', () => prisma.order.aggregate({
-        where: { paymentStatus: 'PAID', orderStatus: 'CANCELLED' },
-        _sum: { netAmount: true },
-      }), { _sum: { netAmount: null } }, partialMetrics),
-      loadMetric('refunds', () => prisma.refundOperation.aggregate({ where: { status: 'COMPLETED' }, _sum: { amount: true } }), { _sum: { amount: null } }, partialMetrics),
+        where: { orderStatus: 'CANCELLED' },
+        _sum: { totalAmount: true },
+      }), { _sum: { totalAmount: null } }, partialMetrics),
+      loadMetric<RefundSummary>('refunds', async () => {
+        const [refundedOrders, completedOperations] = await Promise.all([
+          prisma.order.aggregate({ where: { paymentStatus: 'REFUNDED' }, _sum: { refundAmount: true } }),
+          prisma.refundOperation.aggregate({ where: { status: 'COMPLETED', order: { paymentStatus: { not: 'REFUNDED' } } }, _sum: { amount: true } }),
+        ]);
+        return { _sum: { amount: (refundedOrders._sum.refundAmount ?? 0) + (completedOperations._sum.amount ?? 0) } };
+      }, refundFallback, partialMetrics),
       loadMetric('order-status-counts', () => prisma.order.groupBy({ by: ['orderStatus'], _count: { _all: true } }), [], partialMetrics),
       loadMetric('low-stock-products', () => prisma.product.findMany({
         where: { active: true, stock: { lt: 30 } },
@@ -67,11 +82,11 @@ export async function GET(request: Request) {
         orderBy: { stock: 'asc' },
       }), [], partialMetrics),
       loadMetric<RevenueSummary>('current-period-revenue', () => prisma.order.aggregate({
-        where: { paymentStatus: 'PAID', createdAt: { gte: currentPeriodStart } },
+        where: { paymentStatus: { in: ['PAID', 'REFUNDED'] }, orderStatus: { not: 'CANCELLED' }, createdAt: { gte: currentPeriodStart } },
         _sum: { totalAmount: true },
       }), revenueFallback, partialMetrics),
       loadMetric<RevenueSummary>('previous-period-revenue', () => prisma.order.aggregate({
-        where: { paymentStatus: 'PAID', createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } },
+        where: { paymentStatus: { in: ['PAID', 'REFUNDED'] }, orderStatus: { not: 'CANCELLED' }, createdAt: { gte: previousPeriodStart, lt: currentPeriodStart } },
         _sum: { totalAmount: true },
       }), revenueFallback, partialMetrics),
       loadMetric('recent-orders', () => prisma.order.findMany({
@@ -93,11 +108,11 @@ export async function GET(request: Request) {
     const deliverySuccessRate = closedOrders ? (delivered / closedOrders) * 100 : null;
     const cancelledRate = closedOrders ? (cancelled / closedOrders) * 100 : null;
     const revenue = paidSummary._sum.totalAmount ?? 0;
-    const grossSales = paidSummary._sum.grossAmount ?? revenue;
-    const cancelledDeductions = cancelledFinancials._sum.netAmount ?? 0;
+    const grossSales = grossSalesSummary._sum.totalAmount ?? 0;
+    const cancelledDeductions = cancelledFinancials._sum.totalAmount ?? 0;
     const refundDeductions = refunds._sum.amount ?? 0;
     const marketplaceFees: number | null = null;
-    const netRevenue = Math.max(0, (paidSummary._sum.netAmount ?? revenue) - cancelledDeductions - refundDeductions);
+    const netRevenue = Math.max(0, Math.min(grossSales, revenue - refundDeductions));
 
     return NextResponse.json({
       revenue,
