@@ -15,6 +15,10 @@ export type AdminOrder = {
   paymentMethod: string;
   paymentStatus: string;
   total: number;
+  subtotal: number;
+  shippingFee: number;
+  discountAmount: number;
+  note: string | null;
   trackingCode: string | null;
   carrier: string | null;
   hasOpenCase?: boolean;
@@ -42,6 +46,8 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const [pending, setPending] = useState<string | null>(null);
   const [manualPaymentReason, setManualPaymentReason] = useState<Record<string, string>>({});
   const [manualPaymentOrder, setManualPaymentOrder] = useState<string | null>(null);
+  const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('Khách đổi ý');
   const [editingRecipient, setEditingRecipient] = useState<string | null>(null);
   const [recipientDraft, setRecipientDraft] = useState({ phone: '', address: '' });
   useEffect(() => {
@@ -194,6 +200,30 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
     }
   }
 
+  async function cancelOrder(order: AdminOrder) {
+    setPending(order.orderCode);
+    setToast('');
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ orderCode: order.orderCode, status: 'CANCELLED', cancelReason }),
+      });
+      const result = await response.json() as { status?: string; error?: { message?: string } };
+      if (!response.ok) {
+        setToast(result.error?.message ?? 'Không thể hủy đơn hàng.');
+        return;
+      }
+      setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? 'CANCELLED' } : item));
+      setCancellingOrder(null);
+      setToast(`Đã hủy đơn ${order.orderCode}.`);
+    } catch {
+      setToast('Không thể kết nối để hủy đơn hàng.');
+    } finally {
+      setPending(null);
+    }
+  }
+
   return (
     <div className="admin-orders">
       <div className="admin-order-tabs" role="tablist" aria-label="Lọc trạng thái đơn hàng">
@@ -223,11 +253,13 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                   <strong className="admin-order-code">{order.orderCode}</strong>
                   <span className={`admin-status-badge status-${order.status.toLowerCase()}`}>{orderStatusLabels[order.status] ?? order.status}</span>
                   <span className={`admin-payment-badge ${order.paymentMethod === 'COD' ? 'cod' : order.paymentMethod.toLowerCase()}`}>{order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}</span>
+                  <span className="admin-payment-method-badge">{order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod}</span>
                 </div>
                 <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN')}</time>
               </div>
-              <strong className="admin-order-total">{formatCurrency(order.total)}</strong>
+              <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small></div>
             </header>
+            {order.note?.trim() && <p className="admin-order-customer-note">Ghi chú của khách: {order.note}</p>}
             {order.paymentMethod === 'COD' && order.total >= 200000 && <p className="cod-risk-badge">Cần xác nhận qua điện thoại</p>}
             <div className="admin-order-content">
               <section className="admin-order-customer" aria-label="Thông tin giao hàng">
@@ -266,7 +298,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-toolbar" onSubmit={(event) => save(event, order)}>
               <div className="admin-order-toolbar-controls">
-                <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value !== order.status && (!canSelectStatus(order, value) || value === 'PAID')}>{label}</option>)}</select></label>
+                <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value !== order.status && (!canSelectStatus(order, value) || value === 'PAID' || value === 'CANCELLED')}>{label}</option>)}</select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID" disabled={order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID'}>Đã thanh toán</option></select></label>
                 <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
                 <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} placeholder="Nhập mã vận đơn..." /></label>
@@ -274,9 +306,10 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
               <div className="admin-order-toolbar-actions">
                 <Link className="admin-order-print-button" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
                 {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
-                {['PENDING', 'CONFIRMED', 'PAID'].includes(order.status) && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
+                {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
                 {order.status === 'PROCESSING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao 3PL</button>}
                 {order.status === 'HANDED_OFF' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'IN_TRANSIT')}>Đang giao</button>}
+                {['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(order.status) && <button type="button" className="admin-order-cancel-button" disabled={pending === order.orderCode} onClick={() => { setCancelReason('Khách đổi ý'); setCancellingOrder(order.orderCode); }}>Hủy đơn</button>}
                 <button className="admin-order-save-button" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>
               </div>
             </form>
@@ -285,6 +318,14 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 <header><div><p className="eyebrow">VietQR · {order.orderCode}</p><h3 id={`manual-payment-title-${order.id}`}>Duyệt thanh toán</h3></div><button type="button" aria-label="Đóng" onClick={() => setManualPaymentOrder(null)} disabled={pending === order.orderCode}><X size={18} /></button></header>
                 <label className="field">Lý do xác nhận<input autoFocus required maxLength={1000} value={manualPaymentReason[order.orderCode] ?? ''} onChange={(event) => setManualPaymentReason((current) => ({ ...current, [order.orderCode]: event.target.value }))} placeholder="Ví dụ: Đối soát sao kê khớp" /></label>
                 <footer><button type="button" className="secondary-action" onClick={() => setManualPaymentOrder(null)} disabled={pending === order.orderCode}>Hủy</button><button type="button" className="admin-order-save-button" onClick={() => void confirmManualPayment(order)} disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang xác nhận...' : 'Xác nhận thanh toán'}</button></footer>
+              </section>
+            </div>}
+            {cancellingOrder === order.orderCode && <div className="admin-manual-payment-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && pending !== order.orderCode) setCancellingOrder(null); }}>
+              <section className="admin-manual-payment-dialog" role="dialog" aria-modal="true" aria-labelledby={`cancel-order-title-${order.id}`}>
+                <header><div><p className="eyebrow">Đơn hàng · {order.orderCode}</p><h3 id={`cancel-order-title-${order.id}`}>Xác nhận hủy đơn</h3></div><button type="button" aria-label="Đóng" onClick={() => setCancellingOrder(null)} disabled={pending === order.orderCode}><X size={18} /></button></header>
+                <p>Đơn hàng sẽ ngừng xử lý và số lượng sản phẩm được hoàn lại kho.</p>
+                <label className="field">Lý do hủy<select value={cancelReason} onChange={(event) => setCancelReason(event.target.value)}><option>Khách đổi ý</option><option>Sai thông tin</option><option>Không liên lạc được</option><option>Khách yêu cầu hủy</option><option>Khác</option></select></label>
+                <footer><button type="button" className="secondary-action" onClick={() => setCancellingOrder(null)} disabled={pending === order.orderCode}>Giữ đơn</button><button type="button" className="admin-order-cancel-button is-confirm" onClick={() => void cancelOrder(order)} disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang hủy...' : 'Xác nhận hủy'}</button></footer>
               </section>
             </div>}
           </article>

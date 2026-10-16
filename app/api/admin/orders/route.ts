@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: 'desc' },
     });
-    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, trackingCode: order.trackingCode, carrier: order.carrier, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ ...item, sku: item.product.slug })) }));
+    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, subtotal: order.subtotal, shippingFee: order.shippingFee, discountAmount: order.discountAmount, note: order.note, trackingCode: order.trackingCode, carrier: order.carrier, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ ...item, sku: item.product.slug })) }));
     if (params.get('format') === 'csv') {
       const escape = (value: string | number) => {
         const text = String(value);
@@ -85,12 +85,13 @@ export async function PATCH(request: Request) {
   try {
     const payload: unknown = await request.json();
     if (!isRecord(payload)) return NextResponse.json({ error: { message: 'Dữ liệu yêu cầu không hợp lệ.' } }, { status: 400 });
-    const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown; phone?: unknown; address?: unknown; paymentReason?: unknown };
+    const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown; phone?: unknown; address?: unknown; paymentReason?: unknown; cancelReason?: unknown };
     const orderCode = typeof body.orderCode === 'string' ? body.orderCode.trim().toUpperCase() : '';
     const hasStatus = body.status !== undefined;
     const normalizedPhone = typeof body.phone === 'string' ? body.phone.replace(/\D/g, '') : '';
     const address = typeof body.address === 'string' ? body.address.trim() : '';
     const paymentReason = typeof body.paymentReason === 'string' ? body.paymentReason.trim() : '';
+    const cancelReason = typeof body.cancelReason === 'string' ? body.cancelReason.trim() : '';
     if (!/^MKF-\d{6}$/.test(orderCode) || (hasStatus && (typeof body.status !== 'string' || !statuses.includes(body.status as (typeof statuses)[number])))
       || (!hasStatus && body.paymentStatus === undefined && body.phone === undefined && body.address === undefined)
       || (body.paymentStatus !== undefined && body.paymentStatus !== 'PENDING' && body.paymentStatus !== 'PAID')
@@ -101,6 +102,9 @@ export async function PATCH(request: Request) {
       || (body.address !== undefined && (!address || address.length > 500))
       || (body.paymentReason !== undefined && (typeof body.paymentReason !== 'string' || paymentReason.length > 1000))) {
       return NextResponse.json({ error: { message: 'Mã đơn hoặc trạng thái không hợp lệ.' } }, { status: 400 });
+    }
+    if (body.cancelReason !== undefined && (typeof body.cancelReason !== 'string' || cancelReason.length > 500)) {
+      return NextResponse.json({ error: { message: 'Chọn lý do hủy đơn hợp lệ.' } }, { status: 400 });
     }
     const requestedStatus = hasStatus ? body.status as (typeof statuses)[number] : undefined;
     if (body.carrier && !carriers.includes(body.carrier as (typeof carriers)[number])) {
@@ -128,6 +132,12 @@ export async function PATCH(request: Request) {
       if (['CANCELLED', 'RETURNED'].includes(currentOrder.orderStatus) && targetStatus !== currentOrder.orderStatus) {
         return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc chuyển hoàn là trạng thái cuối, không thể tiếp tục xử lý.' } }, { status: 409 });
       }
+      if (targetStatus === 'CANCELLED' && !['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(currentOrder.orderStatus)) {
+        return NextResponse.json({ error: { message: 'Không thể hủy đơn sau khi đã bàn giao vận chuyển.' } }, { status: 409 });
+      }
+      if (targetStatus === 'CANCELLED' && !cancelReason) {
+        return NextResponse.json({ error: { message: 'Chọn lý do hủy đơn hợp lệ.' } }, { status: 400 });
+      }
       if (currentOrder.orderStatus === 'SHIPPING' && targetStatus !== currentOrder.orderStatus && !['DELIVERED', 'RETURNED'].includes(targetStatus)) {
         return NextResponse.json({ error: { message: 'Đơn đang giao chỉ có thể cập nhật thành đã giao hoặc chuyển hoàn.' } }, { status: 409 });
       }
@@ -136,15 +146,16 @@ export async function PATCH(request: Request) {
       }
       const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
       const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
-      const order = targetStatus === 'RETURNED'
+      const order = ['RETURNED', 'CANCELLED'].includes(targetStatus)
         ? await prisma.$transaction(async (transaction) => {
-          if (currentOrder.orderStatus !== 'RETURNED') {
+          if (currentOrder.orderStatus !== targetStatus) {
             for (const item of currentOrder.items) {
               await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
               if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
               if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
             }
           }
+          if (targetStatus === 'CANCELLED') return transaction.order.update({ where: { orderCode }, data: { orderStatus: targetStatus, deliveredAt: null } });
           return transaction.order.update({
             where: { orderCode },
             data: { orderStatus: targetStatus, carrier: null, trackingCode: null, deliveredAt: null },
@@ -170,7 +181,7 @@ export async function PATCH(request: Request) {
         targetEntity: 'Order',
         targetId: order.orderCode,
         oldValue: { orderStatus: currentOrder.orderStatus, paymentStatus: currentOrder.paymentStatus, phone: currentOrder.phone, address: currentOrder.address, carrier: currentOrder.carrier, trackingCode: currentOrder.trackingCode, note: currentOrder.note },
-        newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode, note: order.note, paymentReason: manualPayment ? paymentReason : undefined },
+        newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode, note: order.note, paymentReason: manualPayment ? paymentReason : undefined, cancelReason: targetStatus === 'CANCELLED' ? cancelReason : undefined },
       });
       return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode });
     });

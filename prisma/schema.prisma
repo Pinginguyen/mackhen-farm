@@ -59,6 +59,7 @@ model User {
   address   String?
   role      UserRole @default(CUSTOMER)
   orders    Order[]
+  reviewReplies ReviewReply[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -258,12 +259,29 @@ model Review {
   comment      String
   riskTag      String?
   riskAnalyzedAt DateTime?
+  adminReply   String?  @db.Text
+  adminReplyAt DateTime?
   createdAt    DateTime @default(now())
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   order        Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  replies      ReviewReply[]
 
   @@unique([orderId, productId])
   @@index([productId, createdAt])
+}
+
+model ReviewReply {
+  id         String   @id @default(cuid())
+  reviewId   String
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName String
+  authorRole String   @default("USER")
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([reviewId])
 }
 
 model Payment {

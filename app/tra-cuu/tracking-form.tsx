@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Check, House, PackageCheck, Printer, Truck } from 'lucide-react';
+import Link from 'next/link';
+import { Box, Check, House, PackageCheck, Printer, Star, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
 import WarrantyRequest from './warranty-request';
 
-type TrackedItem = { productId: string; productName: string; quantity: number; price: number };
+type TrackedItem = { productId: string; productName: string; productSlug?: string; quantity: number; price: number };
 type TrackingTimelineItem = { label: string };
 
 type TrackedOrder = {
@@ -45,7 +46,7 @@ function normalizeOrder(value: unknown): TrackedOrder | null {
   if (typeof order.orderCode !== 'string' || !order.orderCode.trim()) return null;
 
   const items = Array.isArray(order.items)
-    ? order.items.filter((item): item is TrackedItem => Boolean(item && typeof item.productId === 'string' && typeof item.productName === 'string'))
+    ? order.items.filter((item): item is TrackedItem => Boolean(item && typeof item.productId === 'string' && typeof item.productName === 'string' && (item.productSlug === undefined || typeof item.productSlug === 'string')))
     : [];
   const timeline = Array.isArray(order.timeline)
     ? order.timeline.filter((item): item is TrackingTimelineItem => Boolean(item && typeof item.label === 'string'))
@@ -89,29 +90,6 @@ function activeStep(status: string): number {
   if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(status)) return 2;
   if (['CONFIRMED', 'PAID', 'PROCESSING'].includes(status)) return 1;
   return 0;
-}
-
-function ReviewAfterDelivery({ order, productId }: { order: TrackedOrder; productId: string }) {
-  const [message, setMessage] = useState('');
-  const productName = order?.items?.find((item) => item.productId === productId)?.productName ?? 'sản phẩm';
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    try {
-      const response = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ orderCode: order.orderCode, phone: form.get('phone'), productId, rating: Number(form.get('rating')), comment: form.get('comment') }),
-      });
-      const result = await response.json() as { error?: unknown; message?: unknown };
-      setMessage(response.ok ? 'Cảm ơn bạn đã đánh giá.' : getErrorMessage(result?.error ?? result, 'Không thể gửi đánh giá.'));
-    } catch {
-      setMessage('Không thể kết nối. Vui lòng thử lại.');
-    }
-  }
-
-  return <form className="tracking-review" onSubmit={submit}><h4>Đánh giá {productName}</h4><div className="field"><label>Số điện thoại đặt hàng<input name="phone" type="tel" required /></label></div><div className="field"><label>Số sao<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} sao</option>)}</select></label></div><div className="field"><label>Bình luận<input name="comment" minLength={3} maxLength={1000} required /></label></div><button className="secondary-action" type="submit">Gửi đánh giá</button>{message && <p role="status">{message}</p>}</form>;
 }
 
 export default function TrackingForm() {
@@ -276,8 +254,6 @@ export default function TrackingForm() {
         const current = activeStep(orderStatus);
         const delivered = ['DELIVERED', 'COMPLETED'].includes(orderStatus);
         const progress = orderStatus === 'CANCELLED' ? 0 : (current / Math.max(1, timeline.length - 1)) * 100;
-        const productIds = [...new Set(orderItems.map((item) => item.productId).filter(Boolean))];
-
         return (
           <article className={`tracking-order${printOrderCode === order.orderCode ? ' is-print-target' : ''}`} key={order.orderCode}>
             <header>
@@ -325,6 +301,10 @@ export default function TrackingForm() {
                 <div key={`${order.orderCode}-${item.productId}`}>
                   <span>{item.productName} × {item.quantity}</span>
                   <strong>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</strong>
+                  {delivered && item.productSlug && order.phone && <Link
+                    className="tracking-review-action"
+                    href={`/products/${encodeURIComponent(item.productSlug)}?${new URLSearchParams({ review: '1', orderCode: order.orderCode, phone: order.phone }).toString()}#product-reviews-title`}
+                  ><Star size={13} aria-hidden="true" /> Đánh giá</Link>}
                 </div>
               ))}
               {!orderItems.length && <p>Đơn hàng chưa có thông tin sản phẩm.</p>}
@@ -338,13 +318,7 @@ export default function TrackingForm() {
             <p className="tracking-invoice-guarantee">Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.</p>
 
             {delivered && (
-              <>
-                <WarrantyRequest orderCode={order.orderCode} phone={phone} deliveredAt={order.deliveredAt ?? order.createdAt} existingReason={order.warrantyRequest?.reason} />
-                <div className="delivered-reviews">
-                  <h3>Chia sẻ trải nghiệm</h3>
-                  {productIds.map((productId) => <ReviewAfterDelivery key={productId} order={order} productId={productId} />)}
-                </div>
-              </>
+              <WarrantyRequest orderCode={order.orderCode} phone={phone} deliveredAt={order.deliveredAt ?? order.createdAt} existingReason={order.warrantyRequest?.reason} />
             )}
           </article>
         );

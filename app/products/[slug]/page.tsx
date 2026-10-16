@@ -8,7 +8,7 @@ import ProductRating from '@/components/ProductRating';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 import ProductHighlights from '@/components/ProductHighlights';
 
-type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string };
+type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
 function normalizeProductLookup(value: string): string {
   return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
@@ -24,7 +24,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   try {
     const databaseProduct = await prisma.product.findFirst({
       where: { OR: [{ slug: params.slug }, { id: params.slug }] },
-      include: { variants: true, reviews: { orderBy: { createdAt: 'desc' }, take: 20 } },
+      include: { variants: true, reviews: { orderBy: { createdAt: 'desc' }, take: 20, include: { replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
     });
     if (databaseProduct) {
       inactiveInDatabase = !databaseProduct.active;
@@ -38,7 +38,16 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
           status: variant.stock > 0 ? 'Còn hàng' : 'Sắp hết',
         })),
       };
-      reviews = databaseProduct.reviews.map((review) => ({ ...review, createdAt: review.createdAt.toISOString() }));
+      reviews = databaseProduct.reviews.map((review) => ({
+        id: review.id,
+        customerName: review.customerName,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+        adminReply: review.adminReply,
+        adminReplyAt: review.adminReplyAt?.toISOString() ?? null,
+        replies: review.replies.map((reply) => ({ ...reply, createdAt: reply.createdAt.toISOString() })),
+      }));
       try {
         const ratingGroups = await prisma.review.groupBy({
           by: ['rating'],

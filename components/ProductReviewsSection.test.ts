@@ -10,7 +10,7 @@ const props = {
   initialRating: 5,
   initialReviewCount: 1,
   initialRatingCounts: [0, 0, 0, 0, 1],
-  initialReviews: [{ id: 'review-1', customerName: 'Minh Anh', rating: 5, comment: 'Vị ngon, đóng gói cẩn thận', createdAt: '2026-10-15T10:00:00.000Z' }],
+  initialReviews: [{ id: 'review-1', customerName: 'Minh Anh', rating: 5, comment: 'Vị ngon, đóng gói cẩn thận', createdAt: '2026-10-15T10:00:00.000Z', adminReply: null, adminReplyAt: null, replies: [] }],
 };
 
 describe('ProductReviewsSection', () => {

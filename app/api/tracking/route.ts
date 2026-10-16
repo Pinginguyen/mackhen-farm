@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return withDatabase(async () => {
       const order = await prisma.order.findUnique({
         where: { orderCode },
-        include: { items: { select: { productId: true, productName: true, quantity: true, price: true } }, warrantyRequest: { select: { reason: true, status: true, createdAt: true } } },
+        include: { items: { select: { productId: true, productName: true, quantity: true, price: true, product: { select: { slug: true } } } }, warrantyRequest: { select: { reason: true, status: true, createdAt: true } } },
       });
       const items = order && normalizeVietnamesePhone(order.phone) === phone ? [{
         orderCode: order.orderCode,
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         createdAt: order.createdAt,
         deliveredAt: order.deliveredAt,
         warrantyRequest: order.warrantyRequest,
-        items: order.items,
+        items: order.items.map((item) => ({ productId: item.productId, productName: item.productName, productSlug: item.product.slug, quantity: item.quantity, price: item.price })),
         maskedPhone: maskPhone(order.phone),
         maskedAddress: maskAddress(order.address),
       }] : [];

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Star } from 'lucide-react';
+import { MessageCircle, Send, Star, Store } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
@@ -13,7 +13,12 @@ type Review = {
   rating: number;
   comment: string;
   createdAt: string;
+  adminReply: string | null;
+  adminReplyAt: string | null;
+  replies: ReviewReply[];
 };
+
+type ReviewReply = { id: string; authorName: string; authorRole: string; content: string; createdAt: string };
 
 export default function ProductReviewsSection({
   productId,
@@ -42,10 +47,27 @@ export default function ProductReviewsSection({
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [threadReplyOpen, setThreadReplyOpen] = useState<string | null>(null);
+  const [adminReplyOpen, setAdminReplyOpen] = useState<string | null>(null);
+  const [adminReplyDraft, setAdminReplyDraft] = useState('');
+  const [pendingReply, setPendingReply] = useState<string | null>(null);
   const reviewPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('review') !== '1') return;
+    let active = true;
+    void fetch('/api/auth/session', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((result: { user?: { role?: string } | null }) => { if (active) setIsAdmin(result.user?.role === 'ADMIN'); })
+      .catch(() => { if (active) setIsAdmin(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('review') !== '1') return;
+    setOrderCode(searchParams.get('orderCode') ?? '');
+    setPhone(searchParams.get('phone') ?? '');
     setFormOpen(true);
     window.setTimeout(() => document.getElementById('review-form-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }, []);
@@ -103,6 +125,55 @@ export default function ProductReviewsSection({
       setMessage('Không thể kết nối. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function submitThreadReply(event: React.FormEvent<HTMLFormElement>, reviewId: string) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setPendingReply(reviewId);
+    try {
+      const response = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ authorName: form.get('authorName'), content: form.get('content') }),
+      });
+      const result = await response.json() as { reply?: ReviewReply; error?: unknown };
+      if (!response.ok || !result.reply) {
+        setMessage(getErrorMessage(result.error, 'Không thể gửi bình luận.'));
+        return;
+      }
+      setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, replies: [...review.replies, result.reply!] } : review));
+      setThreadReplyOpen(null);
+      setMessage('Bình luận của bạn đã được thêm.');
+    } catch {
+      setMessage('Không thể kết nối. Vui lòng thử lại.');
+    } finally {
+      setPendingReply(null);
+    }
+  }
+
+  async function saveAdminReply(reviewId: string, value: string) {
+    setPendingReply(reviewId);
+    try {
+      const response = await fetch(`/api/admin/reviews/${encodeURIComponent(reviewId)}/reply`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ adminReply: value }),
+      });
+      const result = await response.json() as { item?: { adminReply: string | null; adminReplyAt: string | null }; error?: unknown };
+      if (!response.ok || !result.item) {
+        setMessage(getErrorMessage(result.error, 'Không thể lưu phản hồi của shop.'));
+        return;
+      }
+      setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, ...result.item } : review));
+      setAdminReplyOpen(null);
+      setAdminReplyDraft('');
+      setMessage(value.trim() ? 'Đã lưu phản hồi của shop.' : 'Đã xóa phản hồi của shop.');
+    } catch {
+      setMessage('Không thể kết nối. Vui lòng thử lại.');
+    } finally {
+      setPendingReply(null);
     }
   }
 
@@ -212,6 +283,30 @@ export default function ProductReviewsSection({
                   <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString('vi-VN')}</time>
                 </div>
                 <p className="review-comment-text">{review.comment}</p>
+                {review.adminReply && <div className="review-merchant-reply">
+                  <header><Store size={15} aria-hidden="true" /><strong>Phản hồi từ Mắc Khén Farm</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString('vi-VN') : ''}</time></header>
+                  <p>{review.adminReply}</p>
+                </div>}
+                {isAdmin && <button type="button" className="review-admin-reply-toggle" onClick={() => { setAdminReplyDraft(review.adminReply ?? ''); setAdminReplyOpen(adminReplyOpen === review.id ? null : review.id); }}>
+                  <MessageCircle size={14} aria-hidden="true" /> {review.adminReply ? 'Phản hồi / Sửa phản hồi' : 'Phản hồi'}
+                </button>}
+                {isAdmin && adminReplyOpen === review.id && <form className="review-admin-reply-form" onSubmit={(event) => { event.preventDefault(); void saveAdminReply(review.id, adminReplyDraft); }}>
+                  <label htmlFor={`merchant-reply-${review.id}`}>Phản hồi chính thức của shop</label>
+                  <textarea id={`merchant-reply-${review.id}`} rows={3} maxLength={2000} value={adminReplyDraft} onChange={(event) => setAdminReplyDraft(event.target.value)} />
+                  <div><button type="submit" disabled={pendingReply === review.id || !adminReplyDraft.trim()}><Send size={14} />{pendingReply === review.id ? 'Đang lưu...' : 'Gửi phản hồi'}</button>{review.adminReply && <button type="button" className="review-admin-reply-clear" disabled={pendingReply === review.id} onClick={() => void saveAdminReply(review.id, '')}>Xóa phản hồi</button>}</div>
+                </form>}
+                {!!review.replies.length && <div className="review-thread-replies">
+                  {review.replies.map((reply) => <article className={reply.authorRole === 'ADMIN' ? 'is-admin-reply' : ''} key={reply.id}>
+                    <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString('vi-VN')}</time></header>
+                    <p>{reply.content}</p>
+                  </article>)}
+                </div>}
+                <button type="button" className="review-thread-toggle" onClick={() => setThreadReplyOpen(threadReplyOpen === review.id ? null : review.id)}><MessageCircle size={14} />{threadReplyOpen === review.id ? 'Đóng thảo luận' : `Trả lời (${review.replies.length})`}</button>
+                {threadReplyOpen === review.id && <form className="review-thread-form" onSubmit={(event) => void submitThreadReply(event, review.id)}>
+                  <label>Tên hiển thị<input name="authorName" maxLength={100} required placeholder="Tên của bạn" /></label>
+                  <label>Thảo luận<textarea name="content" rows={3} maxLength={1000} required placeholder="Hỏi thêm hoặc chia sẻ với người mua khác..." /></label>
+                  <button type="submit" disabled={pendingReply === review.id}>{pendingReply === review.id ? 'Đang gửi...' : 'Gửi bình luận'}</button>
+                </form>}
               </article>
             )) : (
               <p className="review-empty-state">Chưa có đánh giá cho sản phẩm này. Hãy là người đầu tiên chia sẻ trải nghiệm.</p>

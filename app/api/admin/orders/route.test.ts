@@ -200,4 +200,35 @@ describe('/api/admin/orders', () => {
     }));
     expect(productUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it('requires a cancellation reason before changing order state', async () => {
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'CANCELLED' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it('cancels an eligible order, restocks inventory transactionally, and accepts a reason', async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null,
+      phone: '0762793244', address: 'Lai Chau', note: null,
+      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+    });
+    orderUpdate.mockResolvedValueOnce({ orderCode: 'MKF-100001', orderStatus: 'CANCELLED', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'CANCELLED', cancelReason: 'Khách đổi ý' }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ status: 'CANCELLED' });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
+    expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { stock: { increment: 2 } } });
+    expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
+  });
 });
