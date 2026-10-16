@@ -35,6 +35,7 @@ const voucherDraft = {
   usageLimit: 25,
   expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   isActive: true,
+  showOnPromoPage: true,
 };
 
 function request(method: string, body?: unknown, url = 'https://mackhen.example/api/admin/vouchers') {
@@ -77,7 +78,7 @@ describe('/api/admin/vouchers', () => {
 
     expect(response.status).toBe(201);
     expect(result.item.code).toBe('TET2026');
-    expect(voucherCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ code: 'TET2026', discountType: 'PERCENTAGE', value: 15, maxDiscount: 50000, usageLimit: 25 }) });
+    expect(voucherCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ code: 'TET2026', discountType: 'PERCENTAGE', value: 15, maxDiscount: 50000, usageLimit: 25, showOnPromoPage: true }) });
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'CREATE_VOUCHER', targetEntity: 'Voucher' }));
   });
 

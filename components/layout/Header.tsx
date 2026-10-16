@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { Gift } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import LogoutButton from '@/app/logout-button';
@@ -30,6 +31,7 @@ export default async function Header() {
       <nav className="main-nav" aria-label="Menu chính">
         <Link href="/">Trang chủ</Link>
         <Link href="/products">Sản phẩm</Link>
+        <Link className="header-promo-link" href="/khuyen-mai"><Gift size={15} aria-hidden="true" /> Khuyến mãi <span aria-label="Hot">Hot</span></Link>
         <Link href="/cart">Giỏ hàng</Link>
         <Link href="/tra-cuu">Tra cứu đơn</Link>
       </nav>

@@ -2079,6 +2079,130 @@ textarea {
   white-space: nowrap;
 }
 
+.checkout-voucher-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #8b1e1e;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.voucher-picker-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(34 24 20 / 58%);
+}
+
+.voucher-picker-dialog {
+  width: min(100%, 560px);
+  max-height: min(78vh, 680px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #eadfd1;
+  border-radius: 12px;
+  background: #fffdf9;
+  box-shadow: 0 24px 70px rgb(29 18 13 / 25%);
+}
+
+.voucher-picker-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.voucher-picker-dialog .eyebrow {
+  margin: 0 0 4px;
+  color: #a56a22;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.voucher-picker-dialog h2 {
+  margin: 0;
+  color: #351d1a;
+  font-size: 1.35rem;
+}
+
+.voucher-picker-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #eadfd1;
+  border-radius: 8px;
+  background: white;
+  color: #533a32;
+  cursor: pointer;
+}
+
+.voucher-picker-list {
+  display: grid;
+  gap: 10px;
+}
+
+.voucher-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #eadfd1;
+  border-left: 4px solid #8b1e1e;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.voucher-picker-item > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.voucher-picker-item strong {
+  color: #8b1e1e;
+}
+
+.voucher-picker-item span,
+.voucher-picker-item small {
+  color: #71645c;
+  font-size: 0.8rem;
+}
+
+.voucher-picker-item b {
+  color: #34221e;
+}
+
+.voucher-picker-item button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.voucher-picker-message {
+  margin: 0;
+  padding: 22px 12px;
+  color: #71645c;
+  text-align: center;
+}
+
+.voucher-picker-message.is-error {
+  color: #a12d2d;
+}
+
 .checkout-voucher-success,
 .checkout-voucher-error {
   margin: 0;
@@ -2092,6 +2216,487 @@ textarea {
 
 .checkout-voucher-error {
   color: #9f3434;
+}
+
+.header-promo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.header-promo-link span {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #8b1e1e;
+  color: #fff8e9;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.promo-page {
+  min-height: 72vh;
+  padding-bottom: 72px;
+  background-color: #fbf8f1;
+  background-image: radial-gradient(#9d7b5520 0.7px, transparent 0.7px);
+  background-size: 14px 14px;
+}
+
+.promo-hero {
+  position: relative;
+  overflow: hidden;
+  background: #641c1d;
+  color: #fff8e9;
+}
+
+.promo-hero::after {
+  position: absolute;
+  top: -100px;
+  right: max(4vw, calc((100vw - 1160px) / 2));
+  width: 400px;
+  height: 400px;
+  border: 1px solid rgb(244 196 112 / 22%);
+  border-radius: 50%;
+  content: '';
+  box-shadow: 0 0 0 42px rgb(244 196 112 / 5%), 0 0 0 84px rgb(244 196 112 / 4%);
+}
+
+.promo-hero-inner {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 40px, 1160px);
+  min-height: 330px;
+  margin: 0 auto;
+  padding: 57px 0 52px;
+}
+
+.promo-eyebrow,
+.promo-section-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 13px;
+  color: #edc276;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.promo-hero h1 {
+  max-width: 690px;
+  margin: 0;
+  color: #fffaf0;
+  font-family: var(--font-be-vietnam-pro), sans-serif;
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.12;
+}
+
+.promo-hero h1 span {
+  display: block;
+}
+
+.promo-hero-title-primary {
+  color: #fff;
+}
+
+.promo-hero-title-brand {
+  color: #f59e0b;
+}
+
+.promo-hero-description {
+  max-width: 520px;
+  margin: 16px 0 22px;
+  color: #f4e7d7;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.promo-hero-cta,
+.promo-use-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 15px;
+  border-radius: 7px;
+  background: #e8b85f;
+  color: #3d2119;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.promo-hero-cta:hover,
+.promo-use-button:hover {
+  transform: translateY(-1px);
+  background: #f2ca7b;
+}
+
+.promo-hero-stamp {
+  position: absolute;
+  right: 12%;
+  bottom: 46px;
+  display: grid;
+  width: 116px;
+  height: 116px;
+  place-content: center;
+  justify-items: center;
+  gap: 5px;
+  border: 1px solid #e8b85f99;
+  border-radius: 50%;
+  color: #f0c46e;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  transform: rotate(9deg);
+}
+
+.promo-content {
+  width: min(100% - 40px, 1160px);
+  margin: 0 auto;
+  padding-top: 38px;
+}
+
+.promo-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.promo-section-kicker {
+  margin-bottom: 6px;
+  color: #a36d26;
+  font-size: 0.66rem;
+}
+
+.promo-section-heading h2 {
+  margin: 0;
+  color: #38221d;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.promo-section-heading > span {
+  padding-bottom: 4px;
+  color: #7d6b5f;
+  font-size: 0.83rem;
+}
+
+.promo-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  margin: 20px 0 23px;
+  padding: 0 0 5px;
+  scrollbar-width: thin;
+}
+
+.promo-tabs button {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: 8px 13px;
+  border: 1px solid #e4d8c8;
+  border-radius: 6px;
+  background: #fffdf8;
+  color: #62554c;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.promo-tabs button.is-selected {
+  border-color: #8b1e1e;
+  background: #8b1e1e;
+  color: #fffaf0;
+}
+
+.promo-voucher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.promo-ticket {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(132px, 0.82fr) minmax(0, 1.7fr);
+  min-height: 186px;
+  overflow: hidden;
+  border: 1px solid #e6dacb;
+  border-radius: 8px;
+  background: #fffefa;
+  box-shadow: 0 5px 16px rgb(70 42 22 / 5%);
+}
+
+.promo-ticket-value {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 10px;
+  background: #8b1e1e;
+  color: #fff7e8;
+  text-align: center;
+}
+
+.promo-ticket.is-shipping .promo-ticket-value {
+  background: #a8532a;
+}
+
+.promo-ticket.is-new .promo-ticket-value {
+  background: #73512c;
+}
+
+.promo-ticket-value::after {
+  position: absolute;
+  top: 0;
+  right: -1px;
+  height: 100%;
+  border-right: 1px dashed rgb(255 248 233 / 62%);
+  content: '';
+}
+
+.promo-ticket-icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 1px solid rgb(255 248 233 / 54%);
+  border-radius: 50%;
+  color: #ffdda1;
+}
+
+.promo-ticket-value strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 1.13rem;
+  line-height: 1.15;
+}
+
+.promo-ticket-value small {
+  color: #f2dcb8;
+  font-size: 0.58rem;
+  font-weight: 750;
+}
+
+.promo-ticket-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.promo-ticket-copy p {
+  margin: 0;
+}
+
+.promo-ticket-title {
+  color: #38221d;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.promo-ticket-condition,
+.promo-ticket-audience,
+.promo-ticket-expiry {
+  margin-top: 5px !important;
+  color: #71645c;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.promo-ticket-condition strong,
+.promo-ticket-expiry strong {
+  color: #4c332b;
+}
+
+.promo-ticket-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.promo-code-badge {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px dashed #c9a774;
+  border-radius: 5px;
+  background: #fff8e9;
+  color: #6c391d;
+  font-size: 0.75rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.promo-copy-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid #e5d8c7;
+  border-radius: 5px;
+  background: #fffefa;
+  color: #5d4940;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.promo-use-button {
+  min-height: 32px;
+  margin-left: auto;
+  padding: 6px 9px;
+  font-size: 0.72rem;
+}
+
+.promo-state,
+.promo-empty {
+  padding: 38px 16px;
+  color: #71645c;
+  text-align: center;
+}
+
+.promo-state.is-error {
+  color: #a12d2d;
+}
+
+.promo-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border: 1px dashed #d8c7b2;
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #8b5c35;
+}
+
+.promo-empty p {
+  margin: 0;
+  color: #71645c;
+}
+
+.promo-toast {
+  position: fixed;
+  z-index: 120;
+  right: 20px;
+  bottom: 22px;
+  max-width: calc(100vw - 40px);
+  padding: 12px 16px;
+  border-radius: 7px;
+  background: #35211c;
+  color: #fff8e9;
+  font-size: 0.85rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.promo-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 760px) {
+  .promo-voucher-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .promo-hero-stamp {
+    right: 5%;
+    width: 94px;
+    height: 94px;
+  }
+}
+
+@media (max-width: 520px) {
+  .promo-hero-inner,
+  .promo-content {
+    width: min(100% - 28px, 1160px);
+  }
+
+  .promo-hero-inner {
+    min-height: 0;
+    padding: 42px 0 38px;
+  }
+
+  .promo-hero h1 {
+    max-width: 310px;
+    font-size: 2rem;
+  }
+
+  .promo-hero-description {
+    max-width: 300px;
+    font-size: 0.9rem;
+  }
+
+  .promo-hero-stamp {
+    top: 30px;
+    right: 2px;
+    width: 62px;
+    height: 62px;
+    gap: 2px;
+    font-size: 0.48rem;
+  }
+
+  .promo-hero-stamp svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .promo-content {
+    padding-top: 28px;
+  }
+
+  .promo-section-heading h2 {
+    font-size: 1.55rem;
+  }
+
+  .promo-ticket {
+    grid-template-columns: 102px minmax(0, 1fr);
+  }
+
+  .promo-ticket-details {
+    padding: 12px;
+  }
+
+  .promo-ticket-value strong {
+    font-size: 0.98rem;
+  }
+
+  .promo-ticket-actions {
+    gap: 6px;
+  }
+
+  .promo-use-button {
+    margin-left: 0;
+  }
+
+  .voucher-picker-dialog {
+    max-height: 88vh;
+    padding: 17px;
+  }
+
+  .voucher-picker-item {
+    align-items: flex-start;
+    padding: 11px;
+  }
 }
 
 .checkout-discount-summary {

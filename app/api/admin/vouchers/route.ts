@@ -19,6 +19,7 @@ type VoucherDraft = {
   isActive: boolean;
   freeShipping: boolean;
   firstOrderOnly: boolean;
+  showOnPromoPage: boolean;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -39,6 +40,7 @@ function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { 
   const isActive = value.isActive === undefined ? true : value.isActive;
   const freeShipping = value.freeShipping === undefined ? false : value.freeShipping;
   const firstOrderOnly = value.firstOrderOnly === undefined ? false : value.firstOrderOnly;
+  const showOnPromoPage = value.showOnPromoPage === undefined ? false : value.showOnPromoPage;
 
   if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) return { error: 'Mã voucher phải có từ 3 đến 32 ký tự chữ, số, gạch ngang hoặc gạch dưới.' };
   if (discountType !== 'PERCENTAGE' && discountType !== 'FIXED') return { error: 'Loại giảm giá không hợp lệ.' };
@@ -49,7 +51,7 @@ function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { 
   if (rawUsageLimit !== null && (!Number.isSafeInteger(rawUsageLimit) || rawUsageLimit < 1)) return { error: 'Giới hạn số lượt dùng phải lớn hơn 0.' };
   if (rawExpiry != null && typeof rawExpiry !== 'string') return { error: 'Hạn sử dụng không hợp lệ.' };
   if (!expiresAt || !Number.isFinite(expiresAt.getTime()) || expiresAt <= new Date()) return { error: 'Hạn sử dụng phải là thời điểm hợp lệ trong tương lai.' };
-  if (typeof isActive !== 'boolean' || typeof freeShipping !== 'boolean' || typeof firstOrderOnly !== 'boolean') return { error: 'Trạng thái voucher không hợp lệ.' };
+  if (typeof isActive !== 'boolean' || typeof freeShipping !== 'boolean' || typeof firstOrderOnly !== 'boolean' || typeof showOnPromoPage !== 'boolean') return { error: 'Trạng thái voucher không hợp lệ.' };
   if (freeShipping && discountType !== 'FIXED') return { error: 'Voucher miễn phí vận chuyển phải dùng loại giảm số tiền cố định.' };
 
   return {
@@ -64,6 +66,7 @@ function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { 
       isActive,
       freeShipping,
       firstOrderOnly,
+      showOnPromoPage,
     },
   };
 }

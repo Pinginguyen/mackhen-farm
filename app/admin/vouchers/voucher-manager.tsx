@@ -16,6 +16,7 @@ type Voucher = {
   usedCount: number;
   freeShipping: boolean;
   firstOrderOnly: boolean;
+  showOnPromoPage: boolean;
 };
 
 type Draft = {
@@ -29,6 +30,7 @@ type Draft = {
   isActive: boolean;
   freeShipping: boolean;
   firstOrderOnly: boolean;
+  showOnPromoPage: boolean;
 };
 
 const emptyDraft: Draft = {
@@ -42,6 +44,7 @@ const emptyDraft: Draft = {
   isActive: true,
   freeShipping: false,
   firstOrderOnly: false,
+  showOnPromoPage: false,
 };
 
 function localDateTime(value: string | null) {
@@ -89,6 +92,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
       isActive: voucher.isActive,
       freeShipping: voucher.freeShipping,
       firstOrderOnly: voucher.firstOrderOnly,
+      showOnPromoPage: voucher.showOnPromoPage,
     });
     setError('');
     setNotice('');
@@ -181,6 +185,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
         <div className="admin-voucher-options">
           {draft.discountType === 'FIXED' && <label><input type="checkbox" checked={draft.freeShipping} onChange={(event) => setDraft((current) => ({ ...current, freeShipping: event.target.checked }))} /> Miễn phí vận chuyển</label>}
           <label><input type="checkbox" checked={draft.firstOrderOnly} onChange={(event) => setDraft((current) => ({ ...current, firstOrderOnly: event.target.checked }))} /> Chỉ áp dụng đơn đầu tiên</label>
+          <label><input type="checkbox" checked={draft.showOnPromoPage} onChange={(event) => setDraft((current) => ({ ...current, showOnPromoPage: event.target.checked }))} /> Hiển thị công khai trên trang Khuyến mãi</label>
           <label><input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft((current) => ({ ...current, isActive: event.target.checked }))} /> Đang bật</label>
         </div>
         <footer><button className="secondary-action" type="button" onClick={() => setFormOpen(false)} disabled={busy}>Hủy</button><button className="primary-action" type="submit" disabled={busy}>{busy ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Tạo voucher'}</button></footer>
@@ -193,7 +198,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
             {vouchers.map((voucher) => {
               const expired = voucher.expiresAt !== null && Date.parse(voucher.expiresAt) <= Date.now();
               return <tr key={voucher.id}>
-                <td><strong>{voucher.code}</strong>{voucher.firstOrderOnly && <small>Đơn đầu tiên</small>}</td>
+                <td><strong>{voucher.code}</strong>{voucher.firstOrderOnly && <small>Đơn đầu tiên</small>}{voucher.showOnPromoPage && <small>Hiển thị công khai</small>}</td>
                 <td>{voucher.freeShipping ? 'Miễn phí vận chuyển' : discountLabel(voucher)}</td>
                 <td>{formatMoney(voucher.minSpend)}</td>
                 <td><span className={`admin-voucher-status${voucher.isActive && !expired ? ' is-active' : ''}`}>{expired ? 'Hết hạn' : voucher.isActive ? 'Đang bật' : 'Đã tắt'}</span></td>

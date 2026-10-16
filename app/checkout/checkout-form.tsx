@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle, Ticket, X } from 'lucide-react';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import { getErrorMessage } from '@/lib/error-message';
 import { createAbortSignal } from '@/lib/request-timeout';
@@ -14,6 +14,7 @@ type CheckoutItem = { id: string; productId: string; productSlug: string; varian
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
 
 type InitialCustomer = { name: string; email: string; phone: string; address: string };
+type AvailableVoucher = { id: string; code: string; discountType: 'PERCENTAGE' | 'FIXED'; value: number; maxDiscount: number | null; minSpend: number; expiresAt: string | null; freeShipping: boolean; firstOrderOnly: boolean };
 
 export function BuyNowCartRecovery({ items }: { items: CheckoutItem[] }) {
   const router = useRouter();
@@ -113,6 +114,10 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
   const [voucherFeedback, setVoucherFeedback] = useState<{ type: 'success' | 'error'; text: string; requiresLogin?: boolean } | null>(null);
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [applyingVoucher, setApplyingVoucher] = useState(false);
+  const [voucherPickerOpen, setVoucherPickerOpen] = useState(false);
+  const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
+  const [loadingVouchers, setLoadingVouchers] = useState(false);
+  const [voucherListError, setVoucherListError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod);
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
@@ -140,8 +145,10 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
     }
   }, [buyNow]);
 
-  async function applyVoucher() {
-    const code = normalizedVoucher;
+  async function applyVoucher(selectedCode = normalizedVoucher) {
+    const code = selectedCode.trim().toUpperCase();
+    if (!code) return;
+    setVoucher(code);
     const phone = String(new FormData(formRef.current ?? undefined).get('phone') ?? '');
     setApplyingVoucher(true);
     setAppliedVoucher('');
@@ -169,6 +176,25 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       setVoucherFeedback({ type: 'error', text: 'Không thể kiểm tra mã giảm giá. Vui lòng thử lại.' });
     } finally {
       setApplyingVoucher(false);
+    }
+  }
+
+  async function openVoucherPicker() {
+    setVoucherPickerOpen(true);
+    setLoadingVouchers(true);
+    setVoucherListError('');
+    try {
+      const response = await fetch('/api/vouchers', { cache: 'no-store' });
+      const result = await response.json() as { items?: AvailableVoucher[]; error?: string | { message?: string } };
+      if (!response.ok || !result.items) {
+        const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
+        throw new Error(errorMessage ?? 'Không thể tải danh sách voucher.');
+      }
+      setAvailableVouchers(result.items);
+    } catch (error) {
+      setVoucherListError(error instanceof Error ? error.message : 'Không thể tải danh sách voucher.');
+    } finally {
+      setLoadingVouchers(false);
     }
   }
 
@@ -293,7 +319,20 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
           <input id="voucher" name="voucher" value={voucher} onChange={(event) => { setVoucher(event.target.value); setAppliedVoucher(''); setVoucherDiscount(0); setVoucherFeedback(null); }} placeholder="Nhập mã giảm giá..." />
           <button type="button" className="secondary-action" onClick={() => void applyVoucher()} disabled={!voucher.trim() || applyingVoucher}>{applyingVoucher ? 'Đang kiểm tra...' : 'Áp dụng'}</button>
         </div>
+        <button type="button" className="checkout-voucher-picker-trigger" onClick={() => void openVoucherPicker()}><Ticket size={16} /> Chọn voucher</button>
       </div>
+      {voucherPickerOpen && <div className="voucher-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setVoucherPickerOpen(false); }}>
+        <section className="voucher-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="voucher-picker-title">
+          <header><div><p className="eyebrow">Ưu đãi dành cho bạn</p><h2 id="voucher-picker-title">Chọn voucher</h2></div><button type="button" className="voucher-picker-close" aria-label="Đóng" onClick={() => setVoucherPickerOpen(false)}><X size={19} /></button></header>
+          {loadingVouchers ? <p className="voucher-picker-message">Đang tải voucher...</p>
+            : voucherListError ? <p className="voucher-picker-message is-error" role="alert">{voucherListError}</p>
+              : availableVouchers.length ? <div className="voucher-picker-list">{availableVouchers.map((item) => <article className="voucher-picker-item" key={item.id}>
+                <div><strong>{item.freeShipping ? 'Miễn phí vận chuyển' : item.discountType === 'PERCENTAGE' ? `Giảm ${item.value}%` : `Giảm ${item.value.toLocaleString('vi-VN')}đ`}</strong><span>Mã <b>{item.code}</b> · Đơn từ {item.minSpend.toLocaleString('vi-VN')}đ</span>{item.firstOrderOnly && <small>Dành cho đơn hàng đầu tiên</small>}{item.expiresAt && <small>Hạn đến {new Date(item.expiresAt).toLocaleDateString('vi-VN')}</small>}</div>
+                <button type="button" className="secondary-action" disabled={applyingVoucher} onClick={() => { setVoucherPickerOpen(false); void applyVoucher(item.code); }}>Áp dụng</button>
+              </article>)}</div>
+                : <p className="voucher-picker-message">Hiện chưa có voucher công khai nào. Hãy quay lại sau nhé.</p>}
+        </section>
+      </div>}
       {voucherFeedback && <p className={voucherFeedback.type === 'success' ? 'checkout-voucher-success' : 'checkout-voucher-error'} role={voucherFeedback.type === 'success' ? 'status' : 'alert'}>{voucherFeedback.text}</p>}
       {voucherFeedback?.requiresLogin && <p className="checkout-voucher-error"><Link href={`/dang-nhap?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Đăng nhập</Link> · <Link href={`/dang-ky?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Tạo tài khoản</Link></p>}
       {appliedVoucher && <div className="checkout-discount-summary"><span>Giảm giá</span><strong>−{discount.toLocaleString('vi-VN')}đ</strong><span>Tổng thanh toán sau giảm</span><strong>{checkoutTotal.toLocaleString('vi-VN')}đ</strong></div>}

@@ -386,6 +386,7 @@ model Voucher {
   usageLimit     Int?
   freeShipping   Boolean             @default(false)
   firstOrderOnly Boolean             @default(false)
+  showOnPromoPage Boolean            @default(false)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 

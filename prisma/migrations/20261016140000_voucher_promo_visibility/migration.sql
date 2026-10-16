@@ -1,0 +1,1 @@
+ALTER TABLE "Voucher" ADD COLUMN "showOnPromoPage" BOOLEAN NOT NULL DEFAULT false;
