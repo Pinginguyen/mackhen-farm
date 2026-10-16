@@ -46,8 +46,8 @@ export async function POST(request: Request) {
     const resetLink = `${baseUrl}/dat-lai-mat-khau?token=${encodeURIComponent(token)}`;
     try {
       await sendPasswordResetEmail(user.email, resetLink);
-    } catch (error) {
-      console.error('Password reset email delivery failed:', error instanceof Error ? error.message : 'Unknown email error');
+    } catch {
+      console.error('Password reset email delivery failed.');
       await prisma.passwordResetToken.deleteMany({ where: { email, token: tokenHash } });
     }
     return genericResponse();

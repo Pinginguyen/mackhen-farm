@@ -1,52 +1,52 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createTransport, sendMail } = vi.hoisted(() => ({
-  createTransport: vi.fn(),
-  sendMail: vi.fn(),
+const { ResendMock, resendSend } = vi.hoisted(() => ({
+  ResendMock: vi.fn(),
+  resendSend: vi.fn(),
 }));
 
-vi.mock('nodemailer', () => ({ default: { createTransport } }));
+vi.mock('resend', () => ({ Resend: ResendMock }));
 
 import { sendPasswordResetEmail } from './email';
 
 describe('sendPasswordResetEmail', () => {
   beforeEach(() => {
-    vi.stubEnv('SMTP_USER', 'shop@example.com');
-    vi.stubEnv('SMTP_PASSWORD', 'test-app-password');
-    createTransport.mockReset().mockReturnValue({ sendMail });
-    sendMail.mockReset().mockResolvedValue({ messageId: 'mail-1' });
+    vi.stubEnv('RESEND_API_KEY', 're_test_api_key');
+    ResendMock.mockReset().mockImplementation(() => ({ emails: { send: resendSend } }));
+    resendSend.mockReset().mockResolvedValue({ data: { id: 'mail-1' }, error: null });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('uses Gmail SMTP over implicit TLS and sends the reset link in branded email', async () => {
+  it('uses Resend and sends the reset link in a branded email', async () => {
     const resetLink = 'https://mackhenfarm.vn/dat-lai-mat-khau?token=abc123';
     await sendPasswordResetEmail('customer@example.com', resetLink);
 
-    expect(createTransport).toHaveBeenCalledWith({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: 'shop@example.com', pass: 'test-app-password' },
-    });
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
-      from: 'Mắc Khén Farm <shop@example.com>',
+    expect(ResendMock).toHaveBeenCalledWith('re_test_api_key');
+    expect(resendSend).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'Mắc Khén Farm <onboarding@resend.dev>',
       to: 'customer@example.com',
-      subject: '[Mắc Khén Farm] Yêu cầu đặt lại mật khẩu của bạn',
-      text: expect.stringContaining(resetLink),
+      subject: '[Mắc Khén Farm] Đặt lại mật khẩu của bạn',
       html: expect.stringContaining(resetLink),
     }));
-    expect(sendMail.mock.calls[0][0].html).toContain('15 phút');
-    expect(sendMail.mock.calls[0][0].html).toContain('Đặt lại mật khẩu ngay');
+    expect(resendSend.mock.calls[0][0].html).toContain('15 phút');
+    expect(resendSend.mock.calls[0][0].html).toContain('Đặt lại mật khẩu');
   });
 
-  it('fails clearly when Gmail credentials are missing', async () => {
-    vi.stubEnv('SMTP_PASSWORD', '');
+  it('fails clearly when RESEND_API_KEY is missing', async () => {
+    vi.stubEnv('RESEND_API_KEY', '');
 
     await expect(sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset'))
-      .rejects.toThrow('SMTP_USER and SMTP_PASSWORD must be configured.');
-    expect(createTransport).not.toHaveBeenCalled();
+      .rejects.toThrow('RESEND_API_KEY is not configured.');
+    expect(ResendMock).not.toHaveBeenCalled();
+  });
+
+  it('throws a generic error when Resend returns an API error', async () => {
+    resendSend.mockResolvedValueOnce({ data: null, error: { message: 'provider error' } });
+
+    await expect(sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset'))
+      .rejects.toThrow('Resend email delivery failed.');
   });
 });
