@@ -376,6 +376,7 @@ model CompensationVoucher {
 model Voucher {
   id             String              @id @default(cuid())
   code           String              @unique
+  name           String?
   discountType   VoucherDiscountType
   value          Int
   maxDiscount    Int?

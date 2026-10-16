@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { voucherFindMany, voucherCreate, voucherUpdate, voucherDelete, requireAdmin, writeAuditLog, prisma } = vi.hoisted(() => {
+const { voucherFindMany, voucherCreate, voucherUpdate, voucherDelete, requireAdmin, writeAuditLog, ensureCoreVouchers, prisma } = vi.hoisted(() => {
   const voucherFindMany = vi.fn();
   const voucherCreate = vi.fn();
   const voucherUpdate = vi.fn();
   const voucherDelete = vi.fn();
   const requireAdmin = vi.fn();
   const writeAuditLog = vi.fn();
+  const ensureCoreVouchers = vi.fn();
   return {
     voucherFindMany,
     voucherCreate,
@@ -14,13 +15,14 @@ const { voucherFindMany, voucherCreate, voucherUpdate, voucherDelete, requireAdm
     voucherDelete,
     requireAdmin,
     writeAuditLog,
+    ensureCoreVouchers,
     prisma: { voucher: { findMany: voucherFindMany, create: voucherCreate, update: voucherUpdate, delete: voucherDelete } },
   };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
-vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
+vi.mock('@/lib/ensure-core-vouchers', () => ({ ensureCoreVouchers }));
 vi.mock('@/lib/auth', () => ({ getRequestSession: () => ({ email: 'admin@example.com' }) }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
 
@@ -54,6 +56,7 @@ describe('/api/admin/vouchers', () => {
     voucherDelete.mockReset().mockResolvedValue({ id: 'voucher-1', ...voucherDraft, expiresAt: new Date(voucherDraft.expiresAt) });
     requireAdmin.mockReset().mockResolvedValue(null);
     writeAuditLog.mockReset().mockResolvedValue(undefined);
+    ensureCoreVouchers.mockReset().mockResolvedValue(undefined);
   });
 
   it('requires admin access to list vouchers', async () => {
@@ -70,6 +73,19 @@ describe('/api/admin/vouchers', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ items: [{ id: 'voucher-1', code: 'TET2026' }] });
+    expect(ensureCoreVouchers).toHaveBeenCalledOnce();
+  });
+
+  it('returns a readable string when the voucher database is unavailable', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    voucherFindMany.mockRejectedValueOnce(new Error('database offline'));
+
+    const response = await GET(request('GET'));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ success: false, error: 'Lỗi kết nối cơ sở dữ liệu' });
+    expect(log).toHaveBeenCalledWith('Voucher database operation failed:', expect.any(Error));
+    log.mockRestore();
   });
 
   it('creates a validated voucher and writes an audit record', async () => {
@@ -78,7 +94,7 @@ describe('/api/admin/vouchers', () => {
 
     expect(response.status).toBe(201);
     expect(result.item.code).toBe('TET2026');
-    expect(voucherCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ code: 'TET2026', discountType: 'PERCENTAGE', value: 15, maxDiscount: 50000, usageLimit: 25, showOnPromoPage: true }) });
+    expect(voucherCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ code: 'TET2026', name: null, discountType: 'PERCENTAGE', value: 15, maxDiscount: 50000, usageLimit: 25, showOnPromoPage: true }) });
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'CREATE_VOUCHER', targetEntity: 'Voucher' }));
   });
 

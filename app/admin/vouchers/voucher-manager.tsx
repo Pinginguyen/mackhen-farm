@@ -6,6 +6,7 @@ import { Pencil, Plus, Trash2, X } from 'lucide-react';
 type Voucher = {
   id: string;
   code: string;
+  name: string | null;
   discountType: 'PERCENTAGE' | 'FIXED';
   value: number;
   maxDiscount: number | null;
@@ -21,6 +22,7 @@ type Voucher = {
 
 type Draft = {
   code: string;
+  name: string;
   discountType: 'PERCENTAGE' | 'FIXED';
   value: string;
   maxDiscount: string;
@@ -35,6 +37,7 @@ type Draft = {
 
 const emptyDraft: Draft = {
   code: '',
+  name: '',
   discountType: 'PERCENTAGE',
   value: '10',
   maxDiscount: '',
@@ -62,6 +65,18 @@ function discountLabel(voucher: Voucher) {
   return voucher.maxDiscount ? `${value} · tối đa ${formatMoney(voucher.maxDiscount)}` : value;
 }
 
+function apiErrorMessage(data: unknown, fallback: string) {
+  if (typeof data === 'string' && data.trim()) return data;
+  if (!data || typeof data !== 'object') return fallback;
+  const response = data as { error?: unknown; message?: unknown };
+  if (typeof response.error === 'string' && response.error.trim()) return response.error;
+  if (response.error && typeof response.error === 'object' && 'message' in response.error) {
+    const message = response.error.message;
+    if (typeof message === 'string' && message.trim()) return message;
+  }
+  return typeof response.message === 'string' && response.message.trim() ? response.message : fallback;
+}
+
 export default function VoucherManager({ initialVouchers }: { initialVouchers: Voucher[] }) {
   const [vouchers, setVouchers] = useState(initialVouchers);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -83,6 +98,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
     setEditingId(voucher.id);
     setDraft({
       code: voucher.code,
+      name: voucher.name ?? '',
       discountType: voucher.discountType,
       value: String(voucher.value),
       maxDiscount: voucher.maxDiscount == null ? '' : String(voucher.maxDiscount),
@@ -101,8 +117,8 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
 
   async function reloadVouchers() {
     const response = await fetch('/api/admin/vouchers', { cache: 'no-store' });
-    const result = await response.json() as { items?: Voucher[]; error?: string };
-    if (!response.ok || !result.items) throw new Error(result.error ?? 'Không thể tải danh sách voucher.');
+    const result = await response.json() as { items?: Voucher[]; error?: unknown };
+    if (!response.ok || !result.items) throw new Error(apiErrorMessage(result, 'Không thể tải danh sách voucher.'));
     setVouchers(result.items);
   }
 
@@ -114,6 +130,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
     const payload = {
       ...draft,
       code: draft.code.trim().toUpperCase(),
+      name: draft.name.trim() || null,
       value: Number(draft.value),
       maxDiscount: draft.discountType === 'PERCENTAGE' && draft.maxDiscount ? Number(draft.maxDiscount) : null,
       minSpend: Number(draft.minSpend),
@@ -128,15 +145,15 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = await response.json() as { item?: Voucher; error?: string };
-      if (!response.ok || !result.item) throw new Error(result.error ?? 'Không thể lưu voucher.');
+      const result = await response.json() as { item?: Voucher; error?: unknown };
+      if (!response.ok || !result.item) throw new Error(apiErrorMessage(result, 'Không thể lưu voucher. Vui lòng thử lại.'));
       await reloadVouchers();
       setNotice(editingId ? `Đã cập nhật voucher ${result.item.code}.` : `Đã tạo voucher ${result.item.code}.`);
       setFormOpen(false);
       setEditingId(null);
       setDraft(emptyDraft);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Không thể lưu voucher.');
+      setError(apiErrorMessage(saveError, 'Không thể lưu voucher. Vui lòng thử lại.'));
     } finally {
       setBusy(false);
     }
@@ -149,13 +166,13 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
     setNotice('');
     try {
       const response = await fetch(`/api/admin/vouchers?id=${encodeURIComponent(voucher.id)}`, { method: 'DELETE' });
-      const result = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? 'Không thể xóa voucher.');
+      const result = await response.json() as { error?: unknown };
+      if (!response.ok) throw new Error(apiErrorMessage(result, 'Không thể xóa voucher.'));
       await reloadVouchers();
       setNotice(`Đã xóa voucher ${voucher.code}.`);
       if (editingId === voucher.id) setFormOpen(false);
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Không thể xóa voucher.');
+      setError(apiErrorMessage(deleteError, 'Không thể xóa voucher.'));
     } finally {
       setBusy(false);
     }
@@ -175,6 +192,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
         <header><h2>{editingId ? 'Sửa voucher' : 'Tạo voucher'}</h2><button type="button" className="admin-voucher-close" aria-label="Đóng biểu mẫu" onClick={() => setFormOpen(false)} disabled={busy}><X size={18} /></button></header>
         <div className="admin-voucher-fields">
           <label className="field">Mã voucher<input value={draft.code} onChange={(event) => setDraft((current) => ({ ...current, code: event.target.value }))} minLength={3} maxLength={32} required placeholder="TET2026" /></label>
+          <label className="field">Tên chương trình<input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} maxLength={120} placeholder="Ví dụ: Ưu đãi thành viên mới" /></label>
           <label className="field">Loại giảm giá<select value={draft.discountType} onChange={(event) => setDraft((current) => ({ ...current, discountType: event.target.value as Draft['discountType'], freeShipping: event.target.value === 'FIXED' && current.freeShipping }))}><option value="PERCENTAGE">Giảm phần trăm (%)</option><option value="FIXED">Giảm số tiền cố định (đ)</option></select></label>
           <label className="field">Giá trị giảm<input type="number" min="1" max={draft.discountType === 'PERCENTAGE' ? 100 : undefined} step="1" value={draft.value} onChange={(event) => setDraft((current) => ({ ...current, value: event.target.value }))} required /></label>
           {draft.discountType === 'PERCENTAGE' && <label className="field">Mức giảm tối đa (đ)<input type="number" min="1" step="1" value={draft.maxDiscount} onChange={(event) => setDraft((current) => ({ ...current, maxDiscount: event.target.value }))} required placeholder="Bắt buộc" /></label>}
@@ -198,7 +216,7 @@ export default function VoucherManager({ initialVouchers }: { initialVouchers: V
             {vouchers.map((voucher) => {
               const expired = voucher.expiresAt !== null && Date.parse(voucher.expiresAt) <= Date.now();
               return <tr key={voucher.id}>
-                <td><strong>{voucher.code}</strong>{voucher.firstOrderOnly && <small>Đơn đầu tiên</small>}{voucher.showOnPromoPage && <small>Hiển thị công khai</small>}</td>
+                <td><strong>{voucher.code}</strong>{voucher.name && <small>{voucher.name}</small>}{voucher.firstOrderOnly && <small>Đơn đầu tiên</small>}{voucher.showOnPromoPage && <small>Hiển thị công khai</small>}</td>
                 <td>{voucher.freeShipping ? 'Miễn phí vận chuyển' : discountLabel(voucher)}</td>
                 <td>{formatMoney(voucher.minSpend)}</td>
                 <td><span className={`admin-voucher-status${voucher.isActive && !expired ? ' is-active' : ''}`}>{expired ? 'Hết hạn' : voucher.isActive ? 'Đang bật' : 'Đã tắt'}</span></td>

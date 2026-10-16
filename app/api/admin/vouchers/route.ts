@@ -4,12 +4,14 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
-import { withDatabase } from '@/lib/api-database';
+import { ensureCoreVouchers } from '@/lib/ensure-core-vouchers';
+import { withVoucherDatabase } from '@/lib/voucher-api';
 
 export const dynamic = 'force-dynamic';
 
 type VoucherDraft = {
   code: string;
+  name: string | null;
   discountType: 'PERCENTAGE' | 'FIXED';
   value: number;
   maxDiscount: number | null;
@@ -29,6 +31,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { draft?: never; error: string } {
   if (!isRecord(value)) return { error: 'Dữ liệu voucher không hợp lệ.' };
   const code = typeof value.code === 'string' ? value.code.trim().toUpperCase() : '';
+  const name = typeof value.name === 'string' ? value.name.trim() || null : null;
   const discountType = value.discountType;
   const numeric = (field: unknown) => typeof field === 'number' || (typeof field === 'string' && field.trim() !== '') ? Number(field) : NaN;
   const amount = numeric(value.value);
@@ -43,6 +46,8 @@ function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { 
   const showOnPromoPage = value.showOnPromoPage === undefined ? false : value.showOnPromoPage;
 
   if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) return { error: 'Mã voucher phải có từ 3 đến 32 ký tự chữ, số, gạch ngang hoặc gạch dưới.' };
+  if (value.name != null && typeof value.name !== 'string') return { error: 'Tên chương trình không hợp lệ.' };
+  if (name && name.length > 120) return { error: 'Tên chương trình không được vượt quá 120 ký tự.' };
   if (discountType !== 'PERCENTAGE' && discountType !== 'FIXED') return { error: 'Loại giảm giá không hợp lệ.' };
   if (!Number.isSafeInteger(amount) || amount < 1 || (discountType === 'PERCENTAGE' && amount > 100)) return { error: 'Giá trị giảm không hợp lệ.' };
   if (discountType === 'PERCENTAGE' && rawMaxDiscount === null) return { error: 'Voucher giảm theo phần trăm bắt buộc có mức giảm tối đa.' };
@@ -57,6 +62,7 @@ function parseDraft(value: unknown): { draft: VoucherDraft; error?: never } | { 
   return {
     draft: {
       code,
+      name,
       discountType,
       value: amount,
       maxDiscount: discountType === 'PERCENTAGE' ? rawMaxDiscount : null,
@@ -86,10 +92,11 @@ function auditValue(voucher: Omit<VoucherDraft, 'expiresAt'> & { expiresAt: Date
 export async function GET(request: Request) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  return withDatabase(async () => {
+  return withVoucherDatabase(async () => {
+    await ensureCoreVouchers();
     const items = await prisma.voucher.findMany({ orderBy: [{ isActive: 'desc' }, { code: 'asc' }] });
     return NextResponse.json({ items });
-  }, 'Admin voucher listing failed');
+  });
 }
 
 export async function POST(request: Request) {
@@ -105,7 +112,7 @@ export async function POST(request: Request) {
   if (!hasDraft(parsed)) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const draft = parsed.draft;
 
-  return withDatabase(async () => {
+  return withVoucherDatabase(async () => {
     try {
       const item = await prisma.voucher.create({ data: draft });
       await writeAuditLog(request, {
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
       if (isUniqueConstraint(error)) return NextResponse.json({ error: 'Mã voucher đã tồn tại.' }, { status: 409 });
       throw error;
     }
-  }, 'Admin voucher creation failed');
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -138,7 +145,7 @@ export async function PATCH(request: Request) {
   if (!hasDraft(parsed)) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const draft = parsed.draft;
 
-  return withDatabase(async () => {
+  return withVoucherDatabase(async () => {
     try {
       const item = await prisma.voucher.update({ where: { id: voucherId }, data: draft });
       await writeAuditLog(request, {
@@ -154,7 +161,7 @@ export async function PATCH(request: Request) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025') return NextResponse.json({ error: 'Không tìm thấy voucher.' }, { status: 404 });
       throw error;
     }
-  }, 'Admin voucher update failed');
+  });
 }
 
 export async function DELETE(request: Request) {
@@ -163,7 +170,7 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get('id')?.trim() ?? '';
   if (!id) return NextResponse.json({ error: 'Thiếu mã voucher cần xóa.' }, { status: 400 });
 
-  return withDatabase(async () => {
+  return withVoucherDatabase(async () => {
     try {
       const item = await prisma.voucher.delete({ where: { id } });
       await writeAuditLog(request, {
@@ -178,5 +185,5 @@ export async function DELETE(request: Request) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2025') return NextResponse.json({ error: 'Không tìm thấy voucher.' }, { status: 404 });
       throw error;
     }
-  }, 'Admin voucher deletion failed');
+  });
 }

@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
-import { withDatabase } from '@/lib/api-database';
+import { ensureCoreVouchers } from '@/lib/ensure-core-vouchers';
+import { withVoucherDatabase } from '@/lib/voucher-api';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return withDatabase(async () => {
+  return withVoucherDatabase(async () => {
+    await ensureCoreVouchers();
     const now = new Date();
     const items = await prisma.voucher.findMany({
       where: {
@@ -17,6 +19,7 @@ export async function GET() {
       select: {
         id: true,
         code: true,
+        name: true,
         discountType: true,
         value: true,
         maxDiscount: true,
@@ -32,5 +35,5 @@ export async function GET() {
     const availableItems = items.filter((item) => item.usageLimit === null || item.usedCount < item.usageLimit);
     const publicItems = availableItems.map(({ usedCount, usageLimit, ...item }) => item);
     return NextResponse.json({ items: publicItems }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
-  }, 'Public voucher listing failed');
+  });
 }

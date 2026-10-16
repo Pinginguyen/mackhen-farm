@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { ensureCoreVouchers } from '@/lib/ensure-core-vouchers';
 import VoucherManager from './voucher-manager';
 
 export const dynamic = 'force-dynamic';
@@ -6,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminVouchersPage() {
   let vouchers: Awaited<ReturnType<typeof prisma.voucher.findMany>> = [];
   try {
+    await ensureCoreVouchers();
     vouchers = await prisma.voucher.findMany({ orderBy: [{ isActive: 'desc' }, { code: 'asc' }] });
   } catch (error) {
     console.error('Unable to load admin vouchers:', error instanceof Error ? error.name : 'UnknownError');

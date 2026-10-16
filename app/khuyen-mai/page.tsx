@@ -7,6 +7,7 @@ import { ArrowRight, Copy, Gift, Sparkles, Tag, Ticket, Truck } from 'lucide-rea
 type Voucher = {
   id: string;
   code: string;
+  name: string | null;
   discountType: 'PERCENTAGE' | 'FIXED';
   value: number;
   maxDiscount: number | null;
@@ -137,7 +138,7 @@ export default function PromotionsPage() {
           {visibleVouchers.map((voucher) => <article className={`promo-ticket${voucher.freeShipping ? ' is-shipping' : voucher.firstOrderOnly ? ' is-new' : ''}`} key={voucher.id}>
             <div className="promo-ticket-value"><span className="promo-ticket-icon">{voucherIcon(voucher)}</span><strong>{valueLabel(voucher)}</strong><small>VOUCHER ĐẶC BIỆT</small></div>
             <div className="promo-ticket-details">
-              <div className="promo-ticket-copy"><p className="promo-ticket-title">{voucher.freeShipping ? 'Ưu đãi vận chuyển' : voucher.firstOrderOnly ? 'Quà cho thành viên mới' : 'Ưu đãi đơn hàng'}</p><p className="promo-ticket-condition">Đơn tối thiểu <strong>{formatMoney(voucher.minSpend)}</strong>{voucher.maxDiscount && voucher.discountType === 'PERCENTAGE' ? ` · tối đa ${formatMoney(voucher.maxDiscount)}` : ''}</p>
+              <div className="promo-ticket-copy"><p className="promo-ticket-title">{voucher.name ?? (voucher.freeShipping ? 'Ưu đãi vận chuyển' : voucher.firstOrderOnly ? 'Quà cho thành viên mới' : 'Ưu đãi đơn hàng')}</p><p className="promo-ticket-condition">Đơn tối thiểu <strong>{formatMoney(voucher.minSpend)}</strong>{voucher.maxDiscount && voucher.discountType === 'PERCENTAGE' ? ` · tối đa ${formatMoney(voucher.maxDiscount)}` : ''}</p>
                 <p className="promo-ticket-audience">{voucher.firstOrderOnly ? 'Chỉ áp dụng cho đơn hàng đầu tiên' : 'Áp dụng cho mọi khách hàng'}</p><p className="promo-ticket-expiry">Hạn dùng: <strong>{expirationLabel(voucher.expiresAt)}</strong></p></div>
               <div className="promo-ticket-actions"><span className="promo-code-badge"><Ticket size={15} aria-hidden="true" />{voucher.code}</span><button type="button" className="promo-copy-button" onClick={() => void copyCode(voucher.code)}><Copy size={15} /> Sao chép mã</button><Link className="promo-use-button" href="/products">Dùng ngay <ArrowRight size={15} /></Link></div>
             </div>
