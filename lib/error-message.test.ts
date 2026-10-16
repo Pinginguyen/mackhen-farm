@@ -8,8 +8,8 @@ describe('getErrorMessage', () => {
   });
 
   it('extracts messages from nested API errors', () => {
-    expect(getErrorMessage({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Dịch vụ dữ liệu hiện không khả dụng' } }))
-      .toBe('Dịch vụ dữ liệu hiện không khả dụng');
+    expect(getErrorMessage({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Hệ thống đang bận, vui lòng thử lại sau.' } }))
+      .toBe('Hệ thống đang bận, vui lòng thử lại sau.');
   });
 
   it('extracts native Error messages and falls back for unknown values', () => {

@@ -1,6 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
-import { fetchApiWithFallback } from '@/lib/server-api';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import { fetchApi } from '@/lib/server-api';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import ProductsManager from './products-manager';
 
@@ -9,7 +8,14 @@ export const dynamic = 'force-dynamic';
 type AdminProduct = CatalogProduct & { active: boolean };
 
 export default async function AdminProductsPage() {
-  const { data: { items: products }, unavailable } = await fetchApiWithFallback<{ items: AdminProduct[] }>('/api/products', { items: DEFAULT_PRODUCTS });
+  let products: AdminProduct[] = [];
+  let unavailable = false;
+  try {
+    const result = await fetchApi<{ items: AdminProduct[] }>('/api/admin/products');
+    products = result.items;
+  } catch {
+    unavailable = true;
+  }
   return (
     <main className="page-shell">
       <section className="page-card">
@@ -20,7 +26,7 @@ export default async function AdminProductsPage() {
           </div>
         </div>
 
-        {unavailable && <p className="empty-state" role="status">Không thể đồng bộ dữ liệu sản phẩm; danh sách mẫu đang được hiển thị.</p>}
+        {unavailable && <p className="empty-state" role="status">Không thể tải sản phẩm từ cơ sở dữ liệu. Vui lòng thử lại sau.</p>}
         <ProductsManager initialProducts={products} />
         <p className="admin-inventory-note"><ArrowUpRight size={15} /> Mức tồn dưới 30 đơn vị được đánh dấu cần bổ sung.</p>
       </section>

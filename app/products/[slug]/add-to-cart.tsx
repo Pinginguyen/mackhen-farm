@@ -122,18 +122,6 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
         <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>
-      <ul className="product-reassurance-list" aria-label="Cam kết Mắc Khén Farm">
-        {isSeasoning ? <>
-          <li>Gia vị tuyển chọn, chuẩn vị Tây Bắc</li>
-          <li>Đóng gói kín, tiện sử dụng và bảo quản</li>
-          <li>Hỗ trợ đổi mới trong 24h nếu bao bì lỗi</li>
-        </> : <>
-          <li>Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén Tây Bắc</li>
-          <li>22g protein thực vật / 100g, 0% cholesterol</li>
-          <li>Đổi gói mới 0đ trong 24h nếu xì túi, không cần trả hàng cũ</li>
-          <li>Túi nhôm 3 lớp và gói khử oxy, giữ độ dai đến 6 tháng</li>
-        </>}
-      </ul>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
         <img src={image} alt="" />
         <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>

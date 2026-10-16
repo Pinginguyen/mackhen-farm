@@ -59,7 +59,7 @@ export default function StockControl({ productId, currentPrice, currentStock, ac
     </td>
     <td>
       <button className={`admin-product-toggle ${active ? 'is-active' : ''}`} type="button" role="switch" aria-checked={active} onClick={() => update({ active: !active })} disabled={saving}>
-        <span />{active ? 'Đang mở bán' : 'Tạm ẩn sản phẩm'}
+        <span />{active ? 'Đang kinh doanh' : 'Tạm ẩn sản phẩm'}
       </button>
       {message && <span className={message.startsWith('Không') ? 'stock-save-error' : 'stock-save-success'} role="status">{message}</span>}
     </td>

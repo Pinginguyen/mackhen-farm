@@ -15,7 +15,7 @@ export async function withDatabase(operation: () => Promise<NextResponse>, error
       return response;
     }
     if (error instanceof Error && error.name.startsWith('PrismaClient')) {
-      const response = NextResponse.json({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Dịch vụ dữ liệu hiện không khả dụng' } }, { status: 503 });
+      const response = NextResponse.json({ error: { code: 'DATABASE_UNAVAILABLE', message: 'Hệ thống đang bận, vui lòng thử lại sau.' } }, { status: 503 });
       recordApiMetric(response.status, Date.now() - startedAt);
       return response;
     }
