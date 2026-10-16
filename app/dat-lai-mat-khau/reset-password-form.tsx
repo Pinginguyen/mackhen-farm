@@ -41,7 +41,7 @@ export default function ResetPasswordForm({ token }: { token: string }) {
     }
   }
 
-  if (complete) return <div className="password-reset-sent" role="status"><h2>Đã cập nhật mật khẩu</h2><p>Bạn có thể đăng nhập bằng mật khẩu mới.</p><Link className="primary-action" href="/dang-nhap">Đến trang đăng nhập</Link></div>;
+  if (complete) return <div className="password-reset-sent" role="status"><h2>Đã cập nhật mật khẩu</h2><p>Bạn có thể đăng nhập bằng mật khẩu mới.</p><Link className="password-reset-login-button inline-block mt-4 px-8 py-3 text-white font-medium text-sm rounded-xl bg-[#8B1E1E] hover:bg-[#721919] transition-all shadow-sm" href="/dang-nhap">Đăng nhập ngay</Link></div>;
   if (!token) return <div className="password-reset-sent"><p className="form-error">Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.</p><Link href="/quen-mat-khau">Yêu cầu liên kết mới</Link></div>;
 
   return <form className="form-list" onSubmit={submit}>

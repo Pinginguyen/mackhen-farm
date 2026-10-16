@@ -191,6 +191,26 @@ describe('/api/returns', () => {
     });
   });
 
+  it('falls back to the request list and logs a missing issued-voucher column', async () => {
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const requestItem = { id: 'return-1', riskTag: null, createdAt: new Date(), order: { orderCode: 'MKF-123456', customerName: 'Nguyễn An', totalAmount: 169000 } };
+    returnFindMany
+      .mockRejectedValueOnce({ code: 'P2022', meta: { column: 'Voucher.returnRequestId' } })
+      .mockResolvedValueOnce([requestItem]);
+
+    try {
+      const response = await GET(makeRequest('GET'));
+      const result = await response.json() as { items: { id: string; issuedVoucher: null }[] };
+
+      expect(response.status).toBe(200);
+      expect(result.items).toEqual([expect.objectContaining({ ...requestItem, createdAt: requestItem.createdAt.toISOString(), issuedVoucher: null })]);
+      expect(returnFindMany).toHaveBeenCalledTimes(2);
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('apply pending migrations.'), expect.objectContaining({ code: 'P2022' }));
+    } finally {
+      logError.mockRestore();
+    }
+  });
+
   it('updates a request status and admin note for an admin', async () => {
     returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
     const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' }));

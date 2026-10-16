@@ -117,10 +117,30 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   return withDatabase(async () => {
-    const items = await prisma.returnRequest.findMany({
-      include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    let items;
+    try {
+      items = await prisma.returnRequest.findMany({
+        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (error) {
+      const missingVoucherRelation = isRecord(error)
+        && error.code === 'P2022'
+        && isRecord(error.meta)
+        && typeof error.meta.column === 'string'
+        && error.meta.column.includes('returnRequestId');
+      if (!missingVoucherRelation) throw error;
+
+      console.error('Admin return list is missing the issued voucher relation column; apply pending migrations.', error);
+      const requestsWithoutIssuedVoucher = await prisma.returnRequest.findMany({
+        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      const items = requestsWithoutIssuedVoucher.map((item) => ({ ...item, issuedVoucher: null }));
+      items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
+        || right.createdAt.getTime() - left.createdAt.getTime());
+      return NextResponse.json({ items });
+    }
     items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
       || right.createdAt.getTime() - left.createdAt.getTime());
     return NextResponse.json({ items });
