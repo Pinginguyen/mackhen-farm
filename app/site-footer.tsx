@@ -16,7 +16,7 @@ export default function SiteFooter() {
         </section>
         <section className="site-footer-column">
           <h2>LIÊN HỆ TRỰC TIẾP</h2>
-          <p>Trần Trung Châu <span>(Sáng lập &amp; Điều hành dự án)</span></p>
+          <p>Nhóm 3 <span>(Sáng lập &amp; Điều hành dự án)</span></p>
           <p>Hotline / Zalo đặt hàng: <a className="footer-zalo-link" href="https://zalo.me/0762793244" target="_blank" rel="noopener noreferrer">0762.793.244 (Bấm chat Zalo)</a></p>
           <p>Email: <a href="mailto:trungchau1210@gmail.com">trungchau1210@gmail.com</a></p>
           <p>Địa chỉ điều hành: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.</p>
