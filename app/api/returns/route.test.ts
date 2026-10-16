@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, transaction, prismaTransaction } = vi.hoisted(() => {
+const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, sendCompensationVoucherEmail, transaction, prismaTransaction } = vi.hoisted(() => {
   const mocks = {
     orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
-    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
+    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(), sendCompensationVoucherEmail: vi.fn(),
   };
   const transaction = {
     order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
@@ -30,6 +30,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
+vi.mock('@/lib/email', () => ({ sendCompensationVoucherEmail }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn() }));
 
@@ -67,6 +68,7 @@ describe('/api/returns', () => {
     voucherCreate.mockReset().mockResolvedValue({ id: 'voucher-2', code: 'COMP-MKF-123456', value: 50000, expiresAt: new Date() });
     requireAdmin.mockReset().mockResolvedValue(null);
     writeAuditLog.mockReset().mockResolvedValue(undefined);
+    sendCompensationVoucherEmail.mockReset().mockResolvedValue(undefined);
     prismaTransaction.mockClear();
   });
 
@@ -269,8 +271,9 @@ describe('/api/returns', () => {
       status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
       refundBankName: null, refundAccountNumber: null, refundAccountHolder: null,
       refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000, user: { email: 'buyer@example.com' }, customer: null },
     });
-    returnUpdate.mockResolvedValueOnce({ id: 'return-1', status: 'VOUCHER_ISSUED', compensationVoucher: { code: 'MKF50-ABCDEF12' }, order: { orderCode: 'MKF-123456', customerName: 'Buyer' } });
+    returnUpdate.mockResolvedValueOnce({ id: 'return-1', status: 'VOUCHER_ISSUED', compensationVoucher: { code: 'MKF50-ABCDEF12', discountPercent: 50 }, order: { orderCode: 'MKF-123456', customerName: 'Buyer' } });
     const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'VOUCHER_ISSUED' }));
 
     expect(response.status).toBe(200);
@@ -281,6 +284,10 @@ describe('/api/returns', () => {
       data: { status: 'VOUCHER_ISSUED', adminNote: null },
       include: expect.objectContaining({ compensationVoucher: true }),
     }));
+    expect(sendCompensationVoucherEmail).toHaveBeenCalledWith({
+      toEmail: 'buyer@example.com', orderCode: 'MKF-123456', voucherCode: 'MKF50-ABCDEF12',
+      discountValue: 50, discountType: 'PERCENTAGE',
+    });
   });
 
   it('issues a private fixed-value voucher after refund approval in the same transaction', async () => {
@@ -288,7 +295,7 @@ describe('/api/returns', () => {
       status: 'REFUND_APPROVED', orderId: 'order-1', customerPhone: '0762793244',
       refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A',
       refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null,
-      order: { orderCode: 'MKF-123456', totalAmount: 169000 },
+      order: { orderCode: 'MKF-123456', totalAmount: 169000, user: { email: null }, customer: { email: 'customer@example.com' } },
     });
     returnUpdate.mockResolvedValueOnce({
       id: 'return-1', status: 'VOUCHER_ISSUED',
@@ -314,6 +321,47 @@ describe('/api/returns', () => {
       action: 'ISSUE_COMPENSATION_VOUCHER', targetEntity: 'ReturnRequest', targetId: 'return-1',
       newValue: expect.objectContaining({ voucherCode: 'COMP-MKF-123456', voucherValue: 50000, resolutionMethod: 'VOUCHER' }),
     }));
+    expect(sendCompensationVoucherEmail).toHaveBeenCalledWith({
+      toEmail: 'customer@example.com', orderCode: 'MKF-123456', voucherCode: 'COMP-MKF-123456',
+      discountValue: 50000, discountType: 'FIXED',
+    });
+  });
+
+  it('keeps voucher issuance successful when no customer email is available or SMTP fails', async () => {
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: null, refundAccountNumber: null, refundAccountHolder: null,
+      refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000, user: null, customer: null },
+    });
+    returnUpdate.mockResolvedValueOnce({
+      id: 'return-1', status: 'VOUCHER_ISSUED', compensationVoucher: { code: 'MKF50-ABCDEF12', discountPercent: 50 },
+      order: { orderCode: 'MKF-123456', customerName: 'Buyer' },
+    });
+
+    const noEmailResponse = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'VOUCHER_ISSUED' }));
+    expect(noEmailResponse.status).toBe(200);
+    expect(sendCompensationVoucherEmail).not.toHaveBeenCalled();
+
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: null, refundAccountNumber: null, refundAccountHolder: null,
+      refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000, user: { email: 'buyer@example.com' }, customer: null },
+    });
+    returnUpdate.mockResolvedValueOnce({
+      id: 'return-1', status: 'VOUCHER_ISSUED', compensationVoucher: { code: 'MKF50-ABCDEF12', discountPercent: 50 },
+      order: { orderCode: 'MKF-123456', customerName: 'Buyer' },
+    });
+    sendCompensationVoucherEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const smtpErrorResponse = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'VOUCHER_ISSUED' }));
+      expect(smtpErrorResponse.status).toBe(200);
+      expect(logError).toHaveBeenCalledWith('Compensation voucher email delivery failed.', expect.any(Error));
+    } finally {
+      logError.mockRestore();
+    }
   });
 
   it('retries voucher issuance without the optional relation when its database column is missing', async () => {

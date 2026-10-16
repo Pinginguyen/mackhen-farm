@@ -7,6 +7,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { withDatabase } from '@/lib/api-database';
+import { sendCompensationVoucherEmail } from '@/lib/email';
 import type { ReturnRequestStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -201,7 +202,7 @@ export async function PATCH(request: Request) {
   return withDatabase(async () => {
     const current = await prisma.returnRequest.findUnique({
       where: { id },
-      select: { status: true, orderId: true, customerPhone: true, refundBankName: true, refundAccountNumber: true, refundAccountHolder: true, refundApprovedBy: true, refundApprovedAt: true, refundTransferReference: true, order: { select: { orderCode: true, totalAmount: true } } },
+      select: { status: true, orderId: true, customerPhone: true, refundBankName: true, refundAccountNumber: true, refundAccountHolder: true, refundApprovedBy: true, refundApprovedAt: true, refundTransferReference: true, order: { select: { orderCode: true, totalAmount: true, user: { select: { email: true } }, customer: { select: { email: true } } } } },
     });
     if (!current) return NextResponse.json({ error: 'Không tìm thấy yêu cầu đổi trả.' }, { status: 404 });
     const allowedTransition = status === current.status
@@ -324,6 +325,25 @@ export async function PATCH(request: Request) {
       oldValue: current,
       newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' && 'issuedVoucher' in item ? item.issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
     });
+    if (status === 'VOUCHER_ISSUED') {
+      const recipientEmail = current.order.user?.email ?? current.order.customer?.email;
+      const compensationVoucher = item.compensationVoucher;
+      const issuedVoucher = 'issuedVoucher' in item ? item.issuedVoucher : null;
+      const voucherCode = compensationVoucher?.code ?? issuedVoucher?.code;
+      if (recipientEmail && voucherCode) {
+        try {
+          await sendCompensationVoucherEmail({
+            toEmail: recipientEmail,
+            orderCode: current.order.orderCode,
+            voucherCode,
+            discountValue: compensationVoucher?.discountPercent ?? issuedVoucher?.value ?? 0,
+            discountType: compensationVoucher ? 'PERCENTAGE' : 'FIXED',
+          });
+        } catch (error) {
+          console.error('Compensation voucher email delivery failed.', error);
+        }
+      }
+    }
     return NextResponse.json({ item });
   }, 'Return request update failed');
 }
