@@ -1732,7 +1732,8 @@ textarea {
 .review-form-heading h3 {
   margin: 0;
   color: var(--text);
-  font-size: 1.15rem;
+  font-size: 1.25rem;
+  font-weight: 800;
 }
 
 .review-form-heading .eyebrow {
@@ -1765,7 +1766,13 @@ textarea {
 }
 
 .review-form .field textarea {
-  min-height: 112px;
+  min-height: 110px;
+  padding: 14px;
+  border-color: #d6d3d1;
+  border-radius: 12px;
+  color: #292524;
+  font-size: 0.875rem;
+  line-height: 1.65;
   resize: vertical;
 }
 
@@ -1783,35 +1790,69 @@ textarea {
   text-align: right;
 }
 
-.review-rating-control > span {
+.review-product-badge {
+  max-width: 48%;
+  padding: 7px 11px;
+  border: 1px solid rgba(139, 30, 30, 0.16);
+  border-radius: 999px;
+  background: #f8eeee;
+  color: #8b1e1e;
+  font-size: 0.8rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.review-rating-control {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+}
+
+.review-rating-prompt {
+  display: grid;
+  gap: 3px;
+}
+
+.review-rating-prompt > span {
   color: var(--text);
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.review-rating-prompt > small {
+  color: #8b1e1e;
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .review-submit-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  justify-self: end;
+  justify-self: stretch;
   gap: 9px;
-  min-width: 180px;
-  min-height: 46px;
-  padding: 10px 18px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px;
   border: 0;
-  border-radius: 8px;
-  background: var(--primary);
+  border-radius: 12px;
+  background: #8b1e1e;
   color: white;
   font: inherit;
-  font-weight: 750;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(74, 26, 18, 0.12);
   cursor: pointer;
-  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  transition: background-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
 }
 
 .review-submit-button:hover:not(:disabled) {
-  background: #711818;
-  box-shadow: 0 8px 18px rgba(139, 30, 30, 0.18);
-  transform: translateY(-1px);
+  background: #721919;
+  box-shadow: 0 6px 14px rgba(139, 30, 30, 0.2);
+}
+
+.review-submit-button:active:not(:disabled) {
+  transform: scale(0.99);
 }
 
 .review-submit-button:disabled {
@@ -2563,6 +2604,20 @@ textarea {
 .account-order-table a {
   color: var(--primary);
   font-weight: 700;
+}
+
+.account-order-table .account-review-link {
+  display: inline-flex;
+  margin-left: 10px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #8b1e1e;
+  color: #fff;
+  text-decoration: none;
+}
+
+.account-order-table .account-review-link:hover {
+  background: #721919;
 }
 
 .admin-portal {
@@ -4464,27 +4519,36 @@ body {
 .review-stars-picker {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 5px;
 }
 
 .review-stars-picker button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 36px;
+  width: 40px;
+  height: 42px;
   padding: 0;
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: #d6d0ca;
-  font-size: 2rem;
   cursor: pointer;
-  transition: color 150ms ease, transform 150ms ease;
+  transition: color 150ms ease, transform 150ms ease, fill 150ms ease;
+}
+
+.review-stars-picker button svg {
+  width: 36px;
+  height: 36px;
 }
 
 .review-stars-picker button.is-selected,
 .review-stars-picker button:hover {
-  color: #d59521;
+  color: #f59e0b;
+}
+
+.review-stars-picker button.is-selected svg,
+.review-stars-picker button:hover svg {
+  fill: currentColor;
 }
 
 .review-stars-picker button:hover {
@@ -4546,6 +4610,10 @@ body {
   .review-submit-button {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .review-product-badge {
+    max-width: 52%;
   }
 }
 
@@ -4816,6 +4884,7 @@ body {
 }
 
 .quantity-stepper button:disabled {
+  opacity: 0.4;
   color: #a8a29e;
   cursor: not-allowed;
 }
@@ -4863,6 +4932,198 @@ body {
 .admin-products-table th:first-child,
 .admin-products-table td:first-child {
   min-width: 270px;
+}
+
+.admin-voucher-manager {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-voucher-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-voucher-toolbar p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.admin-voucher-toolbar .primary-action,
+.admin-voucher-form footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.admin-voucher-form {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #e7e1d8;
+  border-radius: 10px;
+  background: #fffdfa;
+}
+
+.admin-voucher-form > header,
+.admin-voucher-form > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-voucher-form > header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.admin-voucher-close,
+.admin-voucher-actions button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #e7e1d8;
+  border-radius: 8px;
+  background: white;
+  color: #57534e;
+  cursor: pointer;
+}
+
+.admin-voucher-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-voucher-fields .field {
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-voucher-fields input,
+.admin-voucher-fields select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d6d3d1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-voucher-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+}
+
+.admin-voucher-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #57534e;
+  font-size: 0.88rem;
+}
+
+.admin-voucher-form > footer {
+  justify-content: flex-end;
+}
+
+.admin-voucher-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-voucher-table {
+  min-width: 760px;
+}
+
+.admin-voucher-table th,
+.admin-voucher-table td {
+  padding: 14px 18px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-voucher-table th {
+  color: #78716c;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-voucher-table td:first-child strong,
+.admin-voucher-table td:first-child small {
+  display: block;
+}
+
+.admin-voucher-table td:first-child small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.admin-voucher-status {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f5f5f4;
+  color: #57534e;
+  font-size: 0.77rem;
+  font-weight: 700;
+}
+
+.admin-voucher-status.is-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-voucher-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.admin-voucher-actions button:last-child {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.admin-voucher-empty {
+  padding: 30px !important;
+  color: var(--muted);
+  text-align: center !important;
+}
+
+.admin-voucher-error,
+.admin-voucher-notice {
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.admin-voucher-error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.admin-voucher-notice {
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+@media (max-width: 760px) {
+  .admin-voucher-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .admin-product-name {
@@ -6025,11 +6286,17 @@ body {
 }
 
 .admin-order-update .field select,
-.admin-order-update .field input {
+.admin-order-update .field input,
+.admin-order-update .field textarea {
   min-height: 42px;
   border: 1px solid #d6d3d1;
   border-radius: 9px;
   background: white;
+}
+
+.admin-order-update .field textarea {
+  min-height: 74px;
+  resize: vertical;
 }
 
 .admin-order-update .primary-action,
@@ -6038,6 +6305,29 @@ body {
   padding: 9px 13px;
   border-radius: 9px;
   font-size: 0.86rem;
+}
+
+.admin-manual-payment {
+  display: grid;
+  width: min(100%, 560px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ead7b5;
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.admin-manual-payment .field {
+  min-width: 0;
+  margin: 0;
+}
+
+@media (max-width: 620px) {
+  .admin-manual-payment {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .visually-hidden {
@@ -6868,6 +7158,18 @@ body {
   line-height: 1.25;
 }
 
+.home-page .hero-title-main,
+.home-page .hero-title-accent {
+  display: block;
+}
+
+.home-page .hero-title-accent {
+  margin-top: 6px;
+  color: #8b1e1e;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
 .home-page .hero-copy p {
   margin: 0;
   color: #4b5563;
@@ -7023,6 +7325,10 @@ body {
 
   .home-page .hero-copy h1 {
     font-size: 3rem;
+  }
+
+  .home-page .hero-title-accent {
+    font-size: 1.875rem;
   }
 
   .home-page .hero-copy p {
@@ -7893,7 +8199,8 @@ body {
   color: #285b2c;
 }
 
-.return-admin-status.refunded {
+.return-admin-status.refunded,
+.return-admin-status.completed {
   background: #e9f1f7;
   color: #24536f;
 }
@@ -7956,6 +8263,21 @@ body {
   color: #145c43;
   font-size: 0.88rem;
   font-weight: 650;
+}
+
+.admin-return-toast {
+  position: fixed;
+  z-index: 1200;
+  top: 20px;
+  right: 20px;
+  margin: 0;
+  padding: 13px 18px;
+  border: 1px solid #86efac;
+  border-radius: 10px;
+  background: #f0fdf4;
+  box-shadow: 0 8px 24px rgba(20, 83, 45, 0.14);
+  color: #166534;
+  font-weight: 700;
 }
 
 .admin-return-modal-backdrop,

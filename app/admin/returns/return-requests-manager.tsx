@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
-import { AlertTriangle, Check, Clock3, Copy, Image as ImageIcon, PackageCheck, Sparkles, Wallet, X, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Check, Clock3, Copy, Image as ImageIcon, LoaderCircle, PackageCheck, Sparkles, Wallet, X, XCircle } from 'lucide-react';
 
-type ReturnStatus = 'PENDING' | 'REPLACEMENT_APPROVED' | 'VOUCHER_ISSUED' | 'REFUND_APPROVED' | 'REFUNDED' | 'REJECTED';
+type ReturnStatus = 'PENDING' | 'REPLACEMENT_APPROVED' | 'VOUCHER_ISSUED' | 'REFUND_APPROVED' | 'REFUNDED' | 'COMPLETED' | 'REJECTED';
 
 type ReturnRequest = {
   id: string;
@@ -33,7 +32,7 @@ const statusTabs: { id: 'ALL' | ReturnStatus; label: string }[] = [
   { id: 'REPLACEMENT_APPROVED', label: 'Đã duyệt gửi bù' },
   { id: 'VOUCHER_ISSUED', label: 'Đã phát hành voucher' },
   { id: 'REFUND_APPROVED', label: 'Chờ chuyển hoàn' },
-  { id: 'REFUNDED', label: 'Đã hoàn tiền' },
+  { id: 'COMPLETED', label: 'Đã hoàn tiền' },
   { id: 'REJECTED', label: 'Từ chối' },
 ];
 
@@ -43,6 +42,7 @@ const statusLabels: Record<ReturnStatus, string> = {
   VOUCHER_ISSUED: 'Đã phát hành voucher 50%',
   REFUND_APPROVED: 'Đã duyệt · chờ chuyển tiền',
   REFUNDED: 'Đã hoàn tiền',
+  COMPLETED: 'Đã hoàn tiền',
   REJECTED: 'Đã từ chối',
 };
 
@@ -56,8 +56,10 @@ export default function ReturnRequestsManager() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [toast, setToast] = useState('');
   const [copiedRefundField, setCopiedRefundField] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -83,7 +85,7 @@ export default function ReturnRequestsManager() {
 
   const normalizedSearch = search.trim().toLocaleLowerCase('vi');
   const visibleRequests = requests.filter((request) => {
-    const matchesStatus = filter === 'ALL' || request.status === filter;
+    const matchesStatus = filter === 'ALL' || (filter === 'COMPLETED' ? ['COMPLETED', 'REFUNDED'].includes(request.status) : request.status === filter);
     const searchable = `${request.order.orderCode} ${request.order.customerName} ${request.customerPhone} ${request.issueType}`.toLocaleLowerCase('vi');
     return matchesStatus && (!normalizedSearch || searchable.includes(normalizedSearch));
   });
@@ -97,7 +99,12 @@ export default function ReturnRequestsManager() {
   }
 
   async function updateStatus(status: ReturnStatus) {
-    if (!selected) return;
+    if (!selected || busyRef.current) return;
+    if (['REFUNDED', 'COMPLETED'].includes(status) && !refundTransferReference.trim()) {
+      setError('Vui lòng nhập mã tham chiếu giao dịch để xác nhận chuyển hoàn.');
+      return;
+    }
+    busyRef.current = true;
     setBusy(true);
     setError('');
     setNotice('');
@@ -112,6 +119,19 @@ export default function ReturnRequestsManager() {
 
       const updated = result.item;
       setRequests((current) => current.map((request) => request.id === updated.id ? updated : request));
+      if (['REFUNDED', 'COMPLETED'].includes(status)) {
+        setSelected(null);
+        setToast('Đã xác nhận hoàn tiền thành công');
+        window.setTimeout(() => setToast(''), 4000);
+        try {
+          const refreshed = await fetch('/api/returns', { cache: 'no-store' });
+          const queue = await refreshed.json() as { items?: ReturnRequest[] };
+          if (refreshed.ok && queue.items) setRequests(queue.items);
+        } catch {
+          // Keep the successful update already applied to the local list.
+        }
+        return;
+      }
       setSelected(updated);
       setAdminNote(updated.adminNote ?? '');
       setRefundTransferReference(updated.refundTransferReference ?? '');
@@ -119,6 +139,7 @@ export default function ReturnRequestsManager() {
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Không thể cập nhật yêu cầu.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
@@ -163,7 +184,7 @@ export default function ReturnRequestsManager() {
         </button>
         <div className="admin-return-tabs" role="tablist" aria-label="Lọc trạng thái yêu cầu đổi trả">
           {statusTabs.map((tab) => {
-            const count = tab.id === 'ALL' ? requests.length : requests.filter((request) => request.status === tab.id).length;
+            const count = tab.id === 'ALL' ? requests.length : requests.filter((request) => tab.id === 'COMPLETED' ? ['COMPLETED', 'REFUNDED'].includes(request.status) : request.status === tab.id).length;
             return (
               <button
                 type="button"
@@ -186,6 +207,7 @@ export default function ReturnRequestsManager() {
 
       {error && !selected && <p className="admin-return-alert" role="alert">{error}</p>}
       {notice && !selected && <p className="admin-return-notice" role="status">{notice}</p>}
+      {toast && <p className="admin-return-toast" role="status">{toast}</p>}
 
       <div className="admin-return-table-wrap">
         <table className="admin-return-table">
@@ -214,7 +236,7 @@ export default function ReturnRequestsManager() {
                 <td>
                   {request.imageUrl ? (
                     <button className="admin-return-thumbnail" type="button" onClick={() => setImagePreview(request.imageUrl)} aria-label={`Phóng to ảnh minh chứng đơn ${request.order.orderCode}`}>
-                      <Image src={request.imageUrl} alt={`Minh chứng ${request.order.orderCode}`} width={64} height={64} sizes="64px" unoptimized />
+                      <img src={request.imageUrl} alt={`Minh chứng ${request.order.orderCode}`} />
                     </button>
                   ) : <span className="admin-return-no-image">Không có ảnh</span>}
                 </td>
@@ -279,14 +301,14 @@ export default function ReturnRequestsManager() {
               </section>}
               {selected.status === 'REFUND_APPROVED' && <>
                 <p className="admin-return-action-note">Đã được {selected.refundApprovedBy ?? 'Admin'} phê duyệt{selected.refundApprovedAt ? ` lúc ${new Date(selected.refundApprovedAt).toLocaleString('vi-VN')}` : ''}. Hãy thực hiện chuyển khoản ngoài hệ thống, sau đó nhập mã tham chiếu để xác nhận hoàn tất.</p>
-                <label className="admin-return-admin-note">Mã tham chiếu giao dịch<input value={refundTransferReference} onChange={(event) => setRefundTransferReference(event.target.value)} maxLength={160} placeholder="Mã giao dịch ngân hàng / ví" required /></label>
+                <label className="admin-return-admin-note">Mã tham chiếu giao dịch (bắt buộc)<input value={refundTransferReference} onChange={(event) => setRefundTransferReference(event.target.value)} maxLength={160} required aria-invalid={Boolean(error && !refundTransferReference.trim())} placeholder="Mã giao dịch ngân hàng / ví" /></label>
               </>}
               <div className="admin-return-detail-description"><span>Mô tả chi tiết</span><p>{selected.description}</p></div>
               <div className="admin-return-detail-image">
                 <span>Ảnh minh chứng</span>
                 {selected.imageUrl ? (
                   <button type="button" onClick={() => setImagePreview(selected.imageUrl)} aria-label="Phóng to ảnh minh chứng">
-                    <Image src={selected.imageUrl} alt={`Minh chứng đơn ${selected.order.orderCode}`} width={640} height={480} sizes="(max-width: 768px) 90vw, 640px" unoptimized />
+                    <img src={selected.imageUrl} alt={`Minh chứng đơn ${selected.order.orderCode}`} />
                   </button>
                 ) : <p className="admin-return-no-image"><ImageIcon size={17} /> Khách chưa gửi ảnh minh chứng.</p>}
               </div>
@@ -320,8 +342,8 @@ export default function ReturnRequestsManager() {
               ) : selected.status === 'REFUND_APPROVED' ? (
                 <>
                   <span className="admin-return-processed"><Clock3 size={16} /> Đã duyệt · chờ xác nhận chuyển khoản</span>
-                  <button className="admin-return-refund" type="button" onClick={() => void updateStatus('REFUNDED')} disabled={busy || !refundTransferReference.trim()}>
-                    <Wallet size={17} /> Xác nhận đã chuyển hoàn
+                  <button className="admin-return-refund" type="button" onClick={() => void updateStatus('COMPLETED')} disabled={busy}>
+                    {busy ? <LoaderCircle size={17} className="is-spinning" /> : <Wallet size={17} />} {busy ? 'Đang xác nhận...' : 'Xác nhận đã chuyển hoàn'}
                   </button>
                 </>
               ) : (
@@ -339,7 +361,7 @@ export default function ReturnRequestsManager() {
         <div className="admin-return-image-backdrop" onMouseDown={() => setImagePreview(null)}>
           <div className="admin-return-image-viewer" role="dialog" aria-modal="true" aria-label="Ảnh minh chứng" onMouseDown={(event) => event.stopPropagation()}>
             <button type="button" className="admin-return-icon-button" aria-label="Đóng ảnh" onClick={() => setImagePreview(null)}><X size={19} /></button>
-            <Image src={imagePreview} alt="Ảnh minh chứng phóng to" width={1200} height={900} sizes="90vw" unoptimized />
+            <img src={imagePreview} alt="Ảnh minh chứng phóng to" />
           </div>
         </div>
       )}

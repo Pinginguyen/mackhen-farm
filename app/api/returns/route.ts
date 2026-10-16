@@ -17,7 +17,7 @@ const issueTypes = [
   'Khác',
 ] as const;
 
-const returnStatuses: ReturnRequestStatus[] = ['PENDING', 'REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REFUNDED', 'REJECTED'];
+const returnStatuses: ReturnRequestStatus[] = ['PENDING', 'REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REFUNDED', 'COMPLETED', 'REJECTED'];
 const maxEvidenceBytes = 2 * 1024 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -145,6 +145,9 @@ export async function PATCH(request: Request) {
   if (!id || !returnStatuses.includes(status as ReturnRequestStatus) || (adminNote?.length ?? 0) > 4000 || adminNote === undefined || refundTransferReference.length > 160) {
     return NextResponse.json({ error: 'Mã yêu cầu hoặc trạng thái không hợp lệ.' }, { status: 400 });
   }
+  if (['REFUNDED', 'COMPLETED'].includes(status) && !refundTransferReference) {
+    return NextResponse.json({ error: 'Vui lòng nhập mã tham chiếu giao dịch trước khi xác nhận đã chuyển hoàn.' }, { status: 400 });
+  }
 
   return withDatabase(async () => {
     const current = await prisma.returnRequest.findUnique({
@@ -154,7 +157,7 @@ export async function PATCH(request: Request) {
     if (!current) return NextResponse.json({ error: 'Không tìm thấy yêu cầu đổi trả.' }, { status: 404 });
     const allowedTransition = status === current.status
       || (current.status === 'PENDING' && ['REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REJECTED'].includes(status))
-      || (current.status === 'REFUND_APPROVED' && status === 'REFUNDED');
+      || (current.status === 'REFUND_APPROVED' && ['REFUNDED', 'COMPLETED'].includes(status));
     if (!allowedTransition) return NextResponse.json({ error: 'Trạng thái không hợp lệ với vòng đời xử lý hiện tại.' }, { status: 409 });
     if (status === 'REFUND_APPROVED' && (current.status !== 'PENDING' || !current.refundBankName || !current.refundAccountNumber || !current.refundAccountHolder)) {
       return NextResponse.json({ error: 'Chỉ phê duyệt hoàn tiền khi yêu cầu đang chờ và khách đã cung cấp đủ thông tin nhận tiền.' }, { status: 409 });
@@ -162,8 +165,8 @@ export async function PATCH(request: Request) {
     if (status === 'VOUCHER_ISSUED' && current.status !== 'PENDING') {
       return NextResponse.json({ error: 'Chỉ phát hành voucher cho yêu cầu đang chờ xử lý.' }, { status: 409 });
     }
-    if (status === 'REFUNDED' && (current.status !== 'REFUND_APPROVED' || !refundTransferReference)) {
-      return NextResponse.json({ error: 'Cần có phê duyệt của Admin và mã tham chiếu giao dịch trước khi ghi nhận đã hoàn tiền.' }, { status: 409 });
+    if (['REFUNDED', 'COMPLETED'].includes(status) && current.status !== 'REFUND_APPROVED') {
+      return NextResponse.json({ error: 'Cần có phê duyệt của Admin trước khi ghi nhận đã hoàn tiền.' }, { status: 409 });
     }
     const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
     if (status === 'VOUCHER_ISSUED' && current.status === 'VOUCHER_ISSUED') {
@@ -195,17 +198,17 @@ export async function PATCH(request: Request) {
           status: status as ReturnRequestStatus,
           adminNote,
           ...(status === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
-          ...(status === 'REFUNDED' ? { refundTransferReference } : {}),
+          ...(['REFUNDED', 'COMPLETED'].includes(status) ? { refundTransferReference, refundCompletedBy: adminEmail } : {}),
         },
         include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
       });
     await writeAuditLog(request, {
       adminEmail,
-      action: status === 'REFUND_APPROVED' ? 'APPROVE_REFUND' : status === 'VOUCHER_ISSUED' ? 'ISSUE_COMPENSATION_VOUCHER' : 'UPDATE_RETURN_REQUEST',
+      action: status === 'REFUND_APPROVED' ? 'APPROVE_REFUND' : ['REFUNDED', 'COMPLETED'].includes(status) ? 'COMPLETE_REFUND' : status === 'VOUCHER_ISSUED' ? 'ISSUE_COMPENSATION_VOUCHER' : 'UPDATE_RETURN_REQUEST',
       targetEntity: 'ReturnRequest',
       targetId: id,
       oldValue: current,
-      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundTransferReference: refundTransferReference || current.refundTransferReference },
+      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
     });
     return NextResponse.json({ item });
   }, 'Return request update failed');

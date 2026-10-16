@@ -12,6 +12,13 @@ if (databaseUrl) {
   }
 }
 if (datasourceUrl) {
+  if (datasourceUrl.hostname.endsWith('.neon.tech')) {
+    const neonEndpoint = datasourceUrl.hostname.match(/^(ep-[^.]+)(\..+)$/);
+    if (neonEndpoint && !neonEndpoint[1].endsWith('-pooler')) {
+      datasourceUrl.hostname = `${neonEndpoint[1]}-pooler${neonEndpoint[2]}`;
+    }
+    datasourceUrl.searchParams.set('pgbouncer', 'true');
+  }
   const isPooler = datasourceUrl.hostname.includes('-pooler.') || datasourceUrl.searchParams.has('pgbouncer');
   if (isPooler || process.env.VERCEL) datasourceUrl.searchParams.set('pgbouncer', 'true');
   if (process.env.VERCEL) {

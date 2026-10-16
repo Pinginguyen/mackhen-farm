@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Minus, Plus } from 'lucide-react';
 
 import type { ProductVariant } from '@/lib/store-data';
 
-export default function AddToCart({ productId, productSlug, name, image, price, variants }: {
+export default function AddToCart({ productId, productSlug, name, image, price, variants, isSeasoning = false }: {
   productId: string;
   productSlug: string;
   name: string;
@@ -115,16 +114,28 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <span id="product-quantity-label">Số lượng</span>
         <div className="quantity-stepper" role="group" aria-labelledby="product-quantity-label">
           <button type="button" aria-label="Giảm số lượng" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={16} /></button>
-          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={20} value={quantity} onChange={(event) => setQuantity(Math.min(20, Math.max(1, Number(event.target.value) || 1)))} />
-          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 20} onClick={() => setQuantity((value) => Math.min(20, value + 1))}><Plus size={16} /></button>
+          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={99} value={quantity} onChange={(event) => setQuantity(Math.min(99, Math.max(1, Number(event.target.value) || 1)))} />
+          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 99} onClick={() => setQuantity((value) => Math.min(99, value + 1))}><Plus size={16} /></button>
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
         <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
         <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>
+      <ul className="product-reassurance-list" aria-label="Cam kết Mắc Khén Farm">
+        {isSeasoning ? <>
+          <li>Gia vị tuyển chọn, chuẩn vị Tây Bắc</li>
+          <li>Đóng gói kín, tiện sử dụng và bảo quản</li>
+          <li>Hỗ trợ đổi mới trong 24h nếu bao bì lỗi</li>
+        </> : <>
+          <li>Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén Tây Bắc</li>
+          <li>22g protein thực vật / 100g, 0% cholesterol</li>
+          <li>Đổi gói mới 0đ trong 24h nếu xì túi, không cần trả hàng cũ</li>
+          <li>Túi nhôm 3 lớp và gói khử oxy, giữ độ dai đến 6 tháng</li>
+        </>}
+      </ul>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
-        <Image src={image} alt={name} width={48} height={48} sizes="48px" unoptimized={image.startsWith('data:') || /^https?:\/\//i.test(image)} />
+        <img src={image} alt="" />
         <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>
         <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>}

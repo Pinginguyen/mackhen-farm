@@ -18,7 +18,6 @@ const products = [
     description: 'Chẳm chéo ướt đậm vị gia vị vùng Điện Biên, dùng chấm món luộc, nướng và rau củ.',
     image: '/products/cham-cheo.jpg',
     highlight: 'Điện Biên',
-    highlights: ['Công thức chẳm chéo chuẩn vị Điện Biên', 'Vị cay thơm, dùng chấm món luộc và món nướng', 'Hũ 250g tiện dùng trong bữa ăn'],
   },
   {
     name: 'Hạt Mắc Khén Rừng Sao Khô Sơn La',
@@ -34,7 +33,6 @@ const products = [
     description: 'Hạt mắc khén rừng sao khô, gia vị đặc trưng dùng làm chẳm chéo và nêm món ăn.',
     image: '/products/hat-mac-khen.jpg',
     highlight: 'Sơn La',
-    highlights: ['Mắc khén rừng tuyển chọn từ Sơn La', 'Rang khô dậy hương thơm đặc trưng', 'Dùng làm chẳm chéo hoặc nêm món ăn'],
   },
   {
     name: 'Hạt Dổi Rừng Nếp Thượng Hạng',
@@ -50,7 +48,6 @@ const products = [
     description: 'Hạt dổi rừng tuyển chọn, hương thơm đặc trưng để làm gia vị chấm và nêm món nướng.',
     image: '/products/hat-doi.jpg',
     highlight: 'Thượng hạng',
-    highlights: ['Hạt dổi rừng nếp tuyển chọn', 'Hương thơm đặc trưng của núi rừng Tây Bắc', 'Hũ thủy tinh 50g'],
   },
   {
     name: 'Muối Chẳm Chéo Hạt Dổi Rang Khô',
@@ -66,7 +63,6 @@ const products = [
     description: 'Muối chẳm chéo rang khô cùng hạt dổi, tiện nêm nếm và chấm món ăn.',
     image: '/products/muoi-cham-cheo.jpg',
     highlight: 'Hạt dổi rang',
-    highlights: ['Muối chẳm chéo phối hạt dổi rang', 'Vị mặn cay thơm, tiện chấm và nêm nếm', 'Hũ rắc hai nấc 150g'],
   },
   {
     name: 'Mắc Khén Xé Sợi Cay Nồng',
@@ -82,7 +78,6 @@ const products = [
     description: 'Khô bò thực vật xé sợi dai, đậm vị mắc khén và hạt dổi; 22.5g protein/100g, không cholesterol.',
     image: '/products/xe-soi.jpg',
     highlight: 'Cay nồng',
-    highlights: ['22.5g protein thực vật / 100g', 'Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén', 'Sợi dai, cay nồng kiểu Tây Bắc'],
   },
   {
     name: 'Mắc Khén Miếng Dẻo Tiêu Rừng',
@@ -98,7 +93,6 @@ const products = [
     description: 'Khô bò thực vật dạng miếng dẻo, phối vị mật mía và tiêu rừng Tây Bắc.',
     image: '/products/mieng-deo.jpg',
     highlight: 'Tiêu rừng',
-    highlights: ['21g protein thực vật / 100g', 'Miếng dẻo mềm, thấm vị mật mía', 'Hương tiêu rừng Tây Bắc'],
   },
   {
     name: 'Mắc Khén Cháy Tỏi Giòn Cay',
@@ -114,7 +108,6 @@ const products = [
     description: 'Khô bò thực vật giòn cay kết hợp tỏi phi và gia vị mắc khén.',
     image: '/products/chay-toi.jpg',
     highlight: 'Tỏi giòn',
-    highlights: ['23.8g protein thực vật / 100g', 'Tỏi phi giòn thơm kết hợp mắc khén', 'Vị giòn cay đậm đà'],
   },
   {
     name: 'Combo Bộ Ba Nhậu Xanh',
@@ -131,7 +124,6 @@ const products = [
     description: 'Hộp quà đủ ba hương vị khô bò thực vật, tổng khối lượng 450g.',
     image: '/products/combo.jpg',
     highlight: 'Combo quà',
-    highlights: ['98g protein thực vật / hộp', 'Đủ ba hương vị khô thực vật', 'Hộp 450g thích hợp làm quà'],
   },
 ];
 
@@ -161,7 +153,6 @@ async function main() {
           description: product.description,
           image: product.image,
           highlight: product.highlight,
-          highlights: product.highlights,
           active: true,
         },
         create: {
@@ -180,7 +171,6 @@ async function main() {
           description: product.description,
           image: product.image,
           highlight: product.highlight,
-          highlights: product.highlights,
           active: true,
         },
       });

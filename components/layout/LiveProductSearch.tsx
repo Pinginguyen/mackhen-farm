@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
@@ -68,7 +67,7 @@ export default function LiveProductSearch() {
       <input aria-label="Tìm sản phẩm" placeholder="Tìm chẳm chéo, mắc khén..." value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }} />
       {query && <button type="button" aria-label="Xóa tìm kiếm" onClick={() => { setQuery(''); setOpen(true); }}><X size={15} /></button>}
       {showResults && <div className="live-search-dropdown" role="listbox" aria-label="Gợi ý sản phẩm">
-        {loading ? <p className="live-search-empty">Đang tìm sản phẩm...</p> : products.length ? products.map((product) => <Link role="option" href={`/products/${product.slug}`} key={product.id} onClick={() => setQuery('')}><Image src={product.image} alt={product.name} width={48} height={48} sizes="48px" unoptimized={product.image.startsWith('data:') || /^https?:\/\//i.test(product.image)} /><span><strong>{product.name}</strong><small>{product.category}</small></span><span className="live-search-product-pricing"><span><b>{product.price.toLocaleString('vi-VN')}đ</b>{product.originalPrice != null && <del>{product.originalPrice.toLocaleString('vi-VN')}đ</del>}</span><small className={product.stock > 0 ? 'in-stock' : 'out-of-stock'}>{product.stock > 0 ? 'Còn hàng' : 'Tạm hết hàng'}</small></span></Link>) : <p className="live-search-empty">Không tìm thấy sản phẩm phù hợp.</p>}
+        {loading ? <p className="live-search-empty">Đang tìm sản phẩm...</p> : products.length ? products.map((product) => <Link role="option" href={`/products/${product.slug}`} key={product.id} onClick={() => setQuery('')}><img src={product.image} alt="" /><span><strong>{product.name}</strong><small>{product.category}</small></span><span className="live-search-product-pricing"><span><b>{product.price.toLocaleString('vi-VN')}đ</b>{product.originalPrice != null && <del>{product.originalPrice.toLocaleString('vi-VN')}đ</del>}</span><small className={product.stock > 0 ? 'in-stock' : 'out-of-stock'}>{product.stock > 0 ? 'Còn hàng' : 'Tạm hết hàng'}</small></span></Link>) : <p className="live-search-empty">Không tìm thấy sản phẩm phù hợp.</p>}
         <Link className="live-search-all-results" href={`/products?search=${encodeURIComponent(query.trim())}`} onClick={() => setOpen(false)}>Xem tất cả kết quả cho “{query.trim()}”</Link>
       </div>}
     </div>

@@ -147,6 +147,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
       </section>
       <ProductReviewsSection
         productId={product.id}
+        productName={product.name}
         initialRating={product.rating}
         initialReviews={reviews}
         initialReviewCount={reviewCount}

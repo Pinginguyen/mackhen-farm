@@ -1,10 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import Image from 'next/image';
 import { Camera, Upload, X } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
-import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
 const issueTypes = [
   'Giao sai sản phẩm',
@@ -137,7 +135,7 @@ export default function ReturnRequestForm() {
 
         <div className="return-form-field">
           <label htmlFor="return-phone">Số điện thoại đặt hàng <span aria-hidden="true">*</span></label>
-          <ValidatedPhoneInput id="return-phone" name="phone" autoComplete="tel" placeholder="Nhập số điện thoại đặt hàng" required />
+          <input id="return-phone" name="phone" type="tel" autoComplete="tel" placeholder="Nhập số điện thoại đặt hàng" required />
         </div>
 
         <div className="return-form-field">
@@ -201,7 +199,7 @@ export default function ReturnRequestForm() {
             </div>
             <div className="return-form-field">
               <label htmlFor="return-refund-account">Số tài khoản / Số điện thoại ví</label>
-              <input id="return-refund-account" name="refundAccountNumber" type="tel" inputMode="numeric" pattern="[0-9]*" maxLength={100} placeholder="Nhập số tài khoản hoặc SĐT ví" />
+              <input id="return-refund-account" name="refundAccountNumber" maxLength={100} placeholder="Nhập số tài khoản hoặc SĐT ví" inputMode="text" />
             </div>
             <div className="return-form-field return-form-full-width">
               <label htmlFor="return-refund-holder">Tên chủ tài khoản</label>
@@ -227,7 +225,7 @@ export default function ReturnRequestForm() {
           <small className="return-evidence-help">Chọn ảnh từ thiết bị hoặc camera · Tối đa 2MB</small>
           {imageUrl && (
             <div className="return-upload-preview">
-              <Image src={imageUrl} alt="Xem trước ảnh minh chứng" width={480} height={360} sizes="(max-width: 768px) 90vw, 480px" unoptimized />
+              <img src={imageUrl} alt="Xem trước ảnh minh chứng" />
               <button type="button" onClick={removeEvidence} aria-label="Xóa ảnh minh chứng" title="Xóa ảnh">
                 <X size={16} />
               </button>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomInt } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
@@ -84,86 +85,96 @@ export async function PATCH(request: Request) {
   try {
     const payload: unknown = await request.json();
     if (!isRecord(payload)) return NextResponse.json({ error: { message: 'Dữ liệu yêu cầu không hợp lệ.' } }, { status: 400 });
-    const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown };
+    const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown; phone?: unknown; address?: unknown; paymentReason?: unknown };
     const orderCode = typeof body.orderCode === 'string' ? body.orderCode.trim().toUpperCase() : '';
-    if (!/^MKF-\d{6}$/.test(orderCode) || typeof body.status !== 'string' || !statuses.includes(body.status as (typeof statuses)[number])
+    const hasStatus = body.status !== undefined;
+    const normalizedPhone = typeof body.phone === 'string' ? body.phone.replace(/\D/g, '') : '';
+    const address = typeof body.address === 'string' ? body.address.trim() : '';
+    const paymentReason = typeof body.paymentReason === 'string' ? body.paymentReason.trim() : '';
+    if (!/^MKF-\d{6}$/.test(orderCode) || (hasStatus && (typeof body.status !== 'string' || !statuses.includes(body.status as (typeof statuses)[number])))
+      || (!hasStatus && body.paymentStatus === undefined && body.phone === undefined && body.address === undefined)
       || (body.paymentStatus !== undefined && body.paymentStatus !== 'PENDING' && body.paymentStatus !== 'PAID')
       || (body.carrier !== undefined && body.carrier !== null && typeof body.carrier !== 'string')
-      || (body.trackingCode !== undefined && body.trackingCode !== null && typeof body.trackingCode !== 'string')
-      || (typeof body.trackingCode === 'string' && body.trackingCode.length > 160)) {
+      || (body.trackingCode !== undefined && typeof body.trackingCode !== 'string')
+      || (typeof body.trackingCode === 'string' && body.trackingCode.length > 160)
+      || (body.phone !== undefined && !/^0[35789]\d{8}$/.test(normalizedPhone))
+      || (body.address !== undefined && (!address || address.length > 500))
+      || (body.paymentReason !== undefined && (typeof body.paymentReason !== 'string' || paymentReason.length > 1000))) {
       return NextResponse.json({ error: { message: 'Mã đơn hoặc trạng thái không hợp lệ.' } }, { status: 400 });
     }
-    const targetStatus = body.status as (typeof statuses)[number];
+    const requestedStatus = hasStatus ? body.status as (typeof statuses)[number] : undefined;
     if (body.carrier && !carriers.includes(body.carrier as (typeof carriers)[number])) {
       return NextResponse.json({ error: { message: 'Đơn vị vận chuyển không hợp lệ.' } }, { status: 400 });
     }
-    const trackingCode = typeof body.trackingCode === 'string' ? body.trackingCode.trim() : '';
-    if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && !body.carrier) {
-      return NextResponse.json({ error: { message: 'Chọn hãng vận chuyển trước khi cập nhật trạng thái giao hàng.' } }, { status: 400 });
+    let trackingCode = body.trackingCode?.trim() || '';
+    if (requestedStatus === 'HANDED_OFF' && body.carrier === 'SPX' && !trackingCode) {
+      trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
-      const result = await prisma.$transaction(async (transaction) => {
-        const currentOrder = await transaction.order.findUnique({
-          where: { orderCode },
-          include: { items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } },
-        });
-        if (!currentOrder) return { error: { status: 404, message: 'Không tìm thấy đơn hàng.' } };
-        if (currentOrder.orderStatus === 'CANCELLED' && targetStatus !== 'CANCELLED') {
-          return { error: { status: 409, message: 'Đơn đã hủy không thể chuyển sang trạng thái khác.' } };
-        }
-
-        const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
-        const explicitlyPaid = body.paymentStatus === 'PAID';
-        if (isDelivered && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID' && !explicitlyPaid) {
-          return { error: { status: 409, message: 'Chưa xác nhận thanh toán VietQR/MoMo. Hãy cập nhật thanh toán thành Đã thanh toán trước khi hoàn tất đơn.' } };
-        }
-
-        if (targetStatus === 'RETURNED' && currentOrder.orderStatus !== 'RETURNED') {
-          for (const item of currentOrder.items) {
-            await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-            if (item.productVariantId) {
-              await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
-            }
-            if (item.lotCode) {
-              await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { orderStatus: true, paymentStatus: true, paymentMethod: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } } });
+      if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
+      const targetStatus = requestedStatus ?? currentOrder.orderStatus;
+      if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (!(body.carrier || currentOrder.carrier) || !(trackingCode || currentOrder.trackingCode))) {
+        return NextResponse.json({ error: { message: 'Nhập hãng vận chuyển và mã vận đơn trước khi bàn giao.' } }, { status: 400 });
+      }
+      const updatesRecipient = body.phone !== undefined || body.address !== undefined;
+      if (updatesRecipient && !['PENDING', 'PROCESSING'].includes(currentOrder.orderStatus)) {
+        return NextResponse.json({ error: { message: 'Chỉ được sửa số điện thoại và địa chỉ khi đơn đang chờ xử lý hoặc đóng gói.' } }, { status: 409 });
+      }
+      const manualPayment = body.paymentStatus === 'PAID' && currentOrder.paymentStatus !== 'PAID' && currentOrder.paymentMethod === 'VIETQR';
+      if (manualPayment && !paymentReason) {
+        return NextResponse.json({ error: { message: 'Cần nhập lý do để xác nhận thanh toán VietQR thủ công.' } }, { status: 400 });
+      }
+      if (['CANCELLED', 'RETURNED'].includes(currentOrder.orderStatus) && targetStatus !== currentOrder.orderStatus) {
+        return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc chuyển hoàn là trạng thái cuối, không thể tiếp tục xử lý.' } }, { status: 409 });
+      }
+      if (currentOrder.orderStatus === 'SHIPPING' && !['DELIVERED', 'RETURNED'].includes(targetStatus)) {
+        return NextResponse.json({ error: { message: 'Đơn đang giao chỉ có thể cập nhật thành đã giao hoặc chuyển hoàn.' } }, { status: 409 });
+      }
+      if (['DELIVERED', 'COMPLETED'].includes(targetStatus) && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID') {
+        return NextResponse.json({ error: { message: 'Chưa xác nhận thanh toán VietQR. Hãy cập nhật thanh toán thành Đã thanh toán trước khi hoàn tất đơn.' } }, { status: 409 });
+      }
+      const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
+      const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
+      const order = targetStatus === 'RETURNED'
+        ? await prisma.$transaction(async (transaction) => {
+          if (currentOrder.orderStatus !== 'RETURNED') {
+            for (const item of currentOrder.items) {
+              await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+              if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
+              if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
             }
           }
-        }
-
-        const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
-        const paymentStatus = isDelivered
-          ? (currentOrder.paymentMethod === 'COD' || currentOrder.paymentStatus === 'PAID' || explicitlyPaid ? 'PAID' : currentOrder.paymentStatus)
-          : body.paymentStatus === 'PAID' || body.paymentStatus === 'PENDING'
-            ? body.paymentStatus
-            : currentOrder.paymentStatus;
-        const order = await transaction.order.update({
+          return transaction.order.update({
+            where: { orderCode },
+            data: { orderStatus: targetStatus, carrier: null, trackingCode: null, deliveredAt: null },
+          });
+        })
+        : await prisma.order.update({
           where: { orderCode },
           data: {
             orderStatus: targetStatus,
-            paymentStatus,
-            carrier: body.carrier ? body.carrier as (typeof carriers)[number] : null,
-            trackingCode: trackingCode || null,
+            ...(isDelivered ? { paymentStatus: 'PAID' as const } : body.paymentStatus ? { paymentStatus: body.paymentStatus as 'PENDING' | 'PAID' } : {}),
+            ...(body.phone !== undefined ? { phone: normalizedPhone } : {}),
+            ...(body.address !== undefined ? { address } : {}),
+            ...(manualPayment ? { note: [currentOrder.note?.trim(), `[Thanh toán thủ công bởi ${getRequestSession(request)?.email ?? 'unknown-admin'}]: ${paymentReason}`].filter(Boolean).join('\n') } : {}),
+            carrier: body.carrier ? body.carrier as (typeof carriers)[number] : requestedStatus ? null : currentOrder.carrier,
+            trackingCode: trackingCode || (body.trackingCode !== undefined ? null : requestedStatus ? null : currentOrder.trackingCode),
             deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
           },
         });
-        return { order, currentOrder };
-      }, { isolationLevel: 'Serializable' });
-      if ('error' in result && result.error) return NextResponse.json({ error: { message: result.error.message } }, { status: result.error.status });
-      const { order, currentOrder } = result;
+      const statusChanged = targetStatus !== currentOrder.orderStatus;
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
-        action: targetStatus === 'CANCELLED' ? 'CANCEL_ORDER' : 'UPDATE_ORDER_STATUS',
+        action: statusChanged ? targetStatus === 'CANCELLED' ? 'CANCEL_ORDER' : targetStatus === 'RETURNED' ? 'RETURN_ORDER' : 'UPDATE_ORDER_STATUS' : manualPayment ? 'MANUAL_CONFIRM_PAYMENT' : updatesRecipient ? 'UPDATE_ORDER_RECIPIENT' : 'UPDATE_ORDER',
         targetEntity: 'Order',
         targetId: order.orderCode,
-        oldValue: currentOrder,
-        newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, carrier: order.carrier, trackingCode: order.trackingCode },
+        oldValue: { orderStatus: currentOrder.orderStatus, paymentStatus: currentOrder.paymentStatus, phone: currentOrder.phone, address: currentOrder.address, carrier: currentOrder.carrier, trackingCode: currentOrder.trackingCode, note: currentOrder.note },
+        newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode, note: order.note, paymentReason: manualPayment ? paymentReason : undefined },
       });
-      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, carrier: order.carrier, trackingCode: order.trackingCode });
+      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode });
     });
   } catch (error) {
-    if (error instanceof Error && (error as Error & { code?: string }).code === 'P2034') {
-      return NextResponse.json({ error: { message: 'Đơn hàng vừa được cập nhật đồng thời. Vui lòng tải lại trạng thái mới nhất.' } }, { status: 409 });
-    }
     console.error('Admin order update failed:', error);
     return NextResponse.json({ error: { message: 'Không thể cập nhật đơn hàng.' } }, { status: 500 });
   }

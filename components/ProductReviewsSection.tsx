@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Star } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
@@ -16,12 +17,14 @@ type Review = {
 
 export default function ProductReviewsSection({
   productId,
+  productName,
   initialRating,
   initialReviews,
   initialReviewCount,
   initialRatingCounts,
 }: {
   productId: string;
+  productName: string;
   initialRating: number;
   initialReviews: Review[];
   initialReviewCount: number;
@@ -38,7 +41,18 @@ export default function ProductReviewsSection({
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [message, setMessage] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const reviewPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('review') !== '1') return;
+    setFormOpen(true);
+    window.setTimeout(() => document.getElementById('review-form-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }, []);
+
+  useEffect(() => {
+    if (reviewPanelRef.current) reviewPanelRef.current.inert = !formOpen;
+  }, [formOpen]);
 
   const averageRating = useMemo(() => {
     const count = ratingCounts.reduce((sum, value) => sum + value, 0);
@@ -49,7 +63,7 @@ export default function ProductReviewsSection({
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage('');
-    setSubmitting(true);
+    setIsSubmitting(true);
 
     try {
       const response = await fetch('/api/reviews', {
@@ -88,12 +102,12 @@ export default function ProductReviewsSection({
     } catch {
       setMessage('Không thể kết nối. Vui lòng thử lại.');
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
   const visibleRatingCount = ratingCounts.reduce((sum, value) => sum + value, 0);
-  const ratingLabels: Record<number, string> = { 1: 'Không hài lòng', 2: 'Chưa tốt', 3: 'Tạm được', 4: 'Hài lòng', 5: 'Tuyệt vời' };
+  const ratingLabels: Record<number, string> = { 1: 'Rất thất vọng', 2: 'Chưa hài lòng', 3: 'Bình thường / Tạm ổn', 4: 'Hài lòng', 5: 'Tuyệt vời / Rất thích' };
   return (
     <section className="page-card product-reviews" aria-labelledby="product-reviews-title">
       <header className="reviews-section-heading">
@@ -131,11 +145,11 @@ export default function ProductReviewsSection({
         </aside>
 
         <div className="review-content-column">
-          <div id="review-form-panel" className={`review-form-panel${formOpen ? ' is-open' : ''}`} aria-hidden={!formOpen} {...(!formOpen ? { inert: '' } : {})}>
+          <div ref={reviewPanelRef} id="review-form-panel" className={`review-form-panel${formOpen ? ' is-open' : ''}`} aria-hidden={!formOpen}>
             <form className="review-form" onSubmit={submit}>
               <div className="review-form-heading">
-                <div><p className="eyebrow">Chia sẻ trải nghiệm</p><h3>Viết đánh giá</h3></div>
-                <span className="review-rating-label">{ratingLabels[hoverRating || rating]}</span>
+                <div><p className="eyebrow">Chia sẻ trải nghiệm</p><h3>Đánh giá sản phẩm</h3></div>
+                <span className="review-product-badge">{productName}</span>
               </div>
               <div className="review-form-short-fields">
                 <div className="field">
@@ -152,7 +166,7 @@ export default function ProductReviewsSection({
                 <input id="review-order-code" value={orderCode} onChange={(event) => setOrderCode(event.target.value)} placeholder="MKF-123456 · Tra cứu trên phiếu xác nhận đơn" required />
               </div>
               <div className="review-rating-control">
-                <span>Đánh giá của bạn</span>
+                <div className="review-rating-prompt"><span>Đánh giá của bạn</span><small>{ratingLabels[hoverRating || rating]}</small></div>
                 <div className="review-stars-picker" role="group" aria-label="Chọn số sao đánh giá" onMouseLeave={() => setHoverRating(0)}>
                   {[1, 2, 3, 4, 5].map((value) => (
                     <button
@@ -165,18 +179,18 @@ export default function ProductReviewsSection({
                       onBlur={() => setHoverRating(0)}
                       aria-label={`${value} sao`}
                       aria-pressed={rating === value}
-                    >★</button>
+                    ><Star size={34} strokeWidth={1.8} aria-hidden="true" /></button>
                   ))}
                 </div>
               </div>
               <div className="field review-comment-field">
-                <label htmlFor="review-comment">Nội dung nhận xét</label>
-                <textarea id="review-comment" rows={4} value={comment} onChange={(event) => setComment(event.target.value)} minLength={10} maxLength={1000} required />
-                <small>{comment.length} / 1000 ký tự · Tối thiểu 10 ký tự</small>
+                <label htmlFor="review-comment">Bình luận</label>
+                <textarea id="review-comment" rows={4} value={comment} onChange={(event) => setComment(event.target.value)} minLength={10} maxLength={500} required placeholder="Hãy chia sẻ cảm nhận thực tế về hương vị, độ dai ngon và chất lượng đóng gói sản phẩm để giúp các khách hàng khác nhé..." />
+                <small>{comment.length}/500 ký tự · Tối thiểu 10 ký tự</small>
               </div>
-              <button className="review-submit-button" type="submit" disabled={submitting || comment.trim().length < 10}>
-                {submitting && <span className="review-submit-spinner" aria-hidden="true" />}
-                {submitting ? 'Đang gửi đánh giá...' : 'Gửi đánh giá'}
+              <button className="review-submit-button" type="submit" disabled={isSubmitting || comment.trim().length < 10}>
+                {isSubmitting && <span className="review-submit-spinner" aria-hidden="true" />}
+                {isSubmitting ? 'Đang gửi đánh giá...' : 'Gửi đánh giá'}
               </button>
               {message && <p className="review-submit-message" role="status">{message}</p>}
             </form>

@@ -49,7 +49,7 @@ describe('/api/returns', () => {
     returnCreate.mockReset().mockResolvedValue({ id: 'return-1', status: 'PENDING' });
     returnFindMany.mockReset().mockResolvedValue([]);
     returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
-    returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'REFUNDED' });
+    returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'COMPLETED' });
     compensationVoucherCreate.mockReset().mockResolvedValue({ id: 'voucher-1', code: 'MKF50-ABCDEF12' });
     requireAdmin.mockReset().mockResolvedValue(null);
   });
@@ -169,14 +169,22 @@ describe('/api/returns', () => {
 
   it('updates a request status and admin note for an admin', async () => {
     returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
-    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' }));
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' }));
 
     expect(response.status).toBe(200);
     expect(returnUpdate).toHaveBeenCalledWith({
       where: { id: 'return-1' },
-      data: { status: 'REFUNDED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123' },
+      data: { status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123', refundCompletedBy: 'unknown-admin' },
       include: { order: { select: { orderCode: true, customerName: true } }, compensationVoucher: true },
     });
+  });
+
+  it('requires a transfer reference before confirming a refund', async () => {
+    returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'COMPLETED', adminNote: '' }));
+
+    expect(response.status).toBe(400);
+    expect(returnUpdate).not.toHaveBeenCalled();
   });
 
   it('does not allow a pending request to skip approval and become refunded', async () => {

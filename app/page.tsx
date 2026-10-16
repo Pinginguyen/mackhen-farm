@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight, ShieldCheck, Sparkles, Truck } from 'lucide-react';
 
+import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
@@ -22,12 +22,15 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       {searchParams.error === 'forbidden' && <p className="role-notice" role="alert">Bạn không có quyền truy cập khu vực quản trị.</p>}
 
       <section className="hero">
+        <div className="hero3d-layer" aria-hidden="true">
+          <Hero3DCanvasLoader />
+        </div>
         <div className="hero-copy">
           <div className="hero-badges">
             <span className="pill">Upcycled Food · Hương vị Tây Bắc</span>
             <Link href="/products" className="hero-proof-badge"><Sparkles size={16} />Gia vị Tây Bắc</Link>
           </div>
-          <h1>Khô bò thực vật High-Protein, đậm vị Tây Bắc</h1>
+          <h1><span className="hero-title-main">Khô bò thực vật</span><span className="hero-title-accent">High-Protein, đậm vị Tây Bắc</span></h1>
           <p>
             Tái chế bã đậu nành thành món ăn giàu đạm, đậm vị mắc khén và hạt dổi, để nguyên liệu được sử dụng trọn vẹn hơn.
           </p>
@@ -54,20 +57,16 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
         <div className="hero-media">
           <div className="photo-card">
-            <Image
+            <img
               src="/products/xe-soi.jpg"
               alt="Món ăn vặt khô và gia vị Tây Bắc"
-              width={920}
-              height={760}
-              sizes="(max-width: 768px) 100vw, 50vw"
-              priority
             />
           </div>
         </div>
       </section>
 
       <section className="comparison-section">
-        <div className="section-heading home-section-heading"><div><p className="eyebrow">So sánh lựa chọn</p><h2>Đậm vị thực vật, nhẹ gánh chi phí</h2></div></div>
+        <div className="section-heading home-section-heading"><div><p className="eyebrow">So sánh lựa chọn</p><h2>Đậm vị thực vật, chi phí tối ưu</h2></div></div>
         <div className="table-card comparison-table">
           <table>
             <thead>

@@ -25,7 +25,7 @@ export default function HomeTransparencyTabs() {
     <section className="home-transparency-section" aria-labelledby="home-transparency-title">
       <div className="home-transparency-heading">
         <p className="eyebrow">Quy trình & tiêu chuẩn</p>
-        <h2 id="home-transparency-title">MINH BẠCH TỪ XƯỞNG ĐẾN TAY BẠN</h2>
+        <h2 id="home-transparency-title">Minh bạch từ khâu sản xuất đến tay người tiêu dùng</h2>
       </div>
       <div className="home-transparency-tabs" role="tablist" aria-label="Quy trình sản xuất và đóng gói">
         <button type="button" role="tab" aria-selected={activeTab === 'production'} className={activeTab === 'production' ? 'is-active' : ''} onClick={() => setActiveTab('production')}>

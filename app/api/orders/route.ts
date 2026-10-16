@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
-import { calculateVoucherDiscount, getVoucherValidationError, VOUCHER_CODES } from '@/lib/vouchers';
+import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
 
 type CheckoutItemSnapshot = {
@@ -80,8 +80,9 @@ function sameCartContents(
   });
 }
 
-function buildPaymentRedirect(method: 'COD' | 'VIETQR', orderCode: string, amount: number): string {
+function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number): string {
   if (method === 'COD') return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
+  if (method === 'MOMO') return `/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`;
   return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
 }
 
@@ -117,16 +118,16 @@ export async function POST(request: Request) {
   }
   const submittedVoucherCode = body.voucherCode ?? body.discountCode;
   const voucherCode = typeof submittedVoucherCode === 'string' ? submittedVoucherCode.trim().toUpperCase() : '';
-  const isStaticVoucher = (VOUCHER_CODES as readonly string[]).includes(voucherCode);
   const isCompensationVoucher = /^MKF50-[A-F0-9]{8}$/.test(voucherCode);
-  if (voucherCode && !isStaticVoucher && !isCompensationVoucher) {
+  const isManagedVoucher = Boolean(voucherCode) && !isCompensationVoucher;
+  if (voucherCode && !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(voucherCode) && !isCompensationVoucher) {
     return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không tồn tại hoặc đã hết hạn.' } }, { status: 400 });
   }
   const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
-  if (isStaticVoucher && !session) {
+  if (isManagedVoucher && !session) {
     return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
   }
 
@@ -146,7 +147,7 @@ export async function POST(request: Request) {
           total: existingOrder.totalAmount,
           totalAmount: existingOrder.totalAmount,
           duplicate: true,
-          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount, body.buyNow === true),
+          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
         }, { status: 200 });
         if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
         return response;
@@ -176,10 +177,12 @@ export async function POST(request: Request) {
         }));
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
         const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug));
-        const voucherValidationError = getVoucherValidationError(voucherCode, subtotal);
-        if (isStaticVoucher && voucherValidationError) return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
+        const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({ where: { code: voucherCode } }) : null;
+        if (isManagedVoucher && !managedVoucher) return { rejected: 'INVALID_VOUCHER' as const };
+        const voucherValidationError = managedVoucher ? getManagedVoucherValidationError(managedVoucher, subtotal) : null;
+        if (managedVoucher && voucherValidationError) return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
 
-        if (isStaticVoucher && session) {
+        if (managedVoucher?.firstOrderOnly && session) {
           const priorOrders = await transaction.order.count({ where: { userId: session.userId, orderStatus: { not: 'CANCELLED' } } });
           if (priorOrders > 0) return { rejected: 'VOUCHER_FIRST_ORDER_ONLY' as const };
           const phoneUsed = await transaction.order.findFirst({
@@ -189,11 +192,11 @@ export async function POST(request: Request) {
           if (phoneUsed) return { rejected: 'VOUCHER_PHONE_USED' as const };
         }
 
-        const staticDiscount = calculateVoucherDiscount(voucherCode, subtotal, shipping);
         let compensationVoucherId: string | null = null;
-        let discount = staticDiscount ?? 0;
-        if (staticDiscount === null) {
-          if (!isCompensationVoucher) return { rejected: 'INVALID_VOUCHER' as const };
+        let discount = 0;
+        if (managedVoucher) {
+          discount = calculateManagedVoucherDiscount(managedVoucher, subtotal, shipping) ?? 0;
+        } else if (isCompensationVoucher) {
           const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
           if (!voucher || voucher.customerPhone !== phone || voucher.redeemedAt || voucher.expiresAt <= new Date()) {
             return { rejected: 'INVALID_VOUCHER' as const };
@@ -233,6 +236,20 @@ export async function POST(request: Request) {
             data: { redeemedAt: new Date() },
           });
           if (!claimedVoucher.count) return { rejected: 'INVALID_VOUCHER' as const };
+        }
+        if (managedVoucher) {
+          const now = new Date();
+          const claimedVoucher = await transaction.voucher.updateMany({
+            where: { id: managedVoucher.id, isActive: true, ...(managedVoucher.expiresAt ? { expiresAt: { gt: now } } : {}), ...(managedVoucher.usageLimit != null ? { usedCount: { lt: managedVoucher.usageLimit } } : {}) },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (!claimedVoucher.count) return { rejected: 'INVALID_VOUCHER' as const };
+          if (managedVoucher.usageLimit != null) {
+            const updatedVoucher = await transaction.voucher.findUnique({ where: { id: managedVoucher.id }, select: { usedCount: true, usageLimit: true } });
+            if (updatedVoucher?.usageLimit != null && updatedVoucher.usedCount >= updatedVoucher.usageLimit) {
+              await transaction.voucher.updateMany({ where: { id: managedVoucher.id, isActive: true }, data: { isActive: false } });
+            }
+          }
         }
 
         const reservedLotCodes = new Map<string, string>();
@@ -287,6 +304,7 @@ export async function POST(request: Request) {
             subtotal,
             shippingFee: shipping,
             discountAmount: discount,
+            voucherCode: voucherCode || null,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
             grossAmount: subtotal,
@@ -319,7 +337,7 @@ export async function POST(request: Request) {
             total: existingOrder.totalAmount,
             totalAmount: existingOrder.totalAmount,
             duplicate: true,
-            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount, body.buyNow === true),
+            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
           }, { status: 200 });
           if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
           return response;

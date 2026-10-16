@@ -11,7 +11,7 @@ const { orderFindMany, orderFindUnique, orderUpdate, productUpdate, variantUpdat
     productVariant: { update: mocks.variantUpdate },
     productionLot: { updateMany: mocks.lotUpdateMany },
   };
-  const db = { order: { findMany: mocks.orderFindMany }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
+  const db = { order: { findMany: mocks.orderFindMany, findUnique: mocks.orderFindUnique, update: mocks.orderUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
   return { ...mocks, transaction: tx, prisma: db };
 });
 
@@ -80,7 +80,7 @@ describe('/api/admin/orders', () => {
     });
   });
 
-  it('allows handing an order to 3PL without a tracking code', async () => {
+  it('generates an SPX tracking code when handing an order to 3PL without one', async () => {
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -89,7 +89,7 @@ describe('/api/admin/orders', () => {
 
     expect(response.status).toBe(200);
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ orderStatus: 'HANDED_OFF', carrier: 'SPX', trackingCode: null }),
+      data: expect.objectContaining({ orderStatus: 'HANDED_OFF', carrier: 'SPX', trackingCode: expect.stringMatching(/^SPX\d{11}$/) }),
     }));
   });
 
@@ -111,7 +111,7 @@ describe('/api/admin/orders', () => {
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING', paymentStatus: 'PAID' }),
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING', paymentStatus: 'PAID', paymentReason: 'Đối soát sao kê khớp' }),
     }));
 
     expect(response.status).toBe(200);
@@ -133,6 +133,28 @@ describe('/api/admin/orders', () => {
 
   it('does not allow a cancelled order to move back into delivery', async () => {
     orderFindUnique.mockResolvedValueOnce({ orderStatus: 'CANCELLED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'SHIPPING', carrier: 'SPX', trackingCode: 'SPX12345' }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['PENDING', 'CANCELLED', 'PROCESSING'])('blocks a shipping order from moving to %s', async (status) => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not allow a returned order to resume shipping', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'RETURNED', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderCode: 'MKF-100001', status: 'SHIPPING', carrier: 'SPX', trackingCode: 'SPX12345' }),

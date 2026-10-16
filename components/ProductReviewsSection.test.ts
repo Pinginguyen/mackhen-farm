@@ -6,6 +6,7 @@ import ProductReviewsSection from './ProductReviewsSection';
 
 const props = {
   productId: 'product-1',
+  productName: 'Khô bò thực vật TEST2',
   initialRating: 5,
   initialReviewCount: 1,
   initialRatingCounts: [0, 0, 0, 0, 1],
@@ -24,5 +25,9 @@ describe('ProductReviewsSection', () => {
     expect(html).toContain('Đã mua hàng tại Mắc Khén Farm');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('Viết đánh giá của bạn');
+    expect(html).toContain('Đánh giá sản phẩm');
+    expect(html).toContain('Khô bò thực vật TEST2');
+    expect(html).toContain('maxLength="500"');
+    expect(html).toContain('Tuyệt vời / Rất thích');
   });
 });

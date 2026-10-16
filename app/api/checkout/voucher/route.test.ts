@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderCount, orderFindFirst, cartFindUnique } = vi.hoisted(() => ({
-  orderCount: vi.fn(),
-  orderFindFirst: vi.fn(),
-  cartFindUnique: vi.fn(),
-}));
+const { orderCount, orderFindFirst, cartFindUnique, voucherFindUnique } = vi.hoisted(() => {
+  const orderCount = vi.fn();
+  const orderFindFirst = vi.fn();
+  const cartFindUnique = vi.fn();
+  const voucherFindUnique = vi.fn();
+  return { orderCount, orderFindFirst, cartFindUnique, voucherFindUnique };
+});
 
-vi.mock('@/lib/prisma', () => ({ prisma: { order: { count: orderCount, findFirst: orderFindFirst }, cart: { findUnique: cartFindUnique } } }));
+vi.mock('@/lib/prisma', () => ({ prisma: {
+  order: { count: orderCount, findFirst: orderFindFirst },
+  cart: { findUnique: cartFindUnique },
+  voucher: { findUnique: voucherFindUnique },
+  compensationVoucher: { findUnique: vi.fn() },
+} }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 
 import { SESSION_COOKIE, createSessionToken } from '@/lib/auth';
@@ -31,6 +38,11 @@ describe('POST /api/checkout/voucher', () => {
     vi.unstubAllEnvs();
     orderCount.mockReset().mockResolvedValue(0);
     orderFindFirst.mockReset().mockResolvedValue(null);
+    voucherFindUnique.mockReset().mockImplementation(({ where: { code } }: { where: { code: string } }) => Promise.resolve(code === 'GIAM10'
+      ? { code, discountType: 'PERCENTAGE', value: 10, maxDiscount: 30000, minSpend: 150000, expiresAt: null, isActive: true, freeShipping: false, firstOrderOnly: true }
+      : code === 'FREESHIP'
+        ? { code, discountType: 'FIXED', value: 35000, maxDiscount: null, minSpend: 250000, expiresAt: null, isActive: true, freeShipping: true, firstOrderOnly: false }
+        : null));
     cartFindUnique.mockReset().mockResolvedValue({ items: [{ quantity: 1, product: { price: 169000, slug: 'hat-doi-rung-nep-thuong-hang' }, variant: null }] });
   });
 

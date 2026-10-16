@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
     userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
+    voucherFindUnique: vi.fn(), voucherUpdateMany: vi.fn(),
   };
   const tx = {
     cart: { findUnique: mocks.cartFindUnique },
@@ -17,6 +18,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate },
     productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
+    voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
   };
   return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
@@ -50,6 +52,12 @@ describe('POST /api/orders checkout', () => {
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
     compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    voucherFindUnique.mockReset().mockImplementation(({ where: { code } }: { where: { code: string } }) => Promise.resolve(code === 'GIAM10'
+      ? { id: 'voucher-giam10', code, discountType: 'PERCENTAGE', value: 10, maxDiscount: 30000, minSpend: 150000, expiresAt: null, isActive: true, freeShipping: false, firstOrderOnly: true }
+      : code === 'FREESHIP'
+        ? { id: 'voucher-freeship', code, discountType: 'FIXED', value: 35000, maxDiscount: null, minSpend: 250000, expiresAt: null, isActive: true, freeShipping: true, firstOrderOnly: false }
+        : null));
+    voucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
     orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
@@ -107,6 +115,38 @@ describe('POST /api/orders checkout', () => {
       data: expect.objectContaining({ subtotal: 169000, discountAmount: 16900, totalAmount: 152100 }),
     }));
     expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member', orderStatus: { not: 'CANCELLED' } } });
+  });
+
+  it('applies and records an admin-created fixed-amount voucher', async () => {
+    voucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-ban-moi', code: 'BANMOI', discountType: 'FIXED', value: 25000,
+      maxDiscount: null, minSpend: 100000, expiresAt: null, isActive: true,
+      freeShipping: false, firstOrderOnly: false,
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'BANMOI' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ voucherCode: 'BANMOI', discountAmount: 25000, totalAmount: 144000 }) }));
+    expect(voucherUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'voucher-ban-moi', isActive: true }), data: { usedCount: { increment: 1 } } }));
+  });
+
+  it('deactivates a voucher immediately after its final allowed use', async () => {
+    voucherFindUnique
+      .mockResolvedValueOnce({ id: 'voucher-limited', code: 'LIMITED', discountType: 'FIXED', value: 10000, maxDiscount: null, minSpend: 0, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), isActive: true, usedCount: 0, usageLimit: 1, freeShipping: false, firstOrderOnly: false })
+      .mockResolvedValueOnce({ usedCount: 1, usageLimit: 1 });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'LIMITED' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(voucherUpdateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ usedCount: { lt: 1 } }), data: { usedCount: { increment: 1 } } }));
+    expect(voucherUpdateMany).toHaveBeenNthCalledWith(2, { where: { id: 'voucher-limited', isActive: true }, data: { isActive: false } });
   });
 
   it('rejects promotional vouchers for guests before opening a transaction', async () => {

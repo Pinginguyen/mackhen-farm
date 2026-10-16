@@ -39,4 +39,15 @@ describe('GET /api/account/orders', () => {
       take: 50,
     }));
   });
+
+  it('includes product slugs so delivered purchases can link directly to reviews', async () => {
+    orderFindMany.mockResolvedValueOnce([{
+      orderCode: 'MKF-123456',
+      items: [{ productName: 'Hạt dổi', quantity: 1, price: 100000, product: { slug: 'hat-doi-rung' } }],
+    }]);
+
+    const response = await GET(new Request('https://mackhen.example/api/account/orders'));
+
+    expect(await response.json()).toMatchObject({ items: [{ items: [{ productSlug: 'hat-doi-rung' }] }] });
+  });
 });

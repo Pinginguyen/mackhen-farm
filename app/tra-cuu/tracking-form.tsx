@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Box, Check, House, PackageCheck, Printer, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
-import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import WarrantyRequest from './warranty-request';
 
 type TrackedItem = { productId: string; productName: string; quantity: number; price: number };
@@ -112,7 +111,7 @@ function ReviewAfterDelivery({ order, productId }: { order: TrackedOrder; produc
     }
   }
 
-  return <form className="tracking-review" onSubmit={submit}><h4>Đánh giá {productName}</h4><div className="field"><label>Số điện thoại đặt hàng<ValidatedPhoneInput name="phone" required /></label></div><div className="field"><label>Số sao<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} sao</option>)}</select></label></div><div className="field"><label>Bình luận<input name="comment" minLength={3} maxLength={1000} required /></label></div><button className="secondary-action" type="submit">Gửi đánh giá</button>{message && <p role="status">{message}</p>}</form>;
+  return <form className="tracking-review" onSubmit={submit}><h4>Đánh giá {productName}</h4><div className="field"><label>Số điện thoại đặt hàng<input name="phone" type="tel" required /></label></div><div className="field"><label>Số sao<select name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} sao</option>)}</select></label></div><div className="field"><label>Bình luận<input name="comment" minLength={3} maxLength={1000} required /></label></div><button className="secondary-action" type="submit">Gửi đánh giá</button>{message && <p role="status">{message}</p>}</form>;
 }
 
 export default function TrackingForm() {
@@ -254,7 +253,7 @@ export default function TrackingForm() {
         <span>hoặc</span>
         <div className="field">
           <label htmlFor="tracking-phone">Số điện thoại</label>
-          <ValidatedPhoneInput id="tracking-phone" name="phone" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
+          <input id="tracking-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
         </div>
         <button className="primary-action" disabled={loading}>{loading ? 'Đang tra cứu...' : 'Tra cứu đơn hàng'}</button>
       </form>

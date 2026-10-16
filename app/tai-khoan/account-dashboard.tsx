@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/store-data';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
 type Profile = { name: string; email: string; phone: string | null; address: string | null };
-type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; quantity: number; price: number }[]; localFallback?: boolean };
+type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; productSlug: string; quantity: number; price: number }[]; localFallback?: boolean };
 
 const statusLabels: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Chờ xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao', SHIPPING: 'Đang giao', DELIVERED: 'Đã giao', COMPLETED: 'Đã giao', CANCELLED: 'Đã hủy' };
 
@@ -110,7 +110,12 @@ export default function AccountDashboard({ profile, orders, initialTab }: { prof
                     <td>{order.items.length ? order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') : order.localFallback ? 'Đang đồng bộ sản phẩm' : 'Không có sản phẩm'}</td>
                     <td>{order.totalAmount > 0 ? formatCurrency(order.totalAmount) : 'Đang đồng bộ'}</td>
                     <td>{order.localFallback ? 'Đang đồng bộ đơn hàng' : statusLabels[order.orderStatus] ?? order.orderStatus}</td>
-                    <td><Link href={`/tra-cuu?orderCode=${encodeURIComponent(order.orderCode)}`}>Xem chi tiết / Tra cứu</Link></td>
+                    <td>
+                      <Link href={`/tra-cuu?orderCode=${encodeURIComponent(order.orderCode)}`}>Xem chi tiết / Tra cứu</Link>
+                      {!order.localFallback && ['DELIVERED', 'COMPLETED'].includes(order.orderStatus) && order.items[0] && (
+                        <Link className="account-review-link" href={`/products/${encodeURIComponent(order.items[0].productSlug)}?review=1#product-reviews-title`}>Đánh giá</Link>
+                      )}
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>

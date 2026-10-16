@@ -1,8 +1,8 @@
-import { readCartSnapshot } from '@/lib/cart-server';
+import { fetchApiWithFallback } from '@/lib/server-api';
 import CartContent from './cart-content';
 
 export default async function CartPage() {
-  const cart = await readCartSnapshot();
+  const { data: cart } = await fetchApiWithFallback('/api/cart', { items: [] as { id: string; productId: string; productSlug: string; name: string; image: string; quantity: number; unitPrice: number; total: number; stock: number; variantId: string | null; variantLabel: string | null; variants: { id: string; label: string; price: number; weight: string; stock: number }[] }[], subtotal: 0, shipping: 0, total: 0 });
   return (
     <main className="page-shell">
       <section className="page-card">

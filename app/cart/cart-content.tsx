@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 
 import { formatCurrency } from '@/lib/store-data';
@@ -33,7 +32,7 @@ function CartItemRow({
 }) {
   const [saving, setSaving] = useState(false);
   const selectedVariant = item.variants.find((variant) => variant.id === item.variantId);
-  const maxQuantity = Math.min(selectedVariant?.stock ?? item.stock, 20);
+  const maxQuantity = selectedVariant?.stock ?? item.stock;
   const unitPrice = selectedVariant?.price ?? item.unitPrice;
 
   async function update(quantity: number, variantId = item.variantId) {
@@ -50,7 +49,7 @@ function CartItemRow({
 
   return (
     <div className="table-row cart-item">
-      <Image src={item.image} alt={item.name} width={96} height={96} sizes="96px" unoptimized={item.image.startsWith('data:') || /^https?:\/\//i.test(item.image)} />
+      <img src={item.image} alt={item.name} />
       <div className="cart-item-info">
         <strong>{item.name}</strong>
         {item.variantLabel && <div>{item.variantLabel}</div>}
@@ -75,7 +74,7 @@ function CartItemRow({
         <div className="field">
           <span id={`cart-quantity-label-${item.id}`}>Số lượng</span>
           <div className="quantity-stepper" role="group" aria-labelledby={`cart-quantity-label-${item.id}`}>
-            <button type="button" aria-label={`Giảm số lượng ${item.name}`} disabled={saving} onClick={() => void update(item.quantity - 1)}><Minus size={16} /></button>
+            <button type="button" aria-label={`Giảm số lượng ${item.name}`} disabled={saving || item.quantity <= 1} onClick={() => { if (item.quantity > 1) void update(item.quantity - 1); }}><Minus size={16} /></button>
             <input aria-label={`Số lượng ${item.name}`} type="number" min={1} max={maxQuantity} value={item.quantity} disabled={saving} readOnly />
             <button type="button" aria-label={`Tăng số lượng ${item.name}`} disabled={saving || item.quantity >= maxQuantity} onClick={() => void update(Math.min(maxQuantity, item.quantity + 1))}><Plus size={16} /></button>
           </div>

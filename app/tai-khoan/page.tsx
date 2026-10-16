@@ -22,10 +22,10 @@ export default async function CustomerAccountPage({ searchParams }: { searchPara
           { customer: { is: { email: user.email } } },
         ],
       },
-      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true } } },
+      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true, product: { select: { slug: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
 
-  return <main className="page-shell"><AccountDashboard profile={user} orders={orders.map((order) => ({ ...order, createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
+  return <main className="page-shell"><AccountDashboard profile={user} orders={orders.map((order) => ({ ...order, items: order.items.map(({ product, ...item }) => ({ ...item, productSlug: product.slug })), createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
 }

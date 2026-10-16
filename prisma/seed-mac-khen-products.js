@@ -16,7 +16,6 @@ const products = [
     image: '/products/xe-soi.jpg',
     description: 'Vị cay tê Tây Bắc từ hạt dổi mắc khén, giàu 22g protein thực vật, không cholesterol.',
     highlight: 'Cay nồng',
-    highlights: ['22.5g protein thực vật / 100g', 'Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén', 'Sợi dai, cay nồng kiểu Tây Bắc'],
     category: 'Khô chay Tây Bắc',
   },
   {
@@ -31,7 +30,6 @@ const products = [
     image: '/products/mieng-deo.jpg',
     description: 'Bản miếng to dẻo mềm ngấm mật mía và tiêu rừng thơm nồng, ăn vặt ít calo.',
     highlight: 'Tiêu rừng',
-    highlights: ['21g protein thực vật / 100g', 'Miếng dẻo mềm, thấm vị mật mía', 'Hương tiêu rừng Tây Bắc'],
     category: 'Khô chay Tây Bắc',
   },
   {
@@ -46,7 +44,6 @@ const products = [
     image: '/products/chay-toi.jpg',
     description: 'Kết hợp tép tỏi cô đơn phi giòn rụm cùng thớ khô thực vật cay tê, món mồi nhắm lai rai hoàn hảo.',
     highlight: 'Tỏi giòn',
-    highlights: ['23.8g protein thực vật / 100g', 'Tỏi phi giòn thơm kết hợp mắc khén', 'Vị giòn cay đậm đà'],
     category: 'Khô chay Tây Bắc',
   },
   {
@@ -61,7 +58,6 @@ const products = [
     image: '/products/combo.jpg',
     description: 'Trọn bộ 3 vị đặc trưng. Miễn phí vận chuyển toàn quốc và tặng kèm gói dùng thử mini.',
     highlight: 'Combo quà',
-    highlights: ['98g protein thực vật / hộp', 'Đủ ba hương vị khô thực vật', 'Hộp 450g thích hợp làm quà'],
     category: 'Combo quà',
   },
 ];
@@ -94,8 +90,6 @@ async function main() {
           description: product.description,
           image: product.image,
           highlight: product.highlight,
-          highlights: product.highlights,
-          highlights: product.highlights,
           active: true,
         },
       });

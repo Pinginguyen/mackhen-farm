@@ -17,11 +17,14 @@ export async function GET(request: Request) {
           { customer: { is: { email: session.email } } },
         ],
       },
-      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true } } },
+      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true, product: { select: { slug: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
-    return NextResponse.json({ items: orders });
+    return NextResponse.json({ items: orders.map((order) => ({
+      ...order,
+      items: order.items.map(({ product, ...item }) => ({ ...item, productSlug: product.slug })),
+    })) });
   } catch (error) {
     console.error('Account orders lookup failed:', error);
     return NextResponse.json({ error: 'Không thể tải lịch sử đơn hàng.' }, { status: 500 });

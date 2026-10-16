@@ -28,6 +28,11 @@ enum PaymentStatus {
   CANCELLED
 }
 
+enum VoucherDiscountType {
+  PERCENTAGE
+  FIXED
+}
+
 enum UserRole {
   CUSTOMER
   ADMIN
@@ -81,12 +86,12 @@ model Product {
   protein       String?
   calories      Int?
   images        String[]         @default([])
-  highlights    String[]         @default([])
   rating        Float            @default(0)
   stock         Int              @default(0)
   description   String
   image         String
   highlight     String
+  highlights    String[]         @default([])
   active        Boolean          @default(true)
   variants      ProductVariant[]
   cartItems     CartItem[]
@@ -175,6 +180,7 @@ enum ReturnRequestStatus {
   VOUCHER_ISSUED
   REFUND_APPROVED
   REFUNDED
+  COMPLETED
   REJECTED
 }
 
@@ -193,6 +199,7 @@ model Order {
   subtotal      Int
   shippingFee   Float                @map("shipping")
   discountAmount Float               @default(0)
+  voucherCode   String?
   totalAmount   Int                  @map("total")
   idempotencyKey String?              @unique
   lotCode       String?
@@ -250,8 +257,8 @@ model Review {
   riskTag      String?
   riskAnalyzedAt DateTime?
   createdAt    DateTime @default(now())
-  order        Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order        Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@unique([orderId, productId])
   @@index([productId, createdAt])
@@ -294,6 +301,7 @@ model ReturnRequest {
   refundAccountHolder String?
   refundApprovedBy String?
   refundApprovedAt DateTime?
+  refundCompletedBy String?
   refundTransferReference String?
   riskTag       String?
   riskAnalyzedAt DateTime?
@@ -361,4 +369,23 @@ model CompensationVoucher {
   returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Restrict)
 
   @@index([customerPhone, expiresAt, redeemedAt])
+}
+
+model Voucher {
+  id             String              @id @default(cuid())
+  code           String              @unique
+  discountType   VoucherDiscountType
+  value          Int
+  maxDiscount    Int?
+  minSpend       Int                 @default(0)
+  expiresAt      DateTime?
+  isActive       Boolean             @default(true)
+  usedCount      Int                 @default(0)
+  usageLimit     Int?
+  freeShipping   Boolean             @default(false)
+  firstOrderOnly Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([isActive, expiresAt])
 }

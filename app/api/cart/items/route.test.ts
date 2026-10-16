@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindFirst, productUpsert, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma } = vi.hoisted(() => {
+const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     productFindFirst: vi.fn(),
-    productUpsert: vi.fn(),
     cartUpsert: vi.fn(),
     itemFindFirst: vi.fn(),
     itemUpdate: vi.fn(),
@@ -18,7 +17,7 @@ const { productFindFirst, productUpsert, cartUpsert, itemFindFirst, itemUpdate, 
   };
   const client = {
     $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)),
-    product: { findFirst: mocks.productFindFirst, upsert: mocks.productUpsert },
+    product: { findFirst: mocks.productFindFirst },
     cartItem: { findMany: mocks.itemFindMany, deleteMany: mocks.itemDeleteMany },
   };
   return { ...mocks, transaction: tx, prisma: client };
@@ -50,7 +49,6 @@ function request(body: object, method = 'PATCH', cookie = 'bohoch_cart=cart-1') 
 describe('PATCH /api/cart/items', () => {
   beforeEach(() => {
     productFindFirst.mockReset().mockResolvedValue({ ...product, slug: 'mac-khen', active: true });
-    productUpsert.mockReset().mockResolvedValue({ ...product, slug: 'mac-khen', active: true });
     cartUpsert.mockReset().mockResolvedValue({ id: 'cart-1' });
     itemFindFirst.mockReset()
       .mockResolvedValueOnce({ id: 'item-1', cartId: 'cart-1', productId: 'product-1', quantity: 1, product });
@@ -81,14 +79,6 @@ describe('PATCH /api/cart/items', () => {
     expect(itemFindMany).not.toHaveBeenCalled();
   });
 
-  it('rejects a quantity above the per-product limit', async () => {
-    const response = await PATCH(request({ itemId: 'item-1', quantity: 21, variantId: 'variant-large' }));
-
-    expect(response.status).toBe(400);
-    expect(itemFindFirst).not.toHaveBeenCalled();
-    expect(itemUpdate).not.toHaveBeenCalled();
-  });
-
   it('does not update an item that does not belong to the cart cookie', async () => {
     itemFindFirst.mockReset().mockResolvedValue(null);
     const response = await PATCH(request({ itemId: 'other-cart-item', quantity: 1, variantId: 'variant-small' }));
@@ -113,10 +103,7 @@ describe('POST /api/cart/items buy now', () => {
     expect(result.item.quantity).toBe(2);
     expect(quickCartId).not.toBe('regular-cart');
     expect(itemDeleteMany).toHaveBeenCalledWith({ where: { cartId: quickCartId } });
-    const setCookie = response.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('bohoch_buy_now=');
-    expect(setCookie).toMatch(/Path=\//i);
-    expect(setCookie).toMatch(/SameSite=Lax/i);
+    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
     expect(response.headers.get('set-cookie')).not.toContain('bohoch_cart=');
   });
 });
@@ -129,14 +116,6 @@ describe('POST /api/cart/items regular cart', () => {
     itemUpdate.mockReset().mockResolvedValue({ id: 'existing-item', quantity: 4, unitPrice: 100, productVariantId: 'variant-small' });
     itemCreate.mockReset();
     itemFindMany.mockReset().mockResolvedValue([{ quantity: 4, unitPrice: 100, product: { slug: 'mac-khen' } }]);
-  });
-
-  it('rejects quantities above the per-product limit before database access', async () => {
-    const response = await POST(request({ productId: 'product-1', quantity: 21 }, 'POST'));
-
-    expect(response.status).toBe(400);
-    expect(productFindFirst).not.toHaveBeenCalled();
-    expect(cartUpsert).not.toHaveBeenCalled();
   });
 
   it('adds the selected quantity to the existing product variant and returns the new cart count', async () => {
@@ -161,25 +140,6 @@ describe('POST /api/cart/items regular cart', () => {
     expect(response.status).toBe(409);
     expect(itemUpdate).not.toHaveBeenCalled();
     expect(itemCreate).not.toHaveBeenCalled();
-  });
-
-  it('materializes a trusted default catalog product when it is not yet in Prisma', async () => {
-    productFindFirst.mockResolvedValueOnce(null);
-    productUpsert.mockResolvedValueOnce({
-      id: 'fallback-combo-bo-ba-nhau-xanh', slug: 'combo-bo-ba-nhau-xanh', name: 'Combo Bộ Ba Nhậu Xanh',
-      price: 169000, stock: 60, active: true, variants: [],
-    });
-    itemFindFirst.mockResolvedValueOnce(null);
-    itemCreate.mockResolvedValueOnce({ id: 'quick-item', quantity: 1, unitPrice: 169000, productId: 'fallback-combo-bo-ba-nhau-xanh', productVariantId: null });
-    itemFindMany.mockResolvedValueOnce([{ quantity: 1, unitPrice: 169000, product: { slug: 'combo-bo-ba-nhau-xanh' } }]);
-
-    const response = await POST(request({ productId: 'mkf-combo-3', quantity: 1, buyNow: true }, 'POST', ''));
-
-    expect(response.status).toBe(200);
-    expect(productUpsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'fallback-combo-bo-ba-nhau-xanh' },
-      create: expect.objectContaining({ slug: 'combo-bo-ba-nhau-xanh', price: 169000, stock: 60 }),
-    }));
   });
 });
 

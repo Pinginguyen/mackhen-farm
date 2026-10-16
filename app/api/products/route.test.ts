@@ -34,7 +34,6 @@ const validProduct = {
   description: 'Mô tả sản phẩm mới.',
   imageUrl: '/products/xe-soi.jpg',
   stock: 15,
-  highlights: ' 22g protein thực vật / 100g \n\n Đậm vị hạt dổi mắc khén ',
 };
 
 describe('/api/products', () => {
@@ -125,7 +124,7 @@ describe('/api/products', () => {
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({
       where: { id: 'product-1' },
-      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl], highlights: ['22g protein thực vật / 100g', 'Đậm vị hạt dổi mắc khén'] }),
+      data: expect.objectContaining({ price: 99000, stock: 8, image: imageUrl, images: [imageUrl] }),
       include: { variants: true },
     });
   });
@@ -149,7 +148,6 @@ describe('/api/products', () => {
         description: validProduct.description,
         image: validProduct.imageUrl,
         images: [validProduct.imageUrl],
-        highlights: ['22g protein thực vật / 100g', 'Đậm vị hạt dổi mắc khén'],
         active: true,
       }),
     });

@@ -14,7 +14,6 @@ export type DefaultProduct = {
   image: string;
   images: string[];
   highlight: string;
-  highlights: string[];
   active: boolean;
 };
 
@@ -35,7 +34,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/xe-soi.jpg',
     images: ['/products/xe-soi.jpg'],
     highlight: 'Cay nồng',
-    highlights: ['22.5g protein thực vật / 100g', 'Khử mùi ngái đậu nành, đậm vị hạt dổi và mắc khén', 'Sợi dai, cay nồng kiểu Tây Bắc'],
     active: true,
   },
   {
@@ -54,7 +52,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/mieng-deo.jpg',
     images: ['/products/mieng-deo.jpg'],
     highlight: 'Tiêu rừng',
-    highlights: ['21g protein thực vật / 100g', 'Miếng dẻo mềm, thấm vị mật mía', 'Hương tiêu rừng Tây Bắc'],
     active: true,
   },
   {
@@ -73,7 +70,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/chay-toi.jpg',
     images: ['/products/chay-toi.jpg'],
     highlight: 'Tỏi giòn',
-    highlights: ['23.8g protein thực vật / 100g', 'Tỏi phi giòn thơm kết hợp mắc khén', 'Vị giòn cay đậm đà'],
     active: true,
   },
   {
@@ -92,7 +88,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/combo.jpg',
     images: ['/products/combo.jpg'],
     highlight: 'Combo quà',
-    highlights: ['98g protein thực vật / hộp', 'Đủ ba hương vị khô thực vật', 'Hộp 450g thích hợp làm quà'],
     active: true,
   },
   {
@@ -111,7 +106,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/cham-cheo.jpg',
     images: ['/products/cham-cheo.jpg'],
     highlight: 'Điện Biên',
-    highlights: ['Công thức chẳm chéo chuẩn vị Điện Biên', 'Vị cay thơm, dùng chấm món luộc và món nướng', 'Hũ 250g tiện dùng trong bữa ăn'],
     active: true,
   },
   {
@@ -130,7 +124,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/hat-mac-khen.jpg',
     images: ['/products/hat-mac-khen.jpg'],
     highlight: 'Sơn La',
-    highlights: ['Mắc khén rừng tuyển chọn từ Sơn La', 'Rang khô dậy hương thơm đặc trưng', 'Dùng làm chẳm chéo hoặc nêm món ăn'],
     active: true,
   },
   {
@@ -149,7 +142,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/hat-doi.jpg',
     images: ['/products/hat-doi.jpg'],
     highlight: 'Thượng hạng',
-    highlights: ['Hạt dổi rừng nếp tuyển chọn', 'Hương thơm đặc trưng của núi rừng Tây Bắc', 'Hũ thủy tinh 50g'],
     active: true,
   },
   {
@@ -168,7 +160,6 @@ export const DEFAULT_PRODUCTS: DefaultProduct[] = [
     image: '/products/muoi-cham-cheo.jpg',
     images: ['/products/muoi-cham-cheo.jpg'],
     highlight: 'Hạt dổi rang',
-    highlights: ['Muối chẳm chéo phối hạt dổi rang', 'Vị mặn cay thơm, tiện chấm và nêm nếm', 'Hũ rắc hai nấc 150g'],
     active: true,
   },
 ];

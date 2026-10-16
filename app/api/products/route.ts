@@ -49,19 +49,6 @@ function numberValue(value: unknown): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-function normalizeHighlights(value: unknown): string[] | null {
-  if (value === undefined) return [];
-  const lines = typeof value === 'string'
-    ? value.split(/\r?\n/)
-    : Array.isArray(value) && value.every((line) => typeof line === 'string')
-      ? value
-      : null;
-  if (!lines) return null;
-  const highlights = lines.map((line) => line.trim()).filter(Boolean);
-  if (highlights.length > 12 || highlights.some((line) => line.length > 160)) return null;
-  return highlights;
-}
-
 function createSlug(name: string): string {
   const slug = name.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'san-pham';
@@ -116,11 +103,10 @@ export async function POST(request: Request) {
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
   const image = normalizeImage(body.imageUrl ?? body.image);
   const stock = numberValue(body.stock ?? 0);
-  const highlights = normalizeHighlights(body.highlights);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
-    || !image || stock === null || stock < 0 || stock > 1000000 || highlights === null) {
+    || !image || stock === null || stock < 0 || stock > 1000000) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
@@ -141,7 +127,6 @@ export async function POST(request: Request) {
         stock,
         description,
         image,
-        highlights,
         highlight: typeof body.highlight === 'string' && body.highlight.trim() ? body.highlight.trim().slice(0, 40) : 'Sản phẩm mới',
         active: true,
       } satisfies Prisma.ProductCreateInput,
@@ -176,11 +161,10 @@ export async function PATCH(request: Request) {
   const description = typeof body.description === 'string' ? body.description.trim() : typeof body.desc === 'string' ? body.desc.trim() : '';
   const image = normalizeImage(body.imageUrl ?? body.image);
   const stock = numberValue(body.stock ?? 0);
-  const highlights = body.highlights === undefined ? undefined : normalizeHighlights(body.highlights);
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000
-    || !image || stock === null || stock < 0 || stock > 1000000 || highlights === null) {
+    || !image || stock === null || stock < 0 || stock > 1000000) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
@@ -201,7 +185,6 @@ export async function PATCH(request: Request) {
         description,
         image,
         images: [image],
-        ...(highlights === undefined ? {} : { highlights }),
       },
       include: { variants: true },
     });

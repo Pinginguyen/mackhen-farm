@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, BarChart3, ClipboardList, LayoutDashboard, Package, RotateCcw, ScrollText, Settings, Wallet } from 'lucide-react';
+import { Activity, BarChart3, ClipboardList, LayoutDashboard, Package, RotateCcw, ScrollText, Settings, Tag, Wallet } from 'lucide-react';
 
 const navigation = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/orders', label: 'Đơn hàng', icon: ClipboardList },
   { href: '/admin/reconciliation', label: 'Đối soát', icon: Wallet },
   { href: '/admin/returns', label: 'Đổi trả', icon: RotateCcw },
+  { href: '/admin/vouchers', label: 'Voucher & Khuyến mãi', icon: Tag },
   { href: '/admin/products', label: 'Sản phẩm & kho', icon: Package },
   { href: '/admin/audit-logs', label: 'Audit log', icon: ScrollText },
   { href: '/admin/monitoring', label: 'Giám sát hệ thống', icon: Activity },

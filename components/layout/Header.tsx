@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { LayoutDashboard, ShoppingBag } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import LogoutButton from '@/app/logout-button';
@@ -42,21 +41,25 @@ export default async function Header() {
             <Link className="cta-link" href="/dang-ky">Đăng ký</Link>
           </>
         ) : (
-          <details className="account-menu">
-            <summary aria-label={`Mở menu tài khoản ${user.name}`} title="Tài khoản">
-              <span className="account-avatar" aria-hidden="true">MK</span>
-            </summary>
-            <div className="account-dropdown">
-              <div className="account-dropdown-heading">
-                <span>Xin chào,</span>
-                <strong title={user.name}>{user.name}</strong>
+          <>
+            {user.role === 'ADMIN' && (
+              <>
+                <span className="admin-role-badge">Quản trị viên</span>
+                <Link className="cta-link" href="/admin">Vào trang Quản trị</Link>
+              </>
+            )}
+            <details className="account-menu">
+              <summary>
+                {user.name}<span aria-hidden="true">⌄</span>
+              </summary>
+              <div className="account-dropdown">
+                <Link href="/tai-khoan">Thông tin tài khoản</Link>
+                <Link href="/tai-khoan?tab=orders">Đơn mua của tôi</Link>
+                {user.role === 'ADMIN' && <Link href="/admin">Khu vực quản trị</Link>}
+                <LogoutButton />
               </div>
-              <Link href="/tai-khoan?tab=orders"><ShoppingBag size={17} aria-hidden="true" />Đơn mua của tôi</Link>
-              {user.role === 'ADMIN' && <Link className="account-admin-link" href="/admin"><LayoutDashboard size={17} aria-hidden="true" />Vào trang Quản trị Admin</Link>}
-              <div className="account-dropdown-divider" aria-hidden="true" />
-              <LogoutButton />
-            </div>
-          </details>
+            </details>
+          </>
         )}
       </div>
     </header>

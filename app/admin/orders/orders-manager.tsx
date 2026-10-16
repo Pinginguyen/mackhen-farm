@@ -39,6 +39,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const [manualPaymentReason, setManualPaymentReason] = useState<Record<string, string>>({});
   useEffect(() => {
     setSearch(new URLSearchParams(window.location.search).get('search') ?? '');
   }, []);
@@ -78,6 +79,12 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const currentPage = Math.min(page, pageCount);
   const pagedOrders = visibleOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
+  function canSelectStatus(order: AdminOrder, status: string) {
+    if (['CANCELLED', 'RETURNED'].includes(order.status)) return status === order.status;
+    if (order.status === 'SHIPPING') return ['DELIVERED', 'RETURNED'].includes(status);
+    return true;
+  }
+
   const exportParams = new URLSearchParams({ format: 'csv' });
   if (search.trim()) exportParams.set('q', search.trim());
   if (statusTab !== 'ALL') exportParams.set('status', statusTab);
@@ -88,14 +95,16 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   async function save(event: React.FormEvent<HTMLFormElement>, order: AdminOrder) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const phone = form.get('phone');
+    const address = form.get('address');
     setPending(order.orderCode);
     setToast('');
     try {
-      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: form.get('status'), paymentStatus: form.get('paymentStatus'), carrier: form.get('carrier'), trackingCode: form.get('trackingCode') }) });
-      const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
+      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: form.get('status'), paymentStatus: form.get('paymentStatus'), carrier: form.get('carrier'), trackingCode: form.get('trackingCode'), ...(typeof phone === 'string' ? { phone } : {}), ...(typeof address === 'string' ? { address } : {}) }) });
+      const result = await response.json() as { status?: string; paymentStatus?: string; phone?: string; address?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
       else {
-        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? String(form.get('status')), paymentStatus: result.paymentStatus ?? String(form.get('paymentStatus')), carrier: result.carrier ?? (String(form.get('carrier') || '') || null), trackingCode: result.trackingCode ?? (String(form.get('trackingCode') || '') || null) } : item));
+        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? String(form.get('status')), paymentStatus: result.paymentStatus ?? String(form.get('paymentStatus')), phone: result.phone ?? (typeof phone === 'string' ? phone : item.phone), address: result.address ?? (typeof address === 'string' ? address : item.address), carrier: result.carrier ?? (String(form.get('carrier') || '') || null), trackingCode: result.trackingCode ?? (String(form.get('trackingCode') || '') || null) } : item));
         setToast(`Đã cập nhật đơn ${order.orderCode}.`);
       }
     } catch {
@@ -123,6 +132,34 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
       setToast(status === 'HANDED_OFF' ? `Đã bàn giao ${order.orderCode} cho SPX${result.trackingCode ? ` · Mã ${result.trackingCode}` : ''}.` : `Đã cập nhật đơn ${order.orderCode}.`);
     } catch {
       setToast('Không thể kết nối để cập nhật đơn.');
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function confirmManualPayment(order: AdminOrder) {
+    const reason = manualPaymentReason[order.orderCode]?.trim() ?? '';
+    if (!reason) {
+      setToast('Nhập lý do trước khi xác nhận thanh toán thủ công.');
+      return;
+    }
+    setPending(order.orderCode);
+    setToast('');
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ orderCode: order.orderCode, status: order.status, paymentStatus: 'PAID', paymentReason: reason }),
+      });
+      const result = await response.json() as { status?: string; paymentStatus?: string; error?: { message?: string } };
+      if (!response.ok) {
+        setToast(result.error?.message ?? 'Không thể xác nhận thanh toán.');
+        return;
+      }
+      setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? item.status, paymentStatus: result.paymentStatus ?? 'PAID' } : item));
+      setToast(`Đã xác nhận thanh toán thủ công cho đơn ${order.orderCode}.`);
+    } catch {
+      setToast('Không thể kết nối để xác nhận thanh toán.');
     } finally {
       setPending(null);
     }
@@ -160,14 +197,20 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             <ul>{order.items.map((item, index) => <li key={`${order.id}-${index}`}>{item.sku} · {item.productName} × {item.quantity}</li>)}</ul>
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-update" onSubmit={(event) => save(event, order)}>
-              <label className="field">Trạng thái<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value === 'PAID'}>{label}</option>)}</select></label>
-              <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID">Đã thanh toán</option></select></label>
+              <label className="field">SĐT người nhận<input name="phone" type="tel" defaultValue={order.phone} disabled={!['PENDING', 'PROCESSING'].includes(order.status)} /></label>
+              <label className="field">Địa chỉ giao hàng<textarea name="address" rows={2} defaultValue={order.address} disabled={!['PENDING', 'PROCESSING'].includes(order.status)} /></label>
+              <label className="field">Trạng thái<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={!canSelectStatus(order, value) || value === 'PAID'}>{label}</option>)}</select></label>
+              <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID" disabled={order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID'}>Đã thanh toán</option></select></label>
               <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
               <label className="field">Mã vận đơn (không bắt buộc)<input name="trackingCode" defaultValue={order.trackingCode ?? ''} /></label>
               <button className="primary-action" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>
               <Link className="secondary-action" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu nhặt hàng &amp; vận đơn</Link>
             </form>
             <div className="admin-order-quick-actions">
+              {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <div className="admin-manual-payment">
+                <label className="field">Lý do xác nhận thanh toán<input value={manualPaymentReason[order.orderCode] ?? ''} onChange={(event) => setManualPaymentReason((current) => ({ ...current, [order.orderCode]: event.target.value }))} maxLength={1000} placeholder="Ví dụ: Đối soát sao kê khớp" /></label>
+                <button type="button" className="primary-action" disabled={pending === order.orderCode} onClick={() => void confirmManualPayment(order)}>{pending === order.orderCode ? 'Đang xác nhận...' : 'Xác nhận thanh toán thủ công'}</button>
+              </div>}
               {['PENDING', 'CONFIRMED', 'PAID'].includes(order.status) && <button type="button" className="primary-action" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đơn &amp; Đóng gói</button>}
               {order.status === 'PROCESSING' && <button type="button" className="admin-handoff-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao bưu tá 3PL</button>}
               {order.status === 'HANDED_OFF' && <button type="button" className="admin-handoff-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'IN_TRANSIT')}>Chuyển sang đang giao</button>}
