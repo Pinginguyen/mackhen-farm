@@ -6,14 +6,15 @@ import { Minus, Plus } from 'lucide-react';
 
 import type { ProductVariant } from '@/lib/store-data';
 
-export default function AddToCart({ productId, productSlug, name, image, price, variants, isSeasoning = false }: {
+export default function AddToCart({ productId, productSlug, name, image, price, originalPrice, unit, variants }: {
   productId: string;
   productSlug: string;
   name: string;
   image: string;
   price: number;
+  originalPrice?: number | null;
+  unit?: string | null;
   variants: ProductVariant[];
-  isSeasoning?: boolean;
 }) {
   const router = useRouter();
   const [variantId, setVariantId] = useState(variants[0]?.id ?? '');
@@ -24,6 +25,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const primaryActionsRef = useRef<HTMLDivElement>(null);
   const selectedVariant = variants.find((variant) => variant.id === variantId);
   const selectedPrice = selectedVariant?.price ?? price;
+  const selectedOriginalPrice = selectedVariant?.originalPrice ?? originalPrice;
 
   useEffect(() => {
     const target = primaryActionsRef.current;
@@ -102,14 +104,19 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
 
   return (
     <div className="cart-add-control">
-      {variants.length > 0 && (
+      <div className="detail-prices">
+        <strong>{selectedPrice.toLocaleString('vi-VN')}đ</strong>
+        {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del>{selectedOriginalPrice.toLocaleString('vi-VN')}đ</del>}
+      </div>
+      {variants.length >= 2 && (
         <label className="field">
           <span>Phân loại</span>
           <select value={variantId} onChange={(event) => setVariantId(event.target.value)}>
-            {variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.label} · {variant.price.toLocaleString('vi-VN')}đ</option>)}
+            {variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>{variant.label} · {variant.weight} · {variant.price.toLocaleString('vi-VN')}đ</option>)}
           </select>
         </label>
       )}
+      {variants.length === 1 && <p className="product-single-variant">Quy cách: {variants[0].label || unit}</p>}
       <div className="field">
         <span id="product-quantity-label">Số lượng</span>
         <div className="quantity-stepper" role="group" aria-labelledby="product-quantity-label">
@@ -119,13 +126,13 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
-        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
+        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
         <img src={image} alt="" />
         <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>
-        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>}
       {message && <p role="status">{message}</p>}
     </div>

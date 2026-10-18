@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : undefined;
   if (body.variantId && !variant) return NextResponse.json({ error: { code: 'VARIANT_NOT_FOUND', message: 'Không tìm thấy phân loại' } }, { status: 404 });
-  const availableStock = variant?.stock ?? product.stock;
+  const availableStock = variant?.inventory ?? product.stock;
   if (quantity > availableStock) return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
 
   const buyNow = body.buyNow === true;
@@ -103,7 +103,7 @@ export async function PATCH(request: Request) {
       if (body.variantId && !variant) return { error: 'VARIANT_NOT_FOUND', status: 404 as const, message: 'Không tìm thấy phân loại' };
 
       const quantity = body.quantity as number;
-      const availableStock = variant?.stock ?? current.product.stock;
+      const availableStock = variant?.inventory ?? current.product.stock;
       if (quantity > availableStock) return { error: 'INSUFFICIENT_STOCK', status: 409 as const, message: 'Số lượng vượt quá tồn kho' };
 
       const variantId = variant?.id ?? null;

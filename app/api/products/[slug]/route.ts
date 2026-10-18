@@ -20,10 +20,12 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
       status: product.stock < 30 ? 'Sắp hết' : 'Còn hàng',
       variants: product.variants.map((variant) => ({
         ...variant,
-        status: variant.stock < 30 ? 'Sắp hết' : 'Còn hàng',
+        label: variant.title,
+        stock: variant.inventory,
+        status: variant.inventory < 30 ? 'Sắp hết' : 'Còn hàng',
       })),
     },
-    variants: product.variants,
+    variants: product.variants.map((variant) => ({ ...variant, label: variant.title, stock: variant.inventory })),
     reviews: product.reviews,
   });
   });

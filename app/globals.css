@@ -9787,6 +9787,107 @@ body {
   gap: 16px;
 }
 
+.admin-product-variants {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-product-variants legend {
+  padding: 0 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.admin-product-variant-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-product-variant-table {
+  width: 100%;
+  min-width: 610px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-product-variant-table th,
+.admin-product-variant-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-product-variant-table th {
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.admin-product-variant-table input {
+  width: 100%;
+  min-width: 75px;
+  min-height: 40px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.admin-product-variant-table td:first-child input {
+  min-width: 150px;
+}
+
+.admin-product-variant-remove,
+.admin-product-variant-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.admin-product-variant-remove {
+  width: 40px;
+}
+
+.admin-product-variant-add {
+  margin-top: 12px;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.admin-variant-list-summary {
+  display: grid;
+  gap: 2px;
+  color: var(--text);
+}
+
+.admin-variant-list-summary small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.product-single-variant {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .admin-product-full-width {
   grid-column: 1 / -1;
 }

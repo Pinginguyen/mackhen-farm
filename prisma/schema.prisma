@@ -110,19 +110,21 @@ model Product {
 }
 
 model ProductVariant {
-  id        String      @id @default(cuid())
-  productId String
-  label     String
-  price     Int
-  weight    String
-  stock     Int         @default(0)
-  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItems CartItem[]
-  orderItems OrderItem[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  productId     String
+  title         String      @map("label")
+  price         Int
+  originalPrice Int?
+  weight        String
+  inventory     Int         @default(0) @map("stock")
+  sku           String?     @unique(map: "ProductVariant_sku_key")
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  @@unique([productId, label])
+  @@unique([productId, title], map: "ProductVariant_productId_label_key")
   @@index([productId])
 }
 

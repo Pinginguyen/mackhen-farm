@@ -42,7 +42,7 @@ const validProduct = {
 describe('/api/products', () => {
   beforeEach(() => {
     productFindMany.mockReset().mockResolvedValue([]);
-    productFindUnique.mockReset().mockResolvedValue({ id: 'product-1', price: 89000, stock: 10, active: true });
+    productFindUnique.mockReset().mockResolvedValue({ id: 'product-1', price: 89000, stock: 10, active: true, variants: [] });
     productCreate.mockReset().mockResolvedValue({ id: 'product-1', ...validProduct });
     productUpdate.mockReset().mockResolvedValue({ id: 'product-1', ...validProduct });
     productUpdateMany.mockReset();
@@ -160,6 +160,54 @@ describe('/api/products', () => {
         active: true,
       }),
     });
+  });
+
+  it('creates product variants and derives the starting price and stock from them', async () => {
+    const variants = [
+      { title: 'Túi zip 150g', price: 65000, originalPrice: 75000, weight: '150g', inventory: 200, sku: 'ZIP-150' },
+      { title: 'Hũ thủy tinh 300g', price: 125000, originalPrice: null, weight: '300g', inventory: 100, sku: 'JAR-300' },
+    ];
+    await POST(makeRequest('POST', { ...validProduct, variants }));
+
+    expect(productCreate).toHaveBeenCalledWith({ data: expect.objectContaining({
+      price: 65000,
+      originalPrice: 75000,
+      stock: 300,
+      unit: '150g',
+      variants: { create: variants },
+    }), include: { variants: true } });
+  });
+
+  it('updates variant fields by ID and deletes omitted variants', async () => {
+    productFindUnique.mockResolvedValueOnce({ id: 'product-1', price: 65000, stock: 300, active: true, variants: [{ id: 'variant-1' }, { id: 'variant-2' }] });
+    await PATCH(makeRequest('PATCH', {
+      id: 'product-1', ...validProduct,
+      variants: [{ id: 'variant-1', title: 'Túi zip 180g', price: 79000, originalPrice: null, weight: '180g', inventory: 180, sku: 'ZIP-180' }],
+    }));
+
+    expect(productUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      price: 79000,
+      stock: 180,
+      variants: {
+        deleteMany: { id: { notIn: ['variant-1'] } },
+        create: [],
+        upsert: [{ where: { id: 'variant-1' }, update: { title: 'Túi zip 180g', price: 79000, originalPrice: null, weight: '180g', inventory: 180, sku: 'ZIP-180' }, create: { title: 'Túi zip 180g', price: 79000, originalPrice: null, weight: '180g', inventory: 180, sku: 'ZIP-180' } }],
+      },
+    }) }));
+  });
+
+  it('rejects duplicate variant names and invalid variant prices', async () => {
+    const duplicateNames = await POST(makeRequest('POST', { ...validProduct, variants: [
+      { title: 'Túi 150g', price: 65000, weight: '150g', inventory: 2 },
+      { title: ' túi 150G ', price: 70000, weight: '150g', inventory: 2 },
+    ] }));
+    const invalidPrice = await POST(makeRequest('POST', { ...validProduct, variants: [
+      { title: 'Túi 150g', price: 0, weight: '150g', inventory: 2 },
+    ] }));
+
+    expect(duplicateNames.status).toBe(400);
+    expect(invalidPrice.status).toBe(400);
+    expect(productCreate).not.toHaveBeenCalled();
   });
 
   it('allows the optional badge to be left blank', async () => {

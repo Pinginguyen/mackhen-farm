@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 
-export default function StockControl({ productId, currentPrice, currentStock, active: initialActive }: { productId: string; currentPrice: number; currentStock: number; active: boolean }) {
+export default function StockControl({ productId, currentPrice, currentStock, active: initialActive, variantCount = 0 }: { productId: string; currentPrice: number; currentStock: number; active: boolean; variantCount?: number }) {
   const [price, setPrice] = useState(currentPrice);
   const [stock, setStock] = useState(currentStock);
   const [savedPrice, setSavedPrice] = useState(currentPrice);
@@ -40,13 +40,13 @@ export default function StockControl({ productId, currentPrice, currentStock, ac
 
   return <>
     <td>
-      <div className="admin-price-edit">
+      {variantCount > 0 ? <div className="admin-variant-list-summary"><strong>{price.toLocaleString('vi-VN')}đ</strong><small>Giá từ · {variantCount} phân loại</small></div> : <div className="admin-price-edit">
         <label className="admin-input-wrap"><span aria-hidden="true">đ</span><input className="product-price-input" aria-label="Giá bán (VNĐ)" type="number" min={0} step={1000} value={price} onChange={(event) => setPrice(Math.max(0, Number(event.target.value)))} /></label>
         {price !== savedPrice && <button className="admin-save-btn" type="button" onClick={() => update({ price, ...(stock !== savedStock ? { stock } : {}) })} disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu giá'}</button>}
-      </div>
+      </div>}
     </td>
     <td>
-      <div className={`admin-stock-edit ${stockLevel}`}>
+      {variantCount > 0 ? <div className={`admin-stock-edit ${stockLevel}`}><div className="admin-stock-value"><strong>{stock}</strong><span>Tổng tồn kho</span></div></div> : <div className={`admin-stock-edit ${stockLevel}`}>
         <div className="admin-stock-value"><strong>{stock}</strong><span>{stockLevel === 'low' ? 'Thấp' : 'Bình thường'}</span></div>
         <div className="admin-stock-track"><span style={{ width: `${stockPercent}%` }} /></div>
         <div className="admin-stock-controls">
@@ -55,7 +55,7 @@ export default function StockControl({ productId, currentPrice, currentStock, ac
           <input aria-label="Tồn kho mới" type="number" min={0} value={stock} onChange={(event) => setStock(Math.max(0, Number(event.target.value)))} />
           {stock !== savedStock && <button className="admin-save-btn" type="button" onClick={() => update({ stock })} disabled={saving}>{saving ? '...' : 'Lưu'}</button>}
         </div>
-      </div>
+      </div>}
     </td>
     <td>
       <button className={`admin-product-toggle ${active ? 'is-active' : ''}`} type="button" role="switch" aria-checked={active} onClick={() => update({ active: !active })} disabled={saving}>

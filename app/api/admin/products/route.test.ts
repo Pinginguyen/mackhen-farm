@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindMany, requireAdmin, prisma } = vi.hoisted(() => {
+const { productFindMany, requireAdmin, createProduct, updateProduct, deleteProduct, prisma } = vi.hoisted(() => {
   const productFindMany = vi.fn();
   const requireAdmin = vi.fn();
-  return { productFindMany, requireAdmin, prisma: { product: { findMany: productFindMany } } };
+  const createProduct = vi.fn();
+  const updateProduct = vi.fn();
+  const deleteProduct = vi.fn();
+  return { productFindMany, requireAdmin, createProduct, updateProduct, deleteProduct, prisma: { product: { findMany: productFindMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
+vi.mock('@/app/api/products/route', () => ({ POST: createProduct, PATCH: updateProduct, DELETE: deleteProduct }));
 
-import { GET } from './route';
+import { DELETE, GET, PATCH, POST } from './route';
 
 describe('GET /api/admin/products', () => {
   beforeEach(() => {
@@ -37,5 +41,25 @@ describe('GET /api/admin/products', () => {
     expect(response.status).toBe(200);
     expect(result.items).toEqual([expect.objectContaining({ id: 'db-product-1', price: 99000, stock: 18, active: true, badge: 'Bán chạy' })]);
     expect(productFindMany).toHaveBeenCalledWith({ include: { variants: true }, orderBy: { createdAt: 'desc' } });
+  });
+
+  it('delegates collection create, update, and delete to the guarded product handlers', async () => {
+    const createResponse = Response.json({ product: { id: 'new-product' } }, { status: 201 });
+    const updateResponse = Response.json({ product: { id: 'product-1' } });
+    const deleteResponse = Response.json({ success: true });
+    createProduct.mockResolvedValueOnce(createResponse);
+    updateProduct.mockResolvedValueOnce(updateResponse);
+    deleteProduct.mockResolvedValueOnce(deleteResponse);
+
+    const createRequest = new Request('https://mackhen.example/api/admin/products', { method: 'POST', body: '{}' });
+    const updateRequest = new Request('https://mackhen.example/api/admin/products', { method: 'PATCH', body: '{}' });
+    const deleteRequest = new Request('https://mackhen.example/api/admin/products?id=product-1', { method: 'DELETE' });
+
+    expect(await POST(createRequest)).toBe(createResponse);
+    expect(await PATCH(updateRequest)).toBe(updateResponse);
+    expect(await DELETE(deleteRequest)).toBe(deleteResponse);
+    expect(createProduct).toHaveBeenCalledWith(createRequest);
+    expect(updateProduct).toHaveBeenCalledWith(updateRequest);
+    expect(deleteProduct).toHaveBeenCalledWith(deleteRequest);
   });
 });

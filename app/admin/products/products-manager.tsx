@@ -8,7 +8,9 @@ import type { NutritionFacts } from '@/lib/store-data';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import StockControl from './stock-control';
 
-type AdminProduct = CatalogProduct & { active: boolean };
+type AdminVariant = { id: string; title: string; price: number; originalPrice: number | null; weight: string; inventory: number; sku: string | null };
+type AdminProduct = CatalogProduct & { active: boolean; variants?: AdminVariant[] };
+type VariantDraft = { id?: string; title: string; price: string; originalPrice: string; weight: string; inventory: string; sku: string };
 
 type ProductDraft = {
   name: string;
@@ -22,6 +24,7 @@ type ProductDraft = {
   description: string;
   ingredients: string;
   badge: string;
+  variants: VariantDraft[];
   nutritionFacts: NutritionFacts;
 };
 
@@ -51,6 +54,7 @@ const emptyDraft: ProductDraft = {
   description: '',
   ingredients: '',
   badge: '',
+  variants: [],
   nutritionFacts: defaultNutritionFacts(true),
 };
 
@@ -114,6 +118,15 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       description: product.description,
       ingredients: product.ingredients ?? '',
       badge: product.badge ?? '',
+      variants: (product.variants ?? []).map((variant) => ({
+        id: variant.id,
+        title: variant.title,
+        price: String(variant.price),
+        originalPrice: variant.originalPrice == null ? '' : String(variant.originalPrice),
+        weight: variant.weight,
+        inventory: String(variant.inventory),
+        sku: variant.sku ?? '',
+      })),
       nutritionFacts: product.nutritionFacts ?? defaultNutritionFacts(product.category !== 'Gia vị Tây Bắc', product.protein ?? ''),
     });
     setFormError('');
@@ -129,11 +142,10 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
     setFormError('');
 
     try {
-      const response = await fetch('/api/products', {
+      const response = await fetch(editingProduct ? `/api/admin/products/${encodeURIComponent(editingProduct.id)}` : '/api/admin/products', {
         method: editingProduct ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          ...(editingProduct ? { id: editingProduct.id } : {}),
           name: String(draft.name).trim(),
           category: draft.category,
           price: Number(draft.price),
@@ -144,6 +156,15 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           description: String(draft.description).trim(),
           ingredients: String(draft.ingredients).trim(),
           badge: draft.badge.trim() || null,
+          variants: draft.variants.map((variant) => ({
+            ...(variant.id ? { id: variant.id } : {}),
+            title: variant.title.trim(),
+            price: Number(variant.price),
+            originalPrice: variant.originalPrice ? Number(variant.originalPrice) : null,
+            weight: variant.weight.trim(),
+            inventory: Number(variant.inventory) || 0,
+            sku: variant.sku.trim() || null,
+          })),
           nutritionFacts: draft.nutritionFacts,
           imageUrl: draft.imageUrl || undefined,
         }),
@@ -182,7 +203,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
     setNotice('');
 
     try {
-      const response = await fetch(`/api/products?id=${encodeURIComponent(productId)}`, { method: 'DELETE' });
+      const response = await fetch(`/api/admin/products?id=${encodeURIComponent(productId)}`, { method: 'DELETE' });
       const result = await response.json() as { success?: boolean; message?: string; error?: string | { message?: string } };
       if (!response.ok || result.success !== true) {
         const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
@@ -229,7 +250,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                   {isFallback ? (
                     <td className="admin-product-fallback-note" colSpan={3}>Mẫu hiển thị · chưa được lưu trong cơ sở dữ liệu</td>
                   ) : (
-                    <StockControl key={`${product.id}:${product.price}:${product.stock}:${product.active}`} productId={product.id} currentPrice={product.price} currentStock={product.stock} active={product.active ?? true} />
+                    <StockControl key={`${product.id}:${product.price}:${product.stock}:${product.active}`} productId={product.id} currentPrice={product.price} currentStock={product.stock} active={product.active ?? true} variantCount={product.variants?.length ?? 0} />
                   )}
                   <td>{!isFallback && <div className="admin-product-row-actions">
                     <button className="admin-return-icon-button" type="button" title="Chỉnh sửa sản phẩm" aria-label={`Chỉnh sửa ${product.name}`} onClick={() => startEditingProduct(product)}><Pencil size={16} /></button>
@@ -264,6 +285,25 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
               <label className="field">Trọng lượng<input placeholder="150g" value={draft.weight} onChange={(event) => setDraft({ ...draft, weight: event.target.value })} required /></label>
               <label className="field">Hàm lượng Protein<input placeholder="22g/100g" value={draft.protein} onChange={(event) => setDraft({ ...draft, protein: event.target.value })} maxLength={80} required={draft.category !== 'Gia vị'} /></label>
               <label className="field">Tồn kho ban đầu<input type="number" min={0} max={1000000} value={draft.stock} onChange={(event) => setDraft({ ...draft, stock: event.target.value })} required /></label>
+              <fieldset className="admin-product-variants admin-product-full-width">
+                <legend>Phân loại hàng / Quy cách (Variants)</legend>
+                {draft.variants.length > 0 && <div className="admin-product-variant-table-wrap">
+                  <table className="admin-product-variant-table">
+                    <thead><tr><th>Tên phân loại</th><th>Trọng lượng</th><th>Giá bán (VNĐ)</th><th>Tồn kho</th><th>Xóa</th></tr></thead>
+                    <tbody>{draft.variants.map((variant, index) => <tr key={variant.id ?? `new-${index}`}>
+                      <td><input aria-label={`Tên phân loại ${index + 1}`} value={variant.title} onChange={(event) => setDraft((current) => ({ ...current, variants: current.variants.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item) }))} maxLength={120} required /></td>
+                      <td><input aria-label={`Trọng lượng phân loại ${index + 1}`} value={variant.weight} onChange={(event) => setDraft((current) => ({ ...current, variants: current.variants.map((item, itemIndex) => itemIndex === index ? { ...item, weight: event.target.value } : item) }))} maxLength={40} required /></td>
+                      <td><input aria-label={`Giá phân loại ${index + 1}`} type="number" min={1} step={1000} value={variant.price} onChange={(event) => setDraft((current) => ({ ...current, variants: current.variants.map((item, itemIndex) => itemIndex === index ? { ...item, price: event.target.value } : item) }))} required /></td>
+                      <td><input aria-label={`Tồn kho phân loại ${index + 1}`} type="number" min={0} max={1000000} value={variant.inventory} onChange={(event) => setDraft((current) => ({ ...current, variants: current.variants.map((item, itemIndex) => itemIndex === index ? { ...item, inventory: event.target.value } : item) }))} required /></td>
+                      <td><button className="admin-product-variant-remove" type="button" aria-label={`Xóa phân loại ${variant.title || index + 1}`} onClick={() => setDraft((current) => ({ ...current, variants: current.variants.filter((_, itemIndex) => itemIndex !== index) }))}><Trash2 size={16} /></button></td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>}
+                <button className="admin-product-variant-add" type="button" onClick={() => setDraft((current) => ({
+                  ...current,
+                  variants: [...current.variants, { title: '', price: current.price, originalPrice: '', weight: current.weight, inventory: '0', sku: '' }],
+                }))}>+ Thêm phân loại</button>
+              </fieldset>
               <div
                 className={`field admin-product-full-width admin-image-upload${draggingImage ? ' is-dragging' : ''}`}
                 onDragOver={(event) => { event.preventDefault(); setDraggingImage(true); }}

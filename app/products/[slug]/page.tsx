@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency, normalizeNutritionFacts, type Product } from '@/lib/store-data';
+import { normalizeNutritionFacts, type Product } from '@/lib/store-data';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import AddToCart from './add-to-cart';
 import ProductImageGallery from './product-image-gallery';
@@ -35,7 +35,9 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
         variants: databaseProduct.variants.map((variant) => ({
           ...variant,
-          status: variant.stock > 0 ? 'Còn hàng' : 'Sắp hết',
+          label: variant.title,
+          stock: variant.inventory,
+          status: variant.inventory > 0 ? 'Còn hàng' : 'Sắp hết',
         })),
       };
       reviews = databaseProduct.reviews.map((review) => ({
@@ -103,10 +105,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
               <ProductRating rating={product.rating} size="sm" />
             </div>
-            <div className="detail-prices">
-              <strong>{formatCurrency(product.price)}</strong>
-              {product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}
-            </div>
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
               {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts">
@@ -140,8 +139,6 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             </div>
 
             <ProductHighlights highlights={product.highlights} />
-
-            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} variants={product.variants} />
           </div>
         </div>
       </section>

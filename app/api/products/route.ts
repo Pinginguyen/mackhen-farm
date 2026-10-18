@@ -29,7 +29,9 @@ export function GET() {
         status: product.stock < 30 ? 'Sắp hết' : 'Còn hàng',
         variants: product.variants.map((variant) => ({
           ...variant,
-          status: variant.stock < 30 ? 'Sắp hết' : 'Còn hàng',
+          label: variant.title,
+          stock: variant.inventory,
+          status: variant.inventory < 30 ? 'Sắp hết' : 'Còn hàng',
         })),
       })),
       pagination: { page: 1, limit: 10, total: products.length },
@@ -95,6 +97,73 @@ function normalizeNutritionFacts(value: unknown): Prisma.InputJsonValue | null {
   return Object.fromEntries([['enabled', value.enabled], ...fields.map((field) => [field, (value[field] as string).trim()])]);
 }
 
+type VariantInput = {
+  id?: string;
+  title: string;
+  price: number;
+  originalPrice: number | null;
+  weight: string;
+  inventory: number;
+  sku: string | null;
+};
+
+function parseVariants(value: unknown): VariantInput[] | null {
+  if (!Array.isArray(value) || value.length > 30) return null;
+  const variants: VariantInput[] = [];
+
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : undefined;
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    const price = numberValue(item.price);
+    const originalPrice = item.originalPrice == null || item.originalPrice === '' ? null : numberValue(item.originalPrice);
+    const weight = typeof item.weight === 'string' ? item.weight.trim() : '';
+    const inventory = numberValue(item.inventory);
+    const sku = typeof item.sku === 'string' ? item.sku.trim().toUpperCase() || null : null;
+
+    if ((item.id !== undefined && !id) || !title || title.length > 120 || price === null || price <= 0
+      || (item.originalPrice != null && item.originalPrice !== '' && (originalPrice === null || originalPrice < price))
+      || !weight || weight.length > 40 || inventory === null || inventory < 0 || inventory > 1_000_000
+      || (typeof item.sku !== 'undefined' && (typeof item.sku !== 'string' || item.sku.trim().length > 80))) return null;
+
+    variants.push({ ...(id ? { id } : {}), title, price, originalPrice, weight, inventory, sku });
+  }
+
+  const titles = variants.map((variant) => variant.title.toLocaleLowerCase('vi'));
+  const skus = variants.flatMap((variant) => variant.sku ? [variant.sku] : []);
+  if (new Set(titles).size !== titles.length || new Set(skus).size !== skus.length) return null;
+  if (variants.reduce((sum, variant) => sum + variant.inventory, 0) > 1_000_000) return null;
+  return variants;
+}
+
+function variantFields({ title, price, originalPrice, weight, inventory, sku }: VariantInput) {
+  return { title, price, originalPrice, weight, inventory, sku };
+}
+
+function syncVariants(variants: VariantInput[]) {
+  const ids = variants.flatMap((variant) => variant.id ? [variant.id] : []);
+  return {
+    deleteMany: ids.length ? { id: { notIn: ids } } : {},
+    create: variants.filter((variant) => !variant.id).map(variantFields),
+    upsert: variants.filter((variant) => variant.id).map((variant) => ({
+      where: { id: variant.id! },
+      update: variantFields(variant),
+      create: variantFields(variant),
+    })),
+  };
+}
+
+function productVariantDefaults(variants: VariantInput[] | null, fallback: { price: number | null; originalPrice: number | null; stock: number | null; weight: string }) {
+  if (!variants?.length) return fallback;
+  const lowestPriceVariant = variants.reduce((lowest, variant) => variant.price < lowest.price ? variant : lowest);
+  return {
+    price: lowestPriceVariant.price,
+    originalPrice: lowestPriceVariant.originalPrice,
+    stock: variants.reduce((sum, variant) => sum + variant.inventory, 0),
+    weight: variants[0].weight,
+  };
+}
+
 export async function POST(request: Request) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
@@ -108,9 +177,16 @@ export async function POST(request: Request) {
   if (!isRecord(body)) return NextResponse.json({ error: { message: 'Dữ liệu sản phẩm không hợp lệ.' } }, { status: 400 });
 
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const price = numberValue(body.price);
-  const originalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
-  const weightInput = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
+  const variantsProvided = body.variants !== undefined;
+  const variants = variantsProvided ? parseVariants(body.variants) : null;
+  const basePrice = numberValue(body.price);
+  const baseOriginalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
+  const baseStock = numberValue(body.stock ?? 0);
+  const baseWeight = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
+  const productDefaults = productVariantDefaults(variants, { price: basePrice, originalPrice: baseOriginalPrice, stock: baseStock, weight: baseWeight });
+  const price = productDefaults.price;
+  const originalPrice = productDefaults.originalPrice;
+  const weightInput = productDefaults.weight;
   const weightMatch = weightInput.match(/^(\d+)\s*(?:g|gram)?$/i);
   const weight = weightMatch ? Number(weightMatch[1]) : null;
   const protein = typeof body.protein === 'string' ? body.protein.trim().replace(/\s+protein$/i, '') : '';
@@ -120,11 +196,11 @@ export async function POST(request: Request) {
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
-  const stock = numberValue(body.stock ?? 0);
+  const stock = productDefaults.stock;
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
-    || !image || stock === null || stock < 0 || stock > 1000000
+    || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
@@ -151,7 +227,9 @@ export async function POST(request: Request) {
         badge,
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
+        ...(variants?.length ? { variants: { create: variants.map(variantFields) } } : {}),
       } satisfies Prisma.ProductCreateInput,
+      ...(variants?.length ? { include: { variants: true } } : {}),
     });
     return NextResponse.json({ product }, { status: 201 });
   }, 'Admin product creation failed');
@@ -173,9 +251,16 @@ export async function PATCH(request: Request) {
   const productId = body.id.trim();
 
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const price = numberValue(body.price);
-  const originalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
-  const weightInput = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
+  const variantsProvided = body.variants !== undefined;
+  const variants = variantsProvided ? parseVariants(body.variants) : null;
+  const basePrice = numberValue(body.price);
+  const baseOriginalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
+  const baseStock = numberValue(body.stock ?? 0);
+  const baseWeight = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
+  const productDefaults = productVariantDefaults(variants, { price: basePrice, originalPrice: baseOriginalPrice, stock: baseStock, weight: baseWeight });
+  const price = productDefaults.price;
+  const originalPrice = productDefaults.originalPrice;
+  const weightInput = productDefaults.weight;
   const weightMatch = weightInput.match(/^(\d+)\s*(?:g|gram)?$/i);
   const weight = weightMatch ? Number(weightMatch[1]) : null;
   const protein = typeof body.protein === 'string' ? body.protein.trim().replace(/\s+protein$/i, '') : '';
@@ -185,18 +270,21 @@ export async function PATCH(request: Request) {
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
-  const stock = numberValue(body.stock ?? 0);
+  const stock = productDefaults.stock;
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || (body.ingredients != null && typeof body.ingredients !== 'string') || (ingredients?.length ?? 0) > 5000
-    || !image || stock === null || stock < 0 || stock > 1000000
+    || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants)
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, variants: { select: { id: true } } } });
     if (!previous) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
+    if (variantsProvided && variants?.some((variant) => variant.id && !previous.variants.some((current) => current.id === variant.id))) {
+      return NextResponse.json({ error: { message: 'Phân loại không thuộc sản phẩm này.' } }, { status: 400 });
+    }
     const product = await prisma.product.update({
       where: { id: productId },
       data: {
@@ -214,6 +302,7 @@ export async function PATCH(request: Request) {
         images: [image],
         badge,
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
+        ...(variantsProvided ? { variants: syncVariants(variants ?? []) } : {}),
       },
       include: { variants: true },
     });

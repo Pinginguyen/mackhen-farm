@@ -187,7 +187,7 @@ describe('/api/admin/orders', () => {
 
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
-    expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { stock: { increment: 2 } } });
+    expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
 
     orderFindUnique.mockResolvedValueOnce({
@@ -228,7 +228,7 @@ describe('/api/admin/orders', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'CANCELLED' });
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
-    expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { stock: { increment: 2 } } });
+    expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
   });
 });

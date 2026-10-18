@@ -1,9 +1,13 @@
 export type ProductVariant = {
   id: string;
+  title?: string;
   label: string;
   price: number;
+  originalPrice?: number | null;
   weight: string;
+  inventory?: number;
   stock: number;
+  sku?: string | null;
   status: string;
 };
 

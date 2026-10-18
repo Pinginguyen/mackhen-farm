@@ -33,8 +33,8 @@ const product = {
   price: 100,
   stock: 8,
   variants: [
-    { id: 'variant-small', label: 'Gói nhỏ', price: 100, stock: 5 },
-    { id: 'variant-large', label: 'Gói lớn', price: 180, stock: 2 },
+    { id: 'variant-small', title: 'Gói nhỏ', price: 100, inventory: 5 },
+    { id: 'variant-large', title: 'Gói lớn', price: 180, inventory: 2 },
   ],
 };
 

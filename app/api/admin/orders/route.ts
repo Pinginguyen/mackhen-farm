@@ -151,7 +151,7 @@ export async function PATCH(request: Request) {
           if (currentOrder.orderStatus !== targetStatus) {
             for (const item of currentOrder.items) {
               await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-              if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
+              if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
               if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
             }
           }

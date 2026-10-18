@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         for (const item of expiredOrder.items) {
           await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
           if (item.productVariantId) {
-            await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { stock: { increment: item.quantity } } });
+            await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
           }
           if (item.lotCode) {
             await transaction.productionLot.update({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });

@@ -94,21 +94,19 @@ export async function PATCH(request: Request) {
     }
     return withDatabase(async () => {
       const result = await prisma.$transaction(async (transaction) => {
-        const current = await transaction.product.findUnique({ where: { id: body.productId }, select: { stock: true, price: true, active: true } });
+        const current = await transaction.product.findUnique({ where: { id: body.productId }, select: { stock: true, price: true, active: true, variants: { select: { id: true } } } });
         if (!current) return null;
+        if (current.variants?.length && (hasPrice || hasStock || hasStockDelta)) return { variantManaged: true as const };
         const data: { price?: number; stock?: number; active?: boolean } = {};
         if (hasPrice) data.price = body.price;
         if (hasStock) data.stock = body.stock;
         if (hasStockDelta) data.stock = Math.max(0, current.stock + body.stockDelta!);
         if (hasActive) data.active = body.active;
         const updated = await transaction.product.update({ where: { id: body.productId }, data });
-        const variantData: { price?: number; stock?: number } = {};
-        if (hasPrice) variantData.price = body.price;
-        if (hasStock || hasStockDelta) variantData.stock = updated.stock;
-        if (Object.keys(variantData).length) await transaction.productVariant.updateMany({ where: { productId: updated.id }, data: variantData });
         return { product: updated, current };
       });
       if (!result) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
+      if ('variantManaged' in result) return NextResponse.json({ error: { message: 'Hãy chỉnh giá và tồn kho trong từng phân loại của sản phẩm.' } }, { status: 409 });
       const { product, current } = result;
       await writeAuditLog(request, {
         adminEmail,

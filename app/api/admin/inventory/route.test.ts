@@ -43,12 +43,12 @@ describe('PATCH /api/admin/inventory', () => {
     orderItemFindMany.mockReset().mockResolvedValue([]);
     requireAdmin.mockReset();
     requireAdmin.mockResolvedValue(null);
-    productFindUnique.mockResolvedValue({ stock: 12 });
+    productFindUnique.mockResolvedValue({ stock: 12, variants: [] });
     productUpdate.mockResolvedValue({ id: 'product-1', price: 79000, stock: 24 });
     variantUpdateMany.mockResolvedValue({ count: 1 });
   });
 
-  it('updates product and variant price and stock together', async () => {
+  it('updates a product without variants', async () => {
     const request = new Request('https://mackhen.example/api/admin/inventory', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -59,12 +59,12 @@ describe('PATCH /api/admin/inventory', () => {
 
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { price: 79000, stock: 24 } });
-    expect(variantUpdateMany).toHaveBeenCalledWith({ where: { productId: 'product-1' }, data: { price: 79000, stock: 24 } });
+    expect(variantUpdateMany).not.toHaveBeenCalled();
     expect(body.message).toBe('Đã cập nhật giá và tồn kho thành công!');
   });
 
   it('applies quick stock deltas without allowing negative inventory', async () => {
-    productFindUnique.mockResolvedValue({ stock: 1 });
+    productFindUnique.mockResolvedValue({ stock: 1, variants: [] });
     productUpdate.mockResolvedValue({ id: 'product-1', price: 79000, stock: 0, active: true });
     const request = new Request('https://mackhen.example/api/admin/inventory', {
       method: 'PATCH',
@@ -75,7 +75,20 @@ describe('PATCH /api/admin/inventory', () => {
     const response = await PATCH(request);
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: 0 } });
-    expect(variantUpdateMany).toHaveBeenCalledWith({ where: { productId: 'product-1' }, data: { stock: 0 } });
+    expect(variantUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('requires product variants to be edited through their own controls', async () => {
+    productFindUnique.mockResolvedValueOnce({ stock: 12, variants: [{ id: 'variant-1' }] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/inventory', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ productId: 'product-1', stock: 24 }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.message).toContain('từng phân loại');
+    expect(productUpdate).not.toHaveBeenCalled();
+    expect(variantUpdateMany).not.toHaveBeenCalled();
   });
 
   it('returns the ADMIN guard response without touching product data', async () => {

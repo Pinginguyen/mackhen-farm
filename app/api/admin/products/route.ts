@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeNutritionFacts } from '@/lib/store-data';
 import { requireAdmin } from '@/lib/admin-auth';
 import { withDatabase } from '@/lib/api-database';
+import { DELETE as deleteProduct, PATCH as updateProduct, POST as createProduct } from '@/app/api/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,4 +22,16 @@ export async function GET(request: Request) {
       nutritionFacts: normalizeNutritionFacts(product.nutritionFacts),
     })) });
   }, 'Admin product listing failed');
+}
+
+export async function POST(request: Request) {
+  return createProduct(request);
+}
+
+export async function PATCH(request: Request) {
+  return updateProduct(request);
+}
+
+export async function DELETE(request: Request) {
+  return deleteProduct(request);
 }

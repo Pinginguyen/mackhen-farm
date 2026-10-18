@@ -270,7 +270,7 @@ export async function POST(request: Request) {
           const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
           if (item.variant) {
-            const variantStock = await transaction.productVariant.updateMany({ where: { id: item.variant.id, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
+            const variantStock = await transaction.productVariant.updateMany({ where: { id: item.variant.id, inventory: { gte: item.quantity } }, data: { inventory: { decrement: item.quantity } } });
             if (!variantStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
           }
           const lot = await transaction.productionLot.findFirst({
@@ -328,7 +328,7 @@ export async function POST(request: Request) {
             note: typeof body.note === 'string' ? body.note.trim() || null : null,
             items: { create: cart.items.map((item) => {
               const price = item.variant?.price ?? item.product.price;
-              return { productId: item.productId, productVariantId: item.productVariantId, productName: item.product.name, variantLabel: item.variant?.label, quantity: item.quantity, price, lineTotal: item.quantity * price, lotCode: reservedLotCodes.get(item.id) };
+              return { productId: item.productId, productVariantId: item.productVariantId, productName: item.product.name, variantLabel: item.variant?.title, quantity: item.quantity, price, lineTotal: item.quantity * price, lotCode: reservedLotCodes.get(item.id) };
             }) },
           },
         });
