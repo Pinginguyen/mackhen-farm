@@ -13,3 +13,6 @@ coverage
 .vercel
 .azure/.preview-temp/
 .github/agents/
+
+# Sentry Config File
+.env.sentry-build-plugin

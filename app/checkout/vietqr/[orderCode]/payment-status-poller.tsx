@@ -24,7 +24,7 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
 
   useEffect(() => {
     if (paid) {
-      router.push(`/order-success?orderId=${encodeURIComponent(orderId)}`);
+      router.push(`/cam-on?orderCode=${encodeURIComponent(orderCode)}`);
       return;
     }
     if (!canPoll) return;
