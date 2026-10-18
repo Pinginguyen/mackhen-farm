@@ -1959,6 +1959,17 @@ textarea {
   white-space: nowrap;
 }
 
+.cart-add-control .inline-actions > .primary-action {
+  background: #8b1e1e;
+  color: #fff;
+}
+
+.cart-add-control .inline-actions > .secondary-action {
+  border: 1px solid #8b1e1e;
+  background: #fff;
+  color: #8b1e1e;
+}
+
 .product-reassurance-list {
   display: grid;
   gap: 9px;

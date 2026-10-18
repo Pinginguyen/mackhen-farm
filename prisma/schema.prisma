@@ -117,7 +117,7 @@ model ProductVariant {
   originalPrice Int?
   weight        String
   inventory     Int         @default(0) @map("stock")
-  sku           String?     @unique(map: "ProductVariant_sku_key")
+  sku           String?
   product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems     CartItem[]
   orderItems    OrderItem[]

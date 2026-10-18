@@ -61,4 +61,18 @@ describe('AddToCart variants', () => {
 
     expect(container.querySelector('.detail-prices strong')?.textContent).toBe('125.000đ');
   });
+
+  it('hides product-not-found API text and disables purchase controls', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: { code: 'PRODUCT_NOT_FOUND', message: 'Không tìm thấy sản phẩm' } }),
+    }));
+    await act(async () => root.render(createElement(AddToCart, { ...baseProps })));
+    const addButton = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Thêm vào giỏ');
+
+    await act(async () => addButton?.click());
+
+    expect(container.textContent).not.toContain('Không tìm thấy sản phẩm');
+    expect(addButton?.disabled).toBe(true);
+  });
 });

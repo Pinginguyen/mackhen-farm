@@ -21,6 +21,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [productUnavailable, setProductUnavailable] = useState(false);
   const [showStickyBuyBar, setShowStickyBuyBar] = useState(false);
   const primaryActionsRef = useRef<HTMLDivElement>(null);
   const selectedVariant = variants.find((variant) => variant.id === variantId);
@@ -82,10 +83,13 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ productId, variantId: variantId || undefined, quantity, buyNow }),
       });
-      const result = await response.json() as { error?: { message?: string }; cartCount?: number };
+      const result = await response.json() as { error?: { code?: string; message?: string }; cartCount?: number };
       if (!response.ok) {
         if (buyNow) clearBuyNowSnapshot();
-        setMessage(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
+        const unavailable = ['PRODUCT_NOT_FOUND', 'VARIANT_NOT_FOUND'].includes(result.error?.code ?? '')
+          || result.error?.message?.trim() === 'Không tìm thấy sản phẩm';
+        if (unavailable) setProductUnavailable(true);
+        else setMessage(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
         return;
       }
       if (buyNow) router.push('/checkout?mode=buy_now');
@@ -121,18 +125,18 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <span id="product-quantity-label">Số lượng</span>
         <div className="quantity-stepper" role="group" aria-labelledby="product-quantity-label">
           <button type="button" aria-label="Giảm số lượng" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={16} /></button>
-          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={99} value={quantity} onChange={(event) => setQuantity(Math.min(99, Math.max(1, Number(event.target.value) || 1)))} />
-          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 99} onClick={() => setQuantity((value) => Math.min(99, value + 1))}><Plus size={16} /></button>
+          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={20} value={quantity} onChange={(event) => setQuantity(Math.min(20, Math.max(1, Number(event.target.value) || 1)))} />
+          <button type="button" aria-label="Tăng số lượng" disabled={quantity >= 20} onClick={() => setQuantity((value) => Math.min(20, value + 1))}><Plus size={16} /></button>
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
-        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
+        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
         <img src={image} alt="" />
         <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>
-        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
       </div>}
       {message && <p role="status">{message}</p>}
     </div>

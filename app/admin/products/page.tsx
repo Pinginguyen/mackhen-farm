@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import { fetchApi } from '@/lib/server-api';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import ProductsManager from './products-manager';
 
@@ -15,6 +16,7 @@ export default async function AdminProductsPage() {
     products = result.items;
   } catch {
     unavailable = true;
+    products = DEFAULT_PRODUCTS.map((product) => ({ ...product, active: true, variants: [] }));
   }
   return (
     <main className="page-shell">

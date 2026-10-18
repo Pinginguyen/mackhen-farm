@@ -43,6 +43,23 @@ describe('GET /api/admin/products', () => {
     expect(productFindMany).toHaveBeenCalledWith({ include: { variants: true }, orderBy: { createdAt: 'desc' } });
   });
 
+  it('returns the complete fallback catalog when newer database columns are unavailable', async () => {
+    productFindMany.mockRejectedValueOnce(new Error('The column Product.ingredients does not exist'));
+    const response = await GET(new Request('https://mackhen.example/api/admin/products'));
+    const result = await response.json() as { items: { id: string; active: boolean }[] };
+
+    expect(response.status).toBe(200);
+    expect(result.items).toHaveLength(8);
+    expect(result.items.every((item) => item.active)).toBe(true);
+  });
+
+  it('shows fallback products when the database has no catalog rows', async () => {
+    const response = await GET(new Request('https://mackhen.example/api/admin/products'));
+    const result = await response.json() as { items: { id: string }[] };
+
+    expect(result.items).toHaveLength(8);
+  });
+
   it('delegates collection create, update, and delete to the guarded product handlers', async () => {
     const createResponse = Response.json({ product: { id: 'new-product' } }, { status: 201 });
     const updateResponse = Response.json({ product: { id: 'product-1' } });
