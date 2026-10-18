@@ -999,6 +999,7 @@ textarea {
   cursor: pointer;
   font-size: 0.84rem;
   font-weight: 600;
+  white-space: nowrap;
   transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
@@ -5117,10 +5118,13 @@ body {
 }
 
 .review-average-score {
+  flex: 0 0 auto;
+  min-width: 88px;
   color: var(--primary);
   font-size: 3.65rem;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .review-score-row .product-rating .star-rating {
@@ -7858,7 +7862,14 @@ body {
 
   .catalog-filter-tabs {
     margin-inline: -4px;
-    padding-inline: 4px;
+    padding: 6px 24px 8px 4px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .catalog-filter-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .catalog-filter-tabs button {
@@ -10830,7 +10841,7 @@ body {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px 12px;
-    padding: 10px 16px 12px;
+    padding: 8px 16px 10px;
   }
 
   .site-header .brand-wrap {
@@ -10869,11 +10880,17 @@ body {
     grid-row: 3;
     width: 100%;
     flex-wrap: nowrap;
-    gap: 18px;
+    gap: 8px;
     overflow-x: auto;
-    padding: 2px 0 4px;
+    padding: 6px 24px 6px 0;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .site-header .main-nav > a {
+    flex: 0 0 auto;
   }
 
   .site-header .main-nav::-webkit-scrollbar {
@@ -10914,9 +10931,12 @@ body {
   }
 
   .floating-zalo {
-    right: max(16px, env(safe-area-inset-right));
-    bottom: calc(80px + env(safe-area-inset-bottom));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(88px + env(safe-area-inset-bottom));
     z-index: 40;
+    width: 48px;
+    height: 48px;
+    box-shadow: 0 4px 14px rgba(0, 79, 201, 0.28);
   }
 
   .ai-chat-widget {

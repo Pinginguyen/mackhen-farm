@@ -189,7 +189,7 @@ export default function ProductReviewsSection({
       <div className="reviews-layout">
         <aside className="review-summary-panel" aria-label="Tổng quan đánh giá">
           <div className="review-score-row">
-            <strong className="review-average-score">{averageRating.toFixed(1)}</strong>
+            <strong className="review-average-score whitespace-nowrap shrink-0">{averageRating.toFixed(1)}</strong>
             <div>
               <ProductRating rating={averageRating} showValue={false} />
               <p>Dựa trên {reviewCount} lượt đánh giá từ người mua thực tế</p>

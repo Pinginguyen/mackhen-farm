@@ -31,7 +31,7 @@ const results = await Promise.all(routes.map(async (route) => {
     });
     const responseTime = Math.round(performance.now() - startedAt);
     const statusAccepted = response.status === 200 || response.status === 307;
-    const latencyAccepted = responseTime < 2500;
+    const latencyAccepted = responseTime < 2000;
 
     return {
       Route: route,
