@@ -6,6 +6,7 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import LogoutButton from '@/app/logout-button';
 import LiveProductSearch from './LiveProductSearch';
 import CartLink from './CartLink';
+import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
 
 export default async function Header() {
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
@@ -39,6 +40,7 @@ export default async function Header() {
       <div className="site-header-actions">
         <Link className="mobile-search-trigger" href="/products" aria-label="Tìm sản phẩm"><Search size={19} /></Link>
         <CartLink />
+        <LocaleCurrencySwitcher />
         {!user ? (
           <>
             <Link className="mobile-account-trigger" href="/dang-nhap" aria-label="Đăng nhập"><UserRound size={19} /></Link>

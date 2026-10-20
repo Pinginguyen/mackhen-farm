@@ -508,6 +508,7 @@ textarea {
 
 .site-header-actions > a,
 .site-header-actions > details,
+.site-header-actions > .header-locale-wrap,
 .site-header-actions .account-menu summary,
 .site-header-actions .account-avatar {
   flex-shrink: 0;
@@ -2910,6 +2911,125 @@ textarea {
 .payment-method-options small {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.checkout-country-field select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.checkout-cross-border-notice {
+  margin: -4px 0 0;
+  padding: 11px 13px;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  background: #f5f6f7;
+  color: #475569;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.payment-method-options label.payment-method-disabled {
+  cursor: not-allowed;
+  background: #f6f6f4;
+  color: #666;
+}
+
+.payment-method-disabled > input {
+  accent-color: #a3a3a3;
+}
+
+.payment-method-options .payment-sandbox-badge {
+  width: fit-content;
+  margin-top: 3px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #fff2d2;
+  color: #79540c;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.header-locale-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.header-locale-switcher {
+  position: relative;
+}
+
+.header-locale-switcher summary {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 650;
+  list-style: none;
+}
+
+.header-locale-switcher summary::-webkit-details-marker {
+  display: none;
+}
+
+.header-locale-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 70;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 10px 24px rgba(35, 32, 26, 0.14);
+}
+
+.header-locale-dropdown button {
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.header-locale-dropdown button:hover {
+  background: #f4f1ea;
+}
+
+.header-locale-switcher:not([open]):hover > .header-locale-dropdown {
+  display: block;
+}
+
+.header-locale-toast {
+  position: fixed;
+  top: 78px;
+  right: 16px;
+  z-index: 80;
+  width: min(360px, calc(100vw - 32px));
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 10px 26px rgba(35, 32, 26, 0.16);
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 
 .address-fields {

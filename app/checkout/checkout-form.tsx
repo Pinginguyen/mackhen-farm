@@ -120,6 +120,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
   const [loadingVouchers, setLoadingVouchers] = useState(false);
   const [voucherListError, setVoucherListError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod);
+  const [shippingCountry, setShippingCountry] = useState('VN');
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
   const normalizedVoucher = voucher.trim().toUpperCase();
@@ -201,6 +202,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
 
   async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (shippingCountry !== 'VN') return;
     if (submitLock.current) return;
     submitLock.current = true;
     setSubmitting(true);
@@ -309,6 +311,8 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
 
   return (
     <form ref={formRef} className="form-list" onSubmit={submitOrder}>
+      <div className="field checkout-country-field"><label htmlFor="shipping-country">Quốc gia giao hàng</label><select id="shipping-country" value={shippingCountry} onChange={(event) => setShippingCountry(event.target.value)}><option value="VN">Việt Nam</option><option value="SG">Singapore</option><option value="MY">Malaysia</option></select></div>
+      {shippingCountry !== 'VN' && <p className="checkout-cross-border-notice" role="status">Hệ thống vận chuyển xuyên biên giới (Cross-border Shipping) đang trong giai đoạn tích hợp đối tác. Phí vận chuyển sẽ được tự động quy đổi sang SGD/MYR.</p>}
       <div className="field"><label htmlFor="name">Họ tên</label><input id="name" name="name" autoComplete="name" defaultValue={initialCustomer?.name} required /></div>
       <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" defaultValue={initialCustomer?.email} /></div>
       <div className="field"><label htmlFor="phone">Điện thoại</label><ValidatedPhoneInput id="phone" name="phone" autoComplete="tel" defaultValue={initialCustomer?.phone} required /></div>
@@ -340,10 +344,11 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       <fieldset className="payment-method-options"><legend>Phương thức thanh toán</legend>
         <label className={paymentMethod === 'COD' ? 'is-selected' : ''}><input type="radio" name="method" value="COD" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} /><span><strong>COD</strong><small>Thanh toán khi nhận hàng</small></span></label>
         <label className={paymentMethod === 'VIETQR' ? 'is-selected' : ''}><input type="radio" name="method" value="VIETQR" checked={paymentMethod === 'VIETQR'} onChange={() => setPaymentMethod('VIETQR')} /><span><strong>VietQR</strong><small>Quét mã, chuyển khoản ngân hàng</small></span></label>
+        <label className="payment-method-disabled"><input type="radio" name="method" value="HITPAY" disabled /><span><strong>Thanh toán Quốc tế (Singapore / Malaysia)</strong><small>(Hỗ trợ ShopeePay, PayNow, GrabPay qua cổng HitPay)</small><small className="payment-sandbox-badge">[ Đang thử nghiệm Sandbox - Giai đoạn 2 ]</small></span></label>
       </fieldset>
       <div className="field"><label htmlFor="notes">Ghi chú</label><textarea id="notes" name="notes" rows={4} /></div>
       {mobileSummary && <div className="checkout-mobile-summary summary-card">{mobileSummary}</div>}
-      <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
+      <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || shippingCountry !== 'VN' || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
         {submitting
           ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang khởi tạo giao dịch an toàn...</>
           : retryAvailable ? 'Kiểm tra trạng thái / Thử lại an toàn' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
