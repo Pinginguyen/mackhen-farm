@@ -60,3 +60,32 @@ export async function sendCompensationVoucherEmail(input: {
     html: `<div style="margin:0;padding:36px 16px;background:#f7f4ed;font-family:Arial,sans-serif;color:#292524"><div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e7e1d8;border-radius:14px;overflow:hidden"><div style="padding:25px 30px;background:#8b1e1e;color:#fff"><p style="margin:0 0 7px;font-size:12px;text-transform:uppercase;color:#f4d8b0">Mắc Khén Farm</p><h1 style="margin:0;font-size:23px">Lời xin lỗi và món quà từ chúng tôi</h1></div><div style="padding:30px"><p style="margin:0 0 16px;line-height:1.65">Xin lỗi bạn vì sự cố giao sai sản phẩm hoặc chất lượng hàng hóa trong đơn <strong>${orderCode}</strong>. Mắc Khén Farm gửi tặng bạn voucher bồi thường để thay lời xin lỗi.</p><p style="margin:20px 0;padding:18px;border:1px dashed #8b1e1e;border-radius:10px;text-align:center"><strong style="display:block;margin-bottom:8px;font-size:13px;color:#57534e">MÃ VOUCHER</strong><span style="font-size:23px;font-weight:700;letter-spacing:1px;color:#8b1e1e">${voucherCode}</span><span style="display:block;margin-top:8px;font-size:15px">Giảm <strong>${discount}</strong></span></p><p style="margin:28px 0;text-align:center"><a href="${escapedStoreUrl}" style="display:inline-block;padding:14px 24px;border-radius:9px;background:#8b1e1e;color:#fff;text-decoration:none;font-size:15px;font-weight:700">Dùng ngay tại cửa hàng</a></p><p style="margin:0;color:#78716c;font-size:12px;line-height:1.6">Cảm ơn bạn đã thông cảm và tiếp tục ủng hộ Mắc Khén Farm.</p></div></div></div>`,
   });
 }
+
+export async function sendB2bInquiryEmail(input: {
+  companyName: string;
+  country: string;
+  contactName: string;
+  email: string;
+  phone: string | null;
+  expectedVolume: string;
+  message: string | null;
+}) {
+  const { user, transporter } = createEmailTransporter();
+  const recipient = process.env.B2B_INQUIRY_EMAIL || process.env.ADMIN_EMAIL || 'admin@mackhenfarm.vn';
+  const companyName = escapeHtml(input.companyName);
+  const country = escapeHtml(input.country);
+  const contactName = escapeHtml(input.contactName);
+  const email = escapeHtml(input.email);
+  const phone = escapeHtml(input.phone || 'Không cung cấp');
+  const expectedVolume = escapeHtml(input.expectedVolume);
+  const message = escapeHtml(input.message || 'Không có');
+
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: recipient,
+    replyTo: input.email,
+    subject: '[Mắc Khén Farm] Yêu cầu hợp tác B2B mới',
+    text: `Công ty: ${input.companyName}\nQuốc gia: ${input.country}\nNgười liên hệ: ${input.contactName}\nEmail: ${input.email}\nĐiện thoại: ${input.phone || 'Không cung cấp'}\nMOQ dự kiến: ${input.expectedVolume}\nNội dung: ${input.message || 'Không có'}`,
+    html: `<div style="font-family:Arial,sans-serif;color:#292524"><h1>Yêu cầu hợp tác B2B mới</h1><p><strong>Công ty:</strong> ${companyName}</p><p><strong>Quốc gia:</strong> ${country}</p><p><strong>Người liên hệ:</strong> ${contactName}</p><p><strong>Email:</strong> ${email}</p><p><strong>Điện thoại:</strong> ${phone}</p><p><strong>MOQ dự kiến:</strong> ${expectedVolume}</p><p><strong>Nội dung:</strong><br>${message.replace(/\n/g, '<br>')}</p></div>`,
+  });
+}

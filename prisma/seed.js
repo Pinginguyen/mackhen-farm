@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { hash } = require('bcryptjs');
 require('dotenv').config();
 
 const prisma = new PrismaClient();
@@ -189,9 +190,10 @@ async function main() {
         where: { productId: savedProduct.id },
       });
       const variantData = {
-        label: product.unit,
+        title: product.title || product.label || product.unit || 'Túi 150g',
         price: product.price,
         weight: `${product.weight}g`,
+        inventory: product.stock,
       };
 
       if (existingVariant) {
@@ -201,14 +203,74 @@ async function main() {
         });
       } else {
         await transaction.productVariant.create({
-          data: { ...variantData, stock: product.stock, productId: savedProduct.id },
+          data: { ...variantData, productId: savedProduct.id },
         });
       }
     }
   });
 
+  const coreVouchers = [
+    {
+      code: 'FREESHIP',
+      name: 'Miễn phí vận chuyển toàn quốc',
+      discountType: 'FIXED',
+      value: 35000,
+      maxDiscount: null,
+      minSpend: 250000,
+      expiresAt: null,
+      isActive: true,
+      usageLimit: null,
+      freeShipping: true,
+      firstOrderOnly: false,
+      showOnPromoPage: true,
+    },
+    {
+      code: 'GIAM10',
+      name: 'Ưu đãi thành viên mới - Đơn đầu tiên',
+      discountType: 'PERCENTAGE',
+      value: 10,
+      maxDiscount: 30000,
+      minSpend: 150000,
+      expiresAt: null,
+      isActive: true,
+      usageLimit: null,
+      freeShipping: false,
+      firstOrderOnly: true,
+      showOnPromoPage: true,
+    },
+  ];
+
+  for (const voucher of coreVouchers) {
+    await prisma.voucher.upsert({
+      where: { code: voucher.code },
+      create: voucher,
+      update: {},
+    });
+  }
+
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
+  if (!adminPassword || adminPassword.length < 10) {
+    throw new Error('ADMIN_INITIAL_PASSWORD is required and must contain at least 10 characters.');
+  }
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@mackhenfarm.vn' },
+    create: {
+      email: 'admin@mackhenfarm.vn',
+      name: 'Quản Trị Viên Mắc Khén Farm',
+      password: await hash(adminPassword, 12),
+      role: 'ADMIN',
+    },
+    update: {
+      name: 'Quản Trị Viên Mắc Khén Farm',
+      password: await hash(adminPassword, 12),
+      role: 'ADMIN',
+    },
+    select: { email: true, role: true },
+  });
+
   const count = await prisma.product.count({ where: { active: true } });
-  console.log(`Seeded ${count} active products into database.`);
+  console.log(`Seeded ${count} active products and ${coreVouchers.length} core vouchers into database.`);
+  console.log(`Admin account ready: ${admin.email} (${admin.role}).`);
 }
 
 main()

@@ -7,7 +7,7 @@ const { createTransport, sendMail } = vi.hoisted(() => ({
 
 vi.mock('nodemailer', () => ({ default: { createTransport } }));
 
-import { sendCompensationVoucherEmail, sendPasswordResetEmail } from './email';
+import { sendB2bInquiryEmail, sendCompensationVoucherEmail, sendPasswordResetEmail } from './email';
 
 describe('sendPasswordResetEmail', () => {
   beforeEach(() => {
@@ -104,5 +104,37 @@ describe('sendCompensationVoucherEmail', () => {
     });
 
     expect(sendMail.mock.calls[0][0].text).toContain('giảm 50.000đ');
+  });
+});
+
+describe('sendB2bInquiryEmail', () => {
+  beforeEach(() => {
+    vi.stubEnv('SMTP_USER', 'shop@example.com');
+    vi.stubEnv('SMTP_PASSWORD', 'test-app-password');
+    vi.stubEnv('B2B_INQUIRY_EMAIL', 'partners@example.com');
+    createTransport.mockReset().mockReturnValue({ sendMail });
+    sendMail.mockReset().mockResolvedValue({ messageId: 'mail-b2b' });
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('emails the configured partner inbox and escapes inquiry content', async () => {
+    await sendB2bInquiryEmail({
+      companyName: '<Importer & Co>',
+      country: 'Singapore',
+      contactName: 'Jamie Tan',
+      email: 'jamie@example.com',
+      phone: null,
+      expectedVolume: '500 packs',
+      message: '<script>alert(1)</script>',
+    });
+
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'partners@example.com',
+      replyTo: 'jamie@example.com',
+      subject: '[Mắc Khén Farm] Yêu cầu hợp tác B2B mới',
+      html: expect.stringContaining('&lt;Importer &amp; Co&gt;'),
+    }));
+    expect(sendMail.mock.calls[0][0].html).not.toContain('<script>');
   });
 });

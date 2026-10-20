@@ -27,6 +27,8 @@ export default function SiteFooter() {
           <Link href="/tra-cuu">Tra cứu hành trình đơn hàng</Link>
           <Link href="/tra-cuu#return-request-form">Chính sách bảo hành vị giác (Đổi mới trong 24h)</Link>
           <Link href="/products">Danh mục sản phẩm khô bò &amp; gia vị</Link>
+          <Link className="footer-b2b-link" href="/hop-tac-b2b">Hợp tác B2B (Wholesale)</Link>
+          <Link className="footer-b2b-link" href="/truy-xuat">Truy xuất nguồn gốc theo Lô</Link>
         </nav>
         <section className="site-footer-column">
           <h2>TIÊU CHUẨN &amp; PHÁP LÝ</h2>

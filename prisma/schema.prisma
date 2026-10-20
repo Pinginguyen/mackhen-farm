@@ -256,6 +256,22 @@ model OrderItem {
   @@index([orderId])
 }
 
+model B2bInquiry {
+  id             String   @id @default(cuid())
+  companyName    String
+  country        String
+  contactName    String
+  email          String
+  phone          String?
+  expectedVolume String
+  message        String?  @db.Text
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([email, createdAt])
+}
+
 model Review {
   id           String   @id @default(cuid())
   orderId      String?
