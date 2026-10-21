@@ -21,10 +21,10 @@ const batches = {
     expiryDate: '12/10/2027',
     ingredients: 'Ớt thóc tươi, tỏi nếp Điện Biên, rau mùi tàu, mắc khén rang xay thủ công, muối hầm.',
     steps: [
-      { label: 'Nguyên liệu thô', detail: 'Ớt thóc tươi, tỏi nếp Điện Biên, rau mùi tàu, mắc khén rang xay thủ công, muối hầm.' },
-      { label: 'Chế biến & Định hình', detail: 'Thông tin công đoạn chưa được công bố cho lô này.' },
-      { label: 'Sấy dẻo', detail: 'Thông tin công đoạn chưa được công bố cho lô này.' },
-      { label: 'Kiểm nghiệm an toàn', detail: 'Thông tin hồ sơ kiểm nghiệm chưa được công bố cho lô này.' },
+      { label: 'Nguyên liệu thô', detail: 'Ớt thóc tươi, tỏi nếp Điện Biên thu mua từ nông hộ Mường Phăng; Hạt mắc khén & hạt dổi rừng rang thơm từ HTX Bản Lướt, Sơn La; Muối hầm sạch.' },
+      { label: 'Phối trộn & Giã tay', detail: 'Nướng thơm tỏi ớt trên than củi, giã nhuyễn thủ công cùng hạt mắc khén và rau mùi tàu theo công thức truyền thống dân tộc Thái.' },
+      { label: 'Ủ vị & Chiết rót', detail: 'Ủ cân bằng vị cay nồng tê nhẹ trong 24 giờ, chiết rót tự động vào hũ nắp nhôm 250g, dán màng seal nhiệt ngăn oxy hóa.' },
+      { label: 'Kiểm nghiệm an toàn', detail: 'Đạt chuẩn an toàn sinh học QCVN 8-2:2011/BYT. Không phẩm màu, không chất bảo quản nhân tạo. Phiếu kiểm nghiệm vi sinh số 28/ATTP-MKF.' },
     ],
   },
 } as const;
