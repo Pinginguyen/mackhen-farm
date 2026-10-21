@@ -40,7 +40,7 @@ export default function LocaleCurrencySwitcher() {
       <button type="button" className="header-locale-switcher" aria-label={locale === 'en' ? 'Choose language and currency' : 'Chọn ngôn ngữ và tiền tệ'} aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>
         {selectedLanguage.flag} {currency} <span aria-hidden="true">▾</span>
       </button>
-      {isOpen && <div className="header-locale-dropdown absolute right-0 top-full mt-1.5 w-48 bg-white rounded-xl shadow-lg border border-stone-200 py-1.5 z-50">
+      {isOpen && <div className="header-locale-dropdown absolute right-0 top-full mt-1.5 w-48 z-50 bg-white shadow-lg border border-stone-200 rounded-xl">
         {languages.map((language) => <button
           key={language.code}
           type="button"
