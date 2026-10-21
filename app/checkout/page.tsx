@@ -7,6 +7,7 @@ import { readCartSnapshot } from '@/lib/cart-server';
 import CheckoutForm, { BuyNowCartRecovery } from './checkout-form';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import CheckoutOrderSummary from './checkout-order-summary';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
@@ -22,17 +23,12 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
   }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
   const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
-  const orderSummary = <>
-    <h3>Đơn hàng</h3>
-    <div className="summary-list">
-      {cart.items.map((item) => <div className="item" key={`${item.productId}-${item.variantId ?? 'single'}`}><span>{item.name ?? 'Sản phẩm'} x{item.quantity ?? 1}</span><strong>{(item.total ?? 0).toLocaleString('vi-VN')}đ</strong></div>)}
-      <div className="item"><span>Vận chuyển</span><strong>{freeShippingApplied ? <><del>35.000đ</del> 0đ</> : cart.shipping === 0 ? 'Miễn phí · 0đ' : `${cart.shipping.toLocaleString('vi-VN')}đ`}</strong></div>
-      <div className="item"><span>Tạm tính trước mã giảm giá</span><strong>{cart.total.toLocaleString('vi-VN')}đ</strong></div>
-    </div>
-    {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
-    {!freeShippingApplied && cart.shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
-    <div className="cart-footer"><Link href="/cart" className="secondary-action">Quay lại giỏ hàng</Link></div>
-  </>;
+  const orderSummary = <CheckoutOrderSummary
+    items={cart.items.map((item) => ({ id: `${item.productId}-${item.variantId ?? 'single'}`, name: item.name ?? 'Sản phẩm', quantity: item.quantity ?? 1, total: item.total ?? 0 }))}
+    shipping={cart.shipping}
+    total={cart.total}
+    freeShippingApplied={freeShippingApplied}
+  />;
   return (
     <main className="page-shell checkout-page">
       <section className="page-card">

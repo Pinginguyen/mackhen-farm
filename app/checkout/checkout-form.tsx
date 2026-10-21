@@ -10,6 +10,8 @@ import { getErrorMessage } from '@/lib/error-message';
 import { createAbortSignal } from '@/lib/request-timeout';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import VietnamAddressFields from './vietnam-address-fields';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+import { formatApproxVnd } from '@/lib/translations';
 
 type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number };
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
@@ -102,6 +104,7 @@ function rememberUserOrder(orderCode: string) {
 }
 
 export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
+  const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const router = useRouter();
   const [message, setMessage] = useState('');
   const [retryAvailable, setRetryAvailable] = useState(false);
@@ -173,7 +176,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       }
       setAppliedVoucher(code);
       setVoucherDiscount(result.discount);
-      setVoucherFeedback({ type: 'success', text: `Đã áp dụng mã ${code}: giảm ${result.discount.toLocaleString('vi-VN')}đ.` });
+      setVoucherFeedback({ type: 'success', text: locale === 'en' ? `Code ${code} applied: ${formatCurrency(result.discount)} off.` : `Đã áp dụng mã ${code}: giảm ${formatCurrency(result.discount)}.` });
     } catch {
       setVoucherFeedback({ type: 'error', text: 'Không thể kiểm tra mã giảm giá. Vui lòng thử lại.' });
     } finally {
@@ -340,7 +343,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       </div>}
       {voucherFeedback && <p className={voucherFeedback.type === 'success' ? 'checkout-voucher-success' : 'checkout-voucher-error'} role={voucherFeedback.type === 'success' ? 'status' : 'alert'}>{voucherFeedback.text}</p>}
       {voucherFeedback?.requiresLogin && <p className="checkout-voucher-error"><Link href={`/dang-nhap?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Đăng nhập</Link> · <Link href={`/dang-ky?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>Tạo tài khoản</Link></p>}
-      {appliedVoucher && <div className="checkout-discount-summary"><span>Giảm giá</span><strong>−{discount.toLocaleString('vi-VN')}đ</strong><span>Tổng thanh toán sau giảm</span><strong>{checkoutTotal.toLocaleString('vi-VN')}đ</strong></div>}
+      {appliedVoucher && <div className="checkout-discount-summary"><span>{locale === 'en' ? 'Discount' : 'Giảm giá'}</span><strong>−{formatCurrency(discount)}</strong><span>{locale === 'en' ? 'Total after discount' : 'Tổng thanh toán sau giảm'}</span><strong>{formatCurrency(checkoutTotal)}{currency === 'SGD' && <> ({formatApproxVnd(checkoutTotal)})</>}</strong>{currency === 'SGD' && <small>Thanh toán quy đổi theo tỷ giá liên ngân hàng</small>}</div>}
       <fieldset className="payment-method-options"><legend>Phương thức thanh toán</legend>
         <label className={paymentMethod === 'COD' ? 'is-selected' : ''}><input type="radio" name="method" value="COD" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} /><span><strong>COD</strong><small>Thanh toán khi nhận hàng</small></span></label>
         <label className={paymentMethod === 'VIETQR' ? 'is-selected' : ''}><input type="radio" name="method" value="VIETQR" checked={paymentMethod === 'VIETQR'} onChange={() => setPaymentMethod('VIETQR')} /><span><strong>VietQR</strong><small>Quét mã, chuyển khoản ngân hàng</small></span></label>
@@ -351,7 +354,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       <button className="primary-action" type="submit" disabled={checkoutUnavailable || !items.length || shippingCountry !== 'VN' || (buyNow && (!buyNowLoaded || !buyNowSnapshot)) || submitting}>
         {submitting
           ? <><LoaderCircle className="checkout-loading-icon" size={18} aria-hidden="true" />Đang khởi tạo giao dịch an toàn...</>
-          : retryAvailable ? 'Kiểm tra trạng thái / Thử lại an toàn' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : 'Xác nhận đơn hàng'}
+          : retryAvailable ? 'Kiểm tra trạng thái / Thử lại an toàn' : checkoutUnavailable ? 'Tạm thời chưa thể xác nhận' : t('placeOrder')}
       </button>
       {message && <p className="checkout-inline-error" role={retryAvailable ? 'status' : 'alert'}>{message}</p>}
     </form>

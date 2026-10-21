@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 type CartResponse = { items?: { quantity?: number }[] };
 type CartUpdatedEvent = CustomEvent<{ count?: number }>;
 
 export default function CartLink() {
   const [count, setCount] = useState(0);
+  const { t, locale } = useLocaleCurrency();
 
   useEffect(() => {
     let requestVersion = 0;
@@ -39,7 +41,7 @@ export default function CartLink() {
   }, []);
 
   return (
-    <Link className="header-cart" href="/cart" aria-label={`Giỏ hàng${count ? `, ${count} sản phẩm` : ''}`}>
+    <Link className="header-cart" href="/cart" aria-label={`${t('cart')}${count ? `, ${count} ${locale === 'en' ? 'items' : 'sản phẩm'}` : ''}`}>
       <ShoppingBag size={19} />
       {count > 0 && <span className="header-cart-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
     </Link>

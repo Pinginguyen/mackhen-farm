@@ -7,6 +7,7 @@ import SiteHeaderVisibility from '@/components/layout/SiteHeaderVisibility';
 import SmoothScroll from '@/components/SmoothScroll';
 import CartToast from '@/components/CartToast';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
+import { LocaleCurrencyProvider } from '@/lib/i18n-context';
 import { Be_Vietnam_Pro } from 'next/font/google';
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -39,16 +40,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi">
       <body className={beVietnamPro.variable}>
-        <SmoothScroll>
-          <div className="app-viewport overflow-x-hidden">
-            <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
-            {children}
-            <SiteFooter />
-            <FloatingContact />
-            <CartToast />
-            <ExitIntentPopup />
-          </div>
-        </SmoothScroll>
+        <LocaleCurrencyProvider>
+          <SmoothScroll>
+            <div className="app-viewport overflow-x-hidden">
+              <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
+              {children}
+              <SiteFooter />
+              <FloatingContact />
+              <CartToast />
+              <ExitIntentPopup />
+            </div>
+          </SmoothScroll>
+        </LocaleCurrencyProvider>
       </body>
     </html>
   );

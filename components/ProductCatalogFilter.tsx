@@ -6,6 +6,7 @@ import { ArrowRight } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
 import type { NutritionFacts } from '@/lib/store-data';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export type CatalogProduct = {
   id: string;
@@ -32,6 +33,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_50' | '50_100' | 'OVER_150'>('ALL');
   const [proteinOnly, setProteinOnly] = useState(false);
   const [query, setQuery] = useState(initialQuery);
+  const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
   useEffect(() => setQuery(initialQuery), [initialQuery]);
   const plantProducts = products.filter((product) => product.category !== 'Gia vị Tây Bắc');
   const spiceProducts = products.filter((product) => product.category === 'Gia vị Tây Bắc');
@@ -81,10 +83,10 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
                 <div className="meta-row"><span>{product.category} • {product.unit ?? 'Khối lượng chưa cập nhật'}</span></div>
                 <ProductRating rating={product.rating} showValue={false} size="sm" />
               </div>
-              <h4 className="product-name"><Link href={`/products/${product.slug}`}>{product.name}</Link></h4>
+              <h4 className="product-name"><Link href={`/products/${product.slug}`}>{translateProductName(product.name)}</Link></h4>
               <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
               <div className="product-card-pricing">
-                <div className="product-prices"><strong>{product.price.toLocaleString('vi-VN')}đ</strong>{product.originalPrice != null && <del>{product.originalPrice.toLocaleString('vi-VN')}đ</del>}</div>
+                <div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</div>
               </div>
               <Link
                 href={`/products/${product.slug}`}
@@ -93,7 +95,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
                 onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
                 className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
               >
-                {product.stock === 0 ? 'Tạm hết hàng' : <>Chọn mua <ArrowRight size={16} /></>}
+                {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
               </Link>
             </div>
           </article>

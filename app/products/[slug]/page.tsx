@@ -7,6 +7,7 @@ import ProductImageGallery from './product-image-gallery';
 import ProductRating from '@/components/ProductRating';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 import ProductHighlights from '@/components/ProductHighlights';
+import LocalizedProductName from './localized-product-name';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -91,7 +92,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
           <div className="detail-copy">
             <div className="detail-header-row">
               <div className="detail-title-stack">
-                <h1>{product.name}</h1>
+                <h1><LocalizedProductName name={product.name} /></h1>
               </div>
               <div className="detail-header-tags">
                 <span className="pill">{product.category}</span>

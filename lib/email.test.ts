@@ -118,7 +118,7 @@ describe('sendB2bInquiryEmail', () => {
 
   afterEach(() => vi.unstubAllEnvs());
 
-  it('emails the configured partner inbox and escapes inquiry content', async () => {
+  it('emails the SMTP account and escapes inquiry content', async () => {
     await sendB2bInquiryEmail({
       companyName: '<Importer & Co>',
       country: 'Singapore',
@@ -130,11 +130,32 @@ describe('sendB2bInquiryEmail', () => {
     });
 
     expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'partners@example.com',
+      to: 'shop@example.com',
       replyTo: 'jamie@example.com',
       subject: '[Mắc Khén Farm] Yêu cầu hợp tác B2B mới',
       html: expect.stringContaining('&lt;Importer &amp; Co&gt;'),
     }));
     expect(sendMail.mock.calls[0][0].html).not.toContain('<script>');
+  });
+
+  it('uses the Gmail fallback when SMTP_USER is empty, ignoring old recipient settings', async () => {
+    vi.stubEnv('SMTP_USER', '');
+    vi.stubEnv('EMAIL_USER', 'legacy@example.com');
+    vi.stubEnv('EMAIL_PASS', 'legacy-app-password');
+    vi.stubEnv('B2B_INQUIRY_EMAIL', 'admin@mackhenfarm.vn');
+    vi.stubEnv('ADMIN_EMAIL', 'admin@mackhenfarm.vn');
+
+    await sendB2bInquiryEmail({
+      companyName: 'Importer Co',
+      country: 'Singapore',
+      contactName: 'Jamie Tan',
+      email: 'jamie@example.com',
+      phone: null,
+      expectedVolume: '500 packs',
+      message: null,
+    });
+
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: 'trungchau1210@gmail.com' }));
+    expect(sendMail.mock.calls[0][0].to).not.toBe('admin@mackhenfarm.vn');
   });
 });

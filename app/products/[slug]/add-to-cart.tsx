@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Minus, Plus } from 'lucide-react';
 
 import type { ProductVariant } from '@/lib/store-data';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export default function AddToCart({ productId, productSlug, name, image, price, originalPrice, unit, variants }: {
   productId: string;
@@ -23,6 +24,8 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const [saving, setSaving] = useState(false);
   const [productUnavailable, setProductUnavailable] = useState(false);
   const [showStickyBuyBar, setShowStickyBuyBar] = useState(false);
+  const { locale, formatCurrency, t, translateProductName } = useLocaleCurrency();
+  const localizedName = translateProductName(name);
   const primaryActionsRef = useRef<HTMLDivElement>(null);
   const selectedVariant = variants.find((variant) => variant.id === variantId);
   const selectedPrice = selectedVariant?.price ?? price;
@@ -109,14 +112,14 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   return (
     <div className="cart-add-control">
       <div className="detail-prices">
-        <strong>{selectedPrice.toLocaleString('vi-VN')}đ</strong>
-        {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del>{selectedOriginalPrice.toLocaleString('vi-VN')}đ</del>}
+        <strong>{formatCurrency(selectedPrice)}</strong>
+        {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del>{formatCurrency(selectedOriginalPrice)}</del>}
       </div>
       {variants.length >= 2 && (
         <label className="field">
           <span>Phân loại</span>
           <select value={variantId} onChange={(event) => setVariantId(event.target.value)}>
-            {variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>{variant.label} · {variant.weight} · {variant.price.toLocaleString('vi-VN')}đ</option>)}
+            {variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>{variant.label} · {variant.weight} · {formatCurrency(variant.price)}</option>)}
           </select>
         </label>
       )}
@@ -130,13 +133,13 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang thêm...' : 'Thêm vào giỏ'}</button>
-        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <button className="primary-action" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
+        <button className="secondary-action" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
         <img src={image} alt="" />
-        <span><strong>{name}</strong><b>{selectedPrice.toLocaleString('vi-VN')}đ</b></span>
-        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? 'Đang xử lý...' : 'Mua ngay'}</button>
+        <span><strong>{localizedName}</strong><b>{formatCurrency(selectedPrice)}</b></span>
+        <button type="button" className="primary-action" onClick={() => void addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>}
       {message && <p role="status">{message}</p>}
     </div>

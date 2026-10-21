@@ -71,7 +71,7 @@ export async function sendB2bInquiryEmail(input: {
   message: string | null;
 }) {
   const { user, transporter } = createEmailTransporter();
-  const recipient = process.env.B2B_INQUIRY_EMAIL || process.env.ADMIN_EMAIL || 'admin@mackhenfarm.vn';
+  const recipient = process.env.SMTP_USER || 'trungchau1210@gmail.com';
   const companyName = escapeHtml(input.companyName);
   const country = escapeHtml(input.country);
   const contactName = escapeHtml(input.contactName);

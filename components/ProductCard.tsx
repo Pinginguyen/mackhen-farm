@@ -8,18 +8,21 @@ import { ArrowRight, Eye } from 'lucide-react';
 import ProductRating from '@/components/ProductRating';
 import ProductQuickView from '@/components/ProductQuickView';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export default function ProductCard({ product, index }: { product: CatalogProduct; index: number }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false);
+  const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
+  const productName = translateProductName(product.name);
   const secondImage = product.images?.find((image) => image && image !== product.image);
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
 
   return (
     <article className={`product-card${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
       <div className={`image-box product-card-media${secondImage ? ' has-secondary' : ''}`}>
-        <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`Xem ${product.name}`}>
-          <Image className="product-card-image is-primary" src={product.image} alt={product.name} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
-          {secondImage && <Image className="product-card-image is-secondary" src={secondImage} alt={`${product.name}, góc chụp khác`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
+        <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
+          <Image className="product-card-image is-primary" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
+          {secondImage && <Image className="product-card-image is-secondary" src={secondImage} alt={`${productName}, alternate view`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
         </Link>
         <div className="product-badges">
           {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
@@ -27,16 +30,16 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
           <span className="product-badge">{product.highlight}</span>
         </div>
-        {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`Xem nhanh ${product.name}`}><Eye size={16} />Xem nhanh</button>}
+        {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
       </div>
       <div className="card-body">
         <div className="product-card-header">
           <div className="meta-row"><span>{product.category} • {product.unit ?? 'Khối lượng chưa cập nhật'}</span></div>
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
-        <h4 className="product-name"><Link href={`/products/${product.slug}`}>{product.name}</Link></h4>
+        <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
-        <div className="product-card-pricing"><div className="product-prices"><strong>{product.price.toLocaleString('vi-VN')}đ</strong>{product.originalPrice != null && <del>{product.originalPrice.toLocaleString('vi-VN')}đ</del>}</div></div>
+        <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</div></div>
         <Link
           href={`/products/${product.slug}`}
           aria-disabled={product.stock === 0}
@@ -44,7 +47,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
           className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
         >
-          {product.stock === 0 ? 'Tạm hết hàng' : <>Chọn mua <ArrowRight size={16} /></>}
+          {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
         </Link>
       </div>
       {quickViewOpen && <ProductQuickView product={product} onClose={() => setQuickViewOpen(false)} />}
