@@ -7,6 +7,8 @@ import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
 import { fetchApiWithFallback } from '@/lib/server-api';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import LocalizedText from '@/components/LocalizedText';
+import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -19,7 +21,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
   return (
     <main className="page-shell home-page">
       <ScrollReveal groups={homeRevealGroups} />
-      {searchParams.error === 'forbidden' && <p className="role-notice" role="alert">Bạn không có quyền truy cập khu vực quản trị.</p>}
+      {searchParams.error === 'forbidden' && <p className="role-notice" role="alert"><LocalizedText text="Bạn không có quyền truy cập khu vực quản trị." /></p>}
 
       <section className="hero">
         <div className="hero3d-layer" aria-hidden="true">
@@ -27,55 +29,52 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
         <div className="hero-copy">
           <div className="hero-badges">
-            <span className="pill">Upcycled Food · Hương vị Tây Bắc</span>
-            <Link href="/products" className="hero-proof-badge"><Sparkles size={16} />Gia vị Tây Bắc</Link>
+            <span className="pill"><LocalizedText text="Upcycled Food · Hương vị Tây Bắc" /></span>
+            <Link href="/products" className="hero-proof-badge"><Sparkles size={16} /><LocalizedText text="Gia vị Tây Bắc" /></Link>
           </div>
-          <h1><span className="hero-title-main">Khô bò thực vật</span><span className="hero-title-accent">High-Protein, đậm vị Tây Bắc</span></h1>
+          <h1><span className="hero-title-main"><LocalizedText text="Khô bò thực vật" /></span><span className="hero-title-accent"><LocalizedText text="High-Protein, đậm vị Tây Bắc" /></span></h1>
           <p>
-            Tái chế bã đậu nành thành món ăn giàu đạm, đậm vị mắc khén và hạt dổi, để nguyên liệu được sử dụng trọn vẹn hơn.
+            <LocalizedText text="Tái chế bã đậu nành thành món ăn giàu đạm, đậm vị mắc khén và hạt dổi, để nguyên liệu được sử dụng trọn vẹn hơn." />
           </p>
           <div className="hero-actions">
             <Link href="/products" className="primary-btn">
-              Khám phá sản phẩm <ArrowRight size={18} />
+              <LocalizedText text="Khám phá sản phẩm" /> <ArrowRight size={18} />
             </Link>
             <Link href="/tra-cuu" className="secondary-btn">
               <Truck size={17} />
-              Theo dõi đơn hàng
+              <LocalizedText text="Theo dõi đơn hàng" />
             </Link>
           </div>
           <ul className="trust-list hero-checklist">
             <li>
-              <ShieldCheck size={16} /> Tận dụng bã đậu nành địa phương
+              <ShieldCheck size={16} /> <LocalizedText text="Tận dụng bã đậu nành địa phương" />
             </li>
             <li>
-              <Truck size={16} /> Đóng gói sẵn sàng vận chuyển
+              <Truck size={16} /> <LocalizedText text="Đóng gói sẵn sàng vận chuyển" />
             </li>
             <li>
-              <Sparkles size={16} /> Mùi vị đặc trưng Tây Bắc
+              <Sparkles size={16} /> <LocalizedText text="Mùi vị đặc trưng Tây Bắc" />
             </li>
           </ul>
         </div>
         <div className="hero-media">
           <div className="photo-card">
-            <img
-              src="/products/xe-soi.jpg"
-              alt="Món ăn vặt khô và gia vị Tây Bắc"
-            />
+            <LocalizedHeroImage />
           </div>
         </div>
       </section>
 
       <section className="comparison-section">
-        <div className="section-heading home-section-heading"><div><p className="eyebrow">So sánh lựa chọn</p><h2>Đậm vị thực vật, chi phí tối ưu</h2></div></div>
+        <div className="section-heading home-section-heading"><div><p className="eyebrow"><LocalizedText text="So sánh lựa chọn" /></p><h2><LocalizedText text="Đậm vị thực vật, chi phí tối ưu" /></h2></div></div>
         <div className="table-card comparison-table">
           <table>
             <thead>
-              <tr><th>Tiêu chí</th><th className="comparison-featured">Mắc Khén Farm</th><th>Khô bò thịt thật</th></tr>
+              <tr><th><LocalizedText text="Tiêu chí" /></th><th className="comparison-featured"><LocalizedText text="Mắc Khén Farm" /></th><th><LocalizedText text="Khô bò thịt thật" /></th></tr>
             </thead>
             <tbody>
-              <tr><th>Cholesterol</th><td className="comparison-featured">0% Cholesterol</td><td>Có cholesterol</td></tr>
-              <tr><th>Đạm</th><td className="comparison-featured">22g Đạm / túi</td><td>Tùy sản phẩm</td></tr>
-              <tr><th>Chi phí</th><td className="comparison-featured">Tiết kiệm ~50%</td><td>Giá cao hơn</td></tr>
+              <tr><th>Cholesterol</th><td className="comparison-featured">0% Cholesterol</td><td><LocalizedText text="Có cholesterol" /></td></tr>
+              <tr><th><LocalizedText text="Đạm" /></th><td className="comparison-featured"><LocalizedText text="22g Đạm / túi" /></td><td><LocalizedText text="Tùy sản phẩm" /></td></tr>
+              <tr><th><LocalizedText text="Chi phí" /></th><td className="comparison-featured"><LocalizedText text="Tiết kiệm ~50%" /></td><td><LocalizedText text="Giá cao hơn" /></td></tr>
             </tbody>
           </table>
         </div>
@@ -86,9 +85,9 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       <section className="catalog-section">
         <div className="section-heading home-section-heading catalog-heading">
           <div>
-            <h2 className="catalog-section-title">SẢN PHẨM BÁN CHẠY</h2>
+            <h2 className="catalog-section-title"><LocalizedText text="SẢN PHẨM BÁN CHẠY" /></h2>
           </div>
-          <Link href="/products">Xem tất cả</Link>
+          <Link href="/products"><LocalizedText text="Xem tất cả" /></Link>
         </div>
 
         <ProductCatalogFilter products={products} />
@@ -96,8 +95,8 @@ export default async function HomePage({ searchParams }: { searchParams: { error
 
       <section className="story-block">
         <div>
-          <p className="eyebrow">Vì sao lựa chọn Mắc Khén Farm?</p>
-          <h2>Tận dụng trọn nguyên liệu, giữ trọn vị ngon.</h2>
+          <p className="eyebrow"><LocalizedText text="Vì sao lựa chọn Mắc Khén Farm?" /></p>
+          <h2><LocalizedText text="Tận dụng trọn nguyên liệu, giữ trọn vị ngon." /></h2>
         </div>
         <div className="story-grid">
           {[
@@ -106,7 +105,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
             'Túi nhôm 3 lớp kết hợp gói khử oxy giúp bảo vệ sản phẩm trong quá trình bảo quản và vận chuyển.',
           ].map((item) => (
             <div key={item} className="story-item">
-              {item}
+              <LocalizedText text={item} />
             </div>
           ))}
         </div>

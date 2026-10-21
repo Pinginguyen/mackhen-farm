@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+import { translateContent } from '@/lib/translations';
 
 const productionSteps = [
   { title: 'Thu gom phụ phẩm', detail: 'Bã đậu nành địa phương được thu gom trong ngày.' },
@@ -19,27 +21,29 @@ const packagingLayers = [
 
 export default function HomeTransparencyTabs() {
   const [activeTab, setActiveTab] = useState<'production' | 'packaging'>('production');
+  const { locale } = useLocaleCurrency();
+  const text = (value: string) => translateContent(value, locale);
   const steps = activeTab === 'production' ? productionSteps : packagingLayers;
 
   return (
     <section className="home-transparency-section" aria-labelledby="home-transparency-title">
       <div className="home-transparency-heading">
-        <p className="eyebrow">Quy trình & tiêu chuẩn</p>
-        <h2 id="home-transparency-title">Minh bạch từ khâu sản xuất đến tay người tiêu dùng</h2>
+        <p className="eyebrow">{text('Quy trình & tiêu chuẩn')}</p>
+        <h2 id="home-transparency-title">{text('Minh bạch từ khâu sản xuất đến tay người tiêu dùng')}</h2>
       </div>
-      <div className="home-transparency-tabs" role="tablist" aria-label="Quy trình sản xuất và đóng gói">
+      <div className="home-transparency-tabs" role="tablist" aria-label={text('Quy trình sản xuất và đóng gói')}>
         <button type="button" role="tab" aria-selected={activeTab === 'production'} className={activeTab === 'production' ? 'is-active' : ''} onClick={() => setActiveTab('production')}>
-          5 Bước sản xuất sinh thái
+          {text('5 Bước sản xuất sinh thái')}
         </button>
         <button type="button" role="tab" aria-selected={activeTab === 'packaging'} className={activeTab === 'packaging' ? 'is-active' : ''} onClick={() => setActiveTab('packaging')}>
-          4 Lớp đóng gói tiêu chuẩn
+          {text('4 Lớp đóng gói tiêu chuẩn')}
         </button>
       </div>
       <ol className="home-transparency-steps" key={activeTab}>
         {steps.map((step, index) => (
           <li key={step.title} style={{ animationDelay: `${index * 70}ms` }}>
             <span>{String(index + 1).padStart(2, '0')}</span>
-            <div><strong>{step.title}</strong><p>{step.detail}</p></div>
+            <div><strong>{text(step.title)}</strong><p>{text(step.detail)}</p></div>
           </li>
         ))}
       </ol>

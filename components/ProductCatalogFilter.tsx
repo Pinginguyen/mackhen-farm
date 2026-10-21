@@ -7,6 +7,7 @@ import { ArrowRight } from 'lucide-react';
 import ProductRating from '@/components/ProductRating';
 import type { NutritionFacts } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import { translateContent } from '@/lib/translations';
 
 export type CatalogProduct = {
   id: string;
@@ -34,6 +35,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
   const [proteinOnly, setProteinOnly] = useState(false);
   const [query, setQuery] = useState(initialQuery);
   const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
+  const text = (value: string) => translateContent(value, locale);
   useEffect(() => setQuery(initialQuery), [initialQuery]);
   const plantProducts = products.filter((product) => product.category !== 'Gia vị Tây Bắc');
   const spiceProducts = products.filter((product) => product.category === 'Gia vị Tây Bắc');
@@ -50,41 +52,41 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
     return matchesSearch && matchesPrice && (!proteinOnly || proteinGrams > 20);
   });
   const tabs = [
-    { id: 'ALL' as const, label: `Tất cả sản phẩm (${products.length})` },
-    { id: 'PLANT' as const, label: `Khô bò thực vật High-Protein (${plantProducts.length})` },
-    { id: 'SPICE' as const, label: `Gia vị & Chẳm chéo Tây Bắc (${spiceProducts.length})` },
+    { id: 'ALL' as const, label: `${text('Tất cả sản phẩm')} (${products.length})` },
+    { id: 'PLANT' as const, label: `${text('Khô bò thực vật High-Protein')} (${plantProducts.length})` },
+    { id: 'SPICE' as const, label: `${text('Gia vị & Chẳm chéo Tây Bắc')} (${spiceProducts.length})` },
   ];
 
   return (
     <>
-      <div className="catalog-filter-tabs" role="tablist" aria-label="Lọc danh mục sản phẩm">
+      <div className="catalog-filter-tabs" role="tablist" aria-label={text('Lọc danh mục sản phẩm')}>
         {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{tab.label}</button>)}
       </div>
       <div className="catalog-facet-filters">
-        <label className="field">Mức giá<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">Tất cả</option><option value="UNDER_50">Dưới 50k</option><option value="50_100">50k - 100k</option><option value="OVER_150">Combo trên 150k</option></select></label>
-        <label className="catalog-protein-toggle"><input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />Giàu đạm (&gt;20g Protein)</label>
-        <label className="catalog-search-field"><span className="visually-hidden">Tìm trong danh mục</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm sản phẩm trong danh mục" /></label>
-        <span className="catalog-filter-count">{visibleProducts.length} sản phẩm</span>
+        <label className="field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>
+        <label className="catalog-protein-toggle"><input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />{text('Giàu đạm (>20g Protein)')}</label>
+        <label className="catalog-search-field"><span className="visually-hidden">{text('Tìm trong danh mục')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Tìm sản phẩm trong danh mục')} /></label>
+        <span className="catalog-filter-count">{visibleProducts.length} {text('sản phẩm')}</span>
       </div>
       <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
         {visibleProducts.map((product, index) => (
           <article key={product.id} className={`product-card${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
             <div className="image-box">
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={translateProductName(product.name)} />
               <div className="product-badges">
-                {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
-                {product.protein != null && <span className="product-badge nutrition-badge">{product.protein} Protein</span>}
-                {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
-                <span className="product-badge">{product.highlight}</span>
+                {product.stock === 0 && <span className="product-badge out-of-stock-badge">{text('Tạm hết hàng')}</span>}
+                {product.protein != null && <span className="product-badge nutrition-badge">{text(product.protein)} Protein</span>}
+                {product.badge?.trim() && <span className="product-highlight-badge">{text(product.badge)}</span>}
+                <span className="product-badge">{text(product.highlight)}</span>
               </div>
             </div>
             <div className="card-body">
               <div className="product-card-header">
-                <div className="meta-row"><span>{product.category} • {product.unit ?? 'Khối lượng chưa cập nhật'}</span></div>
+                <div className="meta-row"><span>{text(product.category)} • {text(product.unit ?? 'Khối lượng chưa cập nhật')}</span></div>
                 <ProductRating rating={product.rating} showValue={false} size="sm" />
               </div>
               <h4 className="product-name"><Link href={`/products/${product.slug}`}>{translateProductName(product.name)}</Link></h4>
-              <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
+              <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{text(product.description)}</p>
               <div className="product-card-pricing">
                 <div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</div>
               </div>
@@ -95,12 +97,12 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
                 onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
                 className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
               >
-                {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
+                {product.stock === 0 ? text('Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
               </Link>
             </div>
           </article>
         ))}
-        {!visibleProducts.length && <p className="empty-state">Danh mục hiện chưa có sản phẩm.</p>}
+        {!visibleProducts.length && <p className="empty-state">{text('Danh mục hiện chưa có sản phẩm.')}</p>}
       </div>
     </>
   );

@@ -748,6 +748,16 @@ textarea {
   border-radius: 22px;
 }
 
+.photo-card {
+  overflow: hidden;
+}
+
+.photo-card .hero-image-english {
+  object-position: right center;
+  transform: scale(1.8);
+  transform-origin: right center;
+}
+
 .feature-row,
 .catalog-section,
 .story-block,
@@ -3877,9 +3887,6 @@ textarea {
 
 .header-locale-switcher {
   position: relative;
-}
-
-.header-locale-switcher summary {
   display: inline-flex;
   min-height: 38px;
   align-items: center;
@@ -3891,24 +3898,21 @@ textarea {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 650;
-  list-style: none;
-}
-
-.header-locale-switcher summary::-webkit-details-marker {
-  display: none;
+  white-space: nowrap;
 }
 
 .header-locale-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 70;
-  min-width: 190px;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  box-shadow: 0 10px 24px rgba(35, 32, 26, 0.14);
+  z-index: 50;
+  width: 12rem;
+  padding: 4px 0;
+  overflow: hidden;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(35, 32, 26, 0.18);
 }
 
 .header-locale-dropdown button {
@@ -3925,27 +3929,6 @@ textarea {
 
 .header-locale-dropdown button:hover {
   background: #f4f1ea;
-}
-
-.header-locale-switcher:not([open]):hover > .header-locale-dropdown {
-  display: block;
-}
-
-.header-locale-toast {
-  position: fixed;
-  top: 78px;
-  right: 16px;
-  z-index: 80;
-  width: min(360px, calc(100vw - 32px));
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid #d9dee5;
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--text);
-  box-shadow: 0 10px 26px rgba(35, 32, 26, 0.16);
-  font-size: 0.84rem;
-  line-height: 1.5;
 }
 
 .address-fields {

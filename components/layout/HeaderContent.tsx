@@ -7,6 +7,7 @@ import LiveProductSearch from './LiveProductSearch';
 import CartLink from './CartLink';
 import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import { translateContent } from '@/lib/translations';
 
 export default function HeaderContent({ user }: { user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null }) {
   const { locale, t } = useLocaleCurrency();
@@ -17,7 +18,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
       <Link className="brand-wrap" href="/">
         <span className="brand-badge">M</span>
         <span>
-          <small className="eyebrow">Nông sản sấy vị Tây Bắc</small>
+          <small className="eyebrow">{translateContent('Nông sản sấy vị Tây Bắc', locale)}</small>
           <strong className="site-brand-name">Mắc Khén Farm</strong>
         </span>
       </Link>
@@ -30,7 +31,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
       </nav>
       <LiveProductSearch />
       <div className="site-header-actions">
-        <Link className="mobile-search-trigger" href="/products" aria-label="Tìm sản phẩm"><Search size={19} /></Link>
+        <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
         <CartLink />
         <LocaleCurrencySwitcher />
         {!user ? (
