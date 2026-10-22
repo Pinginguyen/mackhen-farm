@@ -6,31 +6,56 @@ export default function LocaleCurrencySwitcher() {
   const { locale, setLocaleCurrency } = useLocaleCurrency();
 
   return (
-    <div className="h-9 inline-flex items-center gap-1.5 px-2 rounded-xl border border-stone-200/70 bg-white text-[11px] font-medium tracking-wider text-stone-600 shadow-xs">
-      {/* Tiếng Việt / VNĐ */}
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        backgroundColor: '#f5f5f4',
+        padding: '3px',
+        borderRadius: '9999px',
+        border: '1px solid #e7e5e4',
+      }}
+    >
+      {/* Nút VNĐ */}
       <button
         type="button"
         onClick={() => setLocaleCurrency('vi', 'VND')}
-        className={`h-7 px-2 rounded-lg transition-all duration-300 cursor-pointer ${
-          locale === 'vi'
-            ? 'bg-white text-[#9B2424] font-bold shadow-2xs'
-            : 'hover:text-stone-900'
-        }`}
+        style={{
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          padding: '4px 12px',
+          borderRadius: '9999px',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.5px',
+          backgroundColor: locale === 'vi' ? '#9B2424' : 'transparent',
+          color: locale === 'vi' ? '#ffffff' : '#57534e',
+          boxShadow: locale === 'vi' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+          transition: 'all 0.2s ease',
+        }}
       >
         VNĐ
       </button>
 
-      <span className="text-stone-300 text-[10px]">|</span>
-
-      {/* English / SGD */}
+      {/* Nút SGD */}
       <button
         type="button"
         onClick={() => setLocaleCurrency('en', 'SGD')}
-        className={`h-7 px-2 rounded-lg transition-all duration-300 cursor-pointer ${
-          locale === 'en'
-            ? 'bg-white text-[#9B2424] font-bold shadow-2xs'
-            : 'hover:text-stone-900'
-        }`}
+        style={{
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          padding: '4px 12px',
+          borderRadius: '9999px',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.5px',
+          backgroundColor: locale === 'en' ? '#9B2424' : 'transparent',
+          color: locale === 'en' ? '#ffffff' : '#57534e',
+          boxShadow: locale === 'en' ? '0 1px 3px rgba(0,0,0,0.15)' : 'none',
+          transition: 'all 0.2s ease',
+        }}
       >
         SGD
       </button>
