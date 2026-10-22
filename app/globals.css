@@ -508,7 +508,6 @@ textarea {
 
 .site-header-actions > a,
 .site-header-actions > details,
-.site-header-actions > .header-locale-wrap,
 .site-header-actions .account-menu summary,
 .site-header-actions .account-avatar {
   flex-shrink: 0;
@@ -4022,58 +4021,6 @@ textarea {
   color: #79540c;
   font-size: 0.7rem;
   font-weight: 650;
-}
-
-.header-locale-wrap {
-  position: relative;
-  display: inline-block;
-  flex: 0 0 auto;
-}
-
-.header-locale-switcher {
-  position: relative;
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  padding: 0 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.header-locale-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 50;
-  width: 12rem;
-  padding: 6px 0;
-  overflow: hidden;
-  border: 1px solid #e7e5e4;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(35, 32, 26, 0.18);
-}
-
-.header-locale-dropdown button {
-  width: 100%;
-  padding: 10px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.header-locale-dropdown button:hover {
-  background: #f4f1ea;
 }
 
 .address-fields {
