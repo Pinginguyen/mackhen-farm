@@ -24,12 +24,12 @@ export default async function ProductsPage({ searchParams }: { searchParams?: { 
   }
 
   return (
-    <main className="page-shell">
-      <section className="page-card">
+    <main className="page-shell !bg-[#FAF7F2]">
+      <section className="page-card !rounded-2xl !border !border-stone-200/70 !bg-white shadow-sm">
         <div className="page-title">
           <div>
             <p className="eyebrow">Danh mục sản phẩm</p>
-            <h2>Khám phá sản phẩm Tây Bắc</h2>
+            <h2 className="text-2xl font-semibold text-stone-900">Khám phá sản phẩm Tây Bắc</h2>
           </div>
         </div>
 

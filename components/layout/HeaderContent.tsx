@@ -14,7 +14,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
-    <header className="topbar site-header sticky top-0 z-50 w-full bg-[#FDFBF7]/90 backdrop-blur-md border-b border-stone-200/80 shadow-sm transition-all duration-200">
+    <header className="topbar site-header sticky top-0 z-50 w-full bg-[#FDFBF7]/90 backdrop-blur-md border-b border-stone-200/80 shadow-sm transition-all duration-200 !sticky !top-0 !z-40 !bg-[#FAF7F2]/90 !backdrop-blur-md !border-b !border-stone-200/60 !py-2 !shadow-none">
       <Link className="brand-wrap" href="/">
         <span className="brand-badge">M</span>
         <span>
@@ -30,7 +30,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
         <Link href="/tra-cuu">{t('trackOrder')}</Link>
       </nav>
       <LiveProductSearch />
-      <div className="site-header-actions">
+      <div className="site-header-actions !gap-2.5">
         <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
         <CartLink />
         <LocaleCurrencySwitcher />
@@ -44,10 +44,10 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
           </>
         ) : (
           <>
-            {user.role === 'ADMIN' && <Link className="admin-header-link" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
+            {user.role === 'ADMIN' && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#9B2424] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#831D1D]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
             <details className="account-menu">
-              <summary aria-label={`${locale === 'en' ? 'Account' : 'Tài khoản'} ${user.name}`} title={user.name}>
-                <span className="account-avatar" aria-hidden="true">{initials || 'MK'}</span>
+              <summary className="!h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white" aria-label={`${locale === 'en' ? 'Account' : 'Tài khoản'} ${user.name}`} title={user.name}>
+                <span className="account-avatar !h-9 !w-9 !rounded-lg !text-stone-700" aria-hidden="true">{initials || 'MK'}</span>
               </summary>
               <div className="account-dropdown">
                 <div className="account-dropdown-heading"><span>{locale === 'en' ? 'Signed in' : 'Đang đăng nhập'}</span><strong>{user.name}</strong></div>

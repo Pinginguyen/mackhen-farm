@@ -41,7 +41,7 @@ export default function CartLink() {
   }, []);
 
   return (
-    <Link className="header-cart" href="/cart" aria-label={`${t('cart')}${count ? `, ${count} ${locale === 'en' ? 'items' : 'sản phẩm'}` : ''}`}>
+    <Link className="header-cart !h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white !text-stone-700 shadow-xs transition-all duration-300 hover:!bg-stone-50" href="/cart" aria-label={`${t('cart')}${count ? `, ${count} ${locale === 'en' ? 'items' : 'sản phẩm'}` : ''}`}>
       <ShoppingBag size={19} />
       {count > 0 && <span className="header-cart-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
     </Link>

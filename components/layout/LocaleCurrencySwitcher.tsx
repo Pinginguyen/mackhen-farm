@@ -6,31 +6,33 @@ export default function LocaleCurrencySwitcher() {
   const { locale, setLocaleCurrency } = useLocaleCurrency();
 
   return (
-    <div className="inline-flex items-center p-0.5 bg-stone-100 rounded-[14px] border border-stone-200/80 shadow-2xs">
-      {/* Nút Tiếng Việt (VNĐ) */}
+    <div className="h-9 inline-flex items-center gap-1.5 px-2 rounded-xl border border-stone-200/70 bg-white text-[11px] font-medium tracking-wider text-stone-600 shadow-xs">
+      {/* Tiếng Việt / VNĐ */}
       <button
         type="button"
         onClick={() => setLocaleCurrency('vi', 'VND')}
-        className={`px-3 py-1.5 text-xs font-semibold rounded-[11px] transition-all duration-200 cursor-pointer ${
+        className={`h-7 px-2 rounded-lg transition-all duration-300 cursor-pointer ${
           locale === 'vi'
-            ? 'bg-[#9B2424] text-white shadow-sm'
-            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/50'
+            ? 'bg-white text-[#9B2424] font-bold shadow-2xs'
+            : 'hover:text-stone-900'
         }`}
       >
-        🇻🇳 VNĐ
+        VNĐ
       </button>
 
-      {/* Nút English (SGD) */}
+      <span className="text-stone-300 text-[10px]">|</span>
+
+      {/* English / SGD */}
       <button
         type="button"
         onClick={() => setLocaleCurrency('en', 'SGD')}
-        className={`px-3 py-1.5 text-xs font-semibold rounded-[11px] transition-all duration-200 cursor-pointer ${
+        className={`h-7 px-2 rounded-lg transition-all duration-300 cursor-pointer ${
           locale === 'en'
-            ? 'bg-[#9B2424] text-white shadow-sm'
-            : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/50'
+            ? 'bg-white text-[#9B2424] font-bold shadow-2xs'
+            : 'hover:text-stone-900'
         }`}
       >
-        🇸🇬 SGD
+        SGD
       </button>
     </div>
   );

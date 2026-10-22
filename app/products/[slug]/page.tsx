@@ -85,8 +85,8 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   return (
-    <main className="page-shell product-detail-page">
-      <section className="detail-section">
+    <main className="page-shell product-detail-page !bg-[#FAF7F2]">
+      <section className="detail-section !rounded-2xl !border-stone-200/80 !bg-white !p-5 shadow-xs sm:!p-7">
         <div className="detail-grid">
           <ProductImageGallery image={product.image} images={product.images ?? []} name={product.name} />
           <div className="detail-copy">
@@ -109,7 +109,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
-              {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts">
+              {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Bảng giá trị dinh dưỡng</h2>
                 <p>{product.nutritionFacts.servingSize}</p>
                 <div className="mobile-table-scroll w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -126,11 +126,11 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
                 </table>
                 </div>
               </section>}
-              {product.ingredients?.trim() && <section className="product-info-block">
+              {product.ingredients?.trim() && <section className="product-info-block !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Thành phần &amp; nguồn gốc nguyên liệu</h2>
                 <p className="whitespace-pre-line">{product.ingredients.trim()}</p>
               </section>}
-              <section className="product-info-block">
+              <section className="product-info-block !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Quy chuẩn đóng gói &amp; bảo quản</h2>
                 <p>Quy cách: {product.unit ?? 'Theo thông tin trên bao bì'}.</p>
                 {!isSeasoning && <p>Túi zip tráng màng nhôm 3 lớp cản sáng, kèm gói khử oxy chuyên dụng.</p>}

@@ -18,17 +18,17 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
 
   return (
-    <article className={`product-card${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
-      <div className={`image-box product-card-media${secondImage ? ' has-secondary' : ''}`}>
+    <article className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-xs transition-all duration-300 hover:!shadow-md hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
+      <div className={`image-box product-card-media group !overflow-hidden !rounded-xl${secondImage ? ' has-secondary' : ''}`}>
         <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
-          <Image className="product-card-image is-primary" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
-          {secondImage && <Image className="product-card-image is-secondary" src={secondImage} alt={`${productName}, alternate view`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
+          <Image className="product-card-image is-primary transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
+          {secondImage && <Image className="product-card-image is-secondary transition-transform duration-500 group-hover:!scale-105" src={secondImage} alt={`${productName}, alternate view`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
         </Link>
         <div className="product-badges">
-          {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
-          {product.protein != null && <span className="product-badge nutrition-badge">{product.protein} Protein</span>}
-          {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
-          <span className="product-badge">{product.highlight}</span>
+          {product.stock === 0 && <span className="product-badge out-of-stock-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">Tạm hết hàng</span>}
+          {product.protein != null && <span className="product-badge nutrition-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{product.protein} Protein</span>}
+          {product.badge?.trim() && <span className="product-highlight-badge !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{product.badge}</span>}
+          <span className="product-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{product.highlight}</span>
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
       </div>
@@ -39,13 +39,13 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
         </div>
         <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
-        <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</div></div>
+        <div className="product-card-pricing"><div className="product-prices"><strong className="!text-[#9B2424]">{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div></div>
         <Link
           href={`/products/${product.slug}`}
           aria-disabled={product.stock === 0}
           tabIndex={product.stock === 0 ? -1 : undefined}
           onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
-          className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
+          className={`product-card-action !rounded-xl !bg-[#9B2424] !text-white !shadow-xs transition-all duration-300 hover:!bg-[#831D1D] hover:!shadow-sm${product.stock === 0 ? ' is-out-of-stock' : ''}`}
         >
           {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
         </Link>

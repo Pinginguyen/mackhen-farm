@@ -70,14 +70,14 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
       </div>
       <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
         {visibleProducts.map((product, index) => (
-          <article key={product.id} className={`product-card${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
-            <div className="image-box">
-              <img src={product.image} alt={translateProductName(product.name)} />
+          <article key={product.id} className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-xs transition-all duration-300 hover:!shadow-md hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
+            <div className="image-box group !overflow-hidden !rounded-xl">
+              <img className="transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={translateProductName(product.name)} />
               <div className="product-badges">
-                {product.stock === 0 && <span className="product-badge out-of-stock-badge">{text('Tạm hết hàng')}</span>}
-                {product.protein != null && <span className="product-badge nutrition-badge">{text(product.protein)} Protein</span>}
-                {product.badge?.trim() && <span className="product-highlight-badge">{text(product.badge)}</span>}
-                <span className="product-badge">{text(product.highlight)}</span>
+                {product.stock === 0 && <span className="product-badge out-of-stock-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text('Tạm hết hàng')}</span>}
+                {product.protein != null && <span className="product-badge nutrition-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.protein)} Protein</span>}
+                {product.badge?.trim() && <span className="product-highlight-badge !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.badge)}</span>}
+                <span className="product-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.highlight)}</span>
               </div>
             </div>
             <div className="card-body">
@@ -88,14 +88,14 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
               <h4 className="product-name"><Link href={`/products/${product.slug}`}>{translateProductName(product.name)}</Link></h4>
               <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{text(product.description)}</p>
               <div className="product-card-pricing">
-                <div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</div>
+                <div className="product-prices"><strong className="!text-[#9B2424]">{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div>
               </div>
               <Link
                 href={`/products/${product.slug}`}
                 aria-disabled={product.stock === 0}
                 tabIndex={product.stock === 0 ? -1 : undefined}
                 onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
-                className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
+                className={`product-card-action !rounded-xl !bg-[#9B2424] !text-white !shadow-xs transition-all duration-300 hover:!bg-[#831D1D] hover:!shadow-sm${product.stock === 0 ? ' is-out-of-stock' : ''}`}
               >
                 {product.stock === 0 ? text('Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
               </Link>

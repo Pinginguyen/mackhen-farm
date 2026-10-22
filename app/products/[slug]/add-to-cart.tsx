@@ -112,8 +112,8 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   return (
     <div className="cart-add-control">
       <div className="detail-prices">
-        <strong>{formatCurrency(selectedPrice)}</strong>
-        {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del>{formatCurrency(selectedOriginalPrice)}</del>}
+        <strong className="!text-[#9B2424] !text-3xl !font-bold">{formatCurrency(selectedPrice)}</strong>
+        {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del className="!text-stone-400">{formatCurrency(selectedOriginalPrice)}</del>}
       </div>
       {variants.length >= 2 && (
         <label className="field">

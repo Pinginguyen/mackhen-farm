@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function ProductHighlights({ highlights }: { highlights?: string[] | null }) {
   return (
-    <section className="product-reassurance-list" aria-label="Đặc điểm sản phẩm và cam kết cửa hàng">
+    <section className="product-reassurance-list !rounded-2xl !border !border-stone-200/80 !bg-white !p-5 shadow-xs" aria-label="Đặc điểm sản phẩm và cam kết cửa hàng">
       {highlights?.length ? (
         <div>
           <h2>Đặc điểm riêng của sản phẩm</h2>

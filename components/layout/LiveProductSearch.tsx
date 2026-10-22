@@ -66,9 +66,9 @@ export default function LiveProductSearch() {
   const showResults = open && query.trim().length >= 2;
 
   return (
-    <div className="live-product-search" ref={rootRef}>
+    <div className="live-product-search !h-9 !min-h-0 !rounded-xl !border-stone-200/70 !bg-white/90 px-3 shadow-xs" ref={rootRef}>
       <Search size={17} aria-hidden="true" />
-      <input aria-label={text('Tìm sản phẩm')} placeholder={text('Tìm chẳm chéo, mắc khén...')} value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }} />
+      <input className="placeholder:text-stone-400" aria-label={text('Tìm sản phẩm')} placeholder={text('Tìm chẳm chéo, mắc khén...')} value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }} />
       {query && <button type="button" aria-label={text('Xóa tìm kiếm')} onClick={() => { setQuery(''); setOpen(true); }}><X size={15} /></button>}
       {showResults && <div className="live-search-dropdown" role="listbox" aria-label={text('Gợi ý sản phẩm')}>
         {loading ? <p className="live-search-empty">{locale === 'en' ? 'Searching products...' : 'Đang tìm sản phẩm...'}</p> : products.length ? products.map((product) => <Link role="option" href={`/products/${product.slug}`} key={product.id} onClick={() => setQuery('')}><img src={product.image} alt="" /><span><strong>{translateProductName(product.name)}</strong><small>{text(product.category)}</small></span><span className="live-search-product-pricing"><span><b>{formatCurrency(product.price)}</b>{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</span><small className={product.stock > 0 ? 'in-stock' : 'out-of-stock'}>{product.stock > 0 ? (locale === 'en' ? 'In stock' : 'Còn hàng') : (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng')}</small></span></Link>) : <p className="live-search-empty">{locale === 'en' ? 'No matching products found.' : 'Không tìm thấy sản phẩm phù hợp.'}</p>}
