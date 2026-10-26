@@ -190,7 +190,7 @@ async function main() {
         where: { productId: savedProduct.id },
       });
       const variantData = {
-        title: product.title || product.label || product.unit || 'Túi 150g',
+        title: product.title || product.label || 'Túi 150g',
         price: product.price,
         weight: `${product.weight}g`,
         inventory: product.stock,

@@ -1,3 +1,5 @@
+'use client';
+
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
 type ProductRatingProps = {

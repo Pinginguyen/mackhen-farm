@@ -26,6 +26,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function getIssuedVoucher(value: unknown): { code: string; value: number } | null {
+  if (!isRecord(value) || typeof value.code !== 'string' || typeof value.value !== 'number') return null;
+  return { code: value.code, value: value.value };
+}
+
 function isMissingReturnVoucherRelationColumn(error: unknown): boolean {
   return isRecord(error)
     && error.code === 'P2022'
@@ -316,6 +321,7 @@ export async function PATCH(request: Request) {
         },
           include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
       });
+    const issuedVoucher = getIssuedVoucher(Reflect.get(item, 'issuedVoucher'));
     if (refundCompleted) revalidateTag('admin-dashboard');
     await writeAuditLog(request, {
       adminEmail,
@@ -323,12 +329,11 @@ export async function PATCH(request: Request) {
       targetEntity: 'ReturnRequest',
       targetId: id,
       oldValue: current,
-      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' && 'issuedVoucher' in item ? item.issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
+      newValue: { status, adminNote, compensationVoucherCode: status === 'VOUCHER_ISSUED' ? item.compensationVoucher?.code : undefined, voucherCode: status === 'VOUCHER_ISSUED' ? issuedVoucher?.code : undefined, voucherValue: resolutionMethod === 'VOUCHER' ? Number(voucherValue) : undefined, resolutionMethod, refundApprovedBy: status === 'REFUND_APPROVED' ? adminEmail : current.refundApprovedBy, refundCompletedBy: ['REFUNDED', 'COMPLETED'].includes(status) ? adminEmail : undefined, refundTransferReference: refundTransferReference || current.refundTransferReference },
     });
     if (status === 'VOUCHER_ISSUED') {
       const recipientEmail = current.order.user?.email ?? current.order.customer?.email;
       const compensationVoucher = item.compensationVoucher;
-      const issuedVoucher = 'issuedVoucher' in item ? item.issuedVoucher : null;
       const voucherCode = compensationVoucher?.code ?? issuedVoucher?.code;
       if (recipientEmail && voucherCode) {
         try {

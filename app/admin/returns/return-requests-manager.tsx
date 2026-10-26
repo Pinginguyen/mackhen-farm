@@ -155,9 +155,7 @@ export default function ReturnRequestsManager() {
       setSelected(updated);
       setAdminNote(updated.adminNote ?? '');
       setRefundTransferReference(updated.refundTransferReference ?? '');
-      setNotice(status === 'VOUCHER_ISSUED' && updated.issuedVoucher
-        ? `Đã phát hành voucher ${updated.issuedVoucher.code} trị giá ${updated.issuedVoucher.value.toLocaleString('vi-VN')}đ.`
-        : `Đã cập nhật yêu cầu ${updated.order.orderCode}: ${statusLabels[updated.status]}.`);
+      setNotice(`Đã cập nhật yêu cầu ${updated.order.orderCode}: ${statusLabels[updated.status]}.`);
     } catch (updateError) {
       setError(getErrorMessage(updateError, 'Không thể cập nhật yêu cầu.'));
     } finally {
