@@ -203,7 +203,11 @@ async function main() {
         });
       } else {
         await transaction.productVariant.create({
-          data: { ...variantData, productId: savedProduct.id },
+          data: {
+            ...variantData,
+            title: product.title || product.label || 'Túi 150g',
+            productId: savedProduct.id,
+          },
         });
       }
     }
