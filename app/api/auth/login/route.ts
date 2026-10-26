@@ -8,13 +8,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as { email?: string; password?: string };
     const email = body.email?.trim().toLowerCase();
-    if (!email || !body.password) return NextResponse.json({ error: 'Vui lòng nhập email và mật khẩu.' }, { status: 400 });
+    if (!email || typeof body.password !== 'string' || !body.password) return NextResponse.json({ error: 'Vui lòng nhập email và mật khẩu.' }, { status: 400 });
     if (!getAuthSecret()) {
       return NextResponse.json({ error: 'Máy chủ chưa cấu hình AUTH_SECRET hoặc NEXTAUTH_SECRET (tối thiểu 32 ký tự).' }, { status: 503 });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await compare(body.password, user.password))) {
+    if (!user || !user.password) {
+      return NextResponse.json({ error: 'Email hoặc mật khẩu không chính xác.' }, { status: 401 });
+    }
+    if (!(await compare(body.password, user.password))) {
       return NextResponse.json({ error: 'Email hoặc mật khẩu không chính xác.' }, { status: 401 });
     }
     const role = email === ADMIN_EMAIL ? 'ADMIN' : user.role;
@@ -28,7 +31,7 @@ export async function POST(request: Request) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (error) {
-    console.error('Login failed:', error);
+    console.error('[AUTH_ERROR_DETAIL]:', error);
     return NextResponse.json({ error: 'Không thể đăng nhập lúc này.' }, { status: 500 });
   }
 }

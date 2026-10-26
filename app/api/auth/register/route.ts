@@ -31,10 +31,10 @@ export async function POST(request: Request) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (error) {
+    console.error('[AUTH_ERROR_DETAIL]:', error);
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ error: 'Email này đã được đăng ký.' }, { status: 409 });
     }
-    console.error('Registration failed:', error);
     return NextResponse.json({ error: 'Không thể tạo tài khoản lúc này.' }, { status: 500 });
   }
 }

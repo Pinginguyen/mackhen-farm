@@ -70,6 +70,28 @@ describe('POST /api/auth/login', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it('returns 401 when no account matches the email', async () => {
+    findUnique.mockResolvedValue(null);
+    const response = await POST(login('missing@example.com'));
+
+    expect(response.status).toBe(401);
+    expect(comparePassword).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when the account has no password hash', async () => {
+    findUnique.mockResolvedValue({
+      id: 'customer-1',
+      name: 'Customer',
+      email: 'customer@example.com',
+      role: 'CUSTOMER',
+      password: '',
+    });
+    const response = await POST(login('customer@example.com'));
+
+    expect(response.status).toBe(401);
+    expect(comparePassword).not.toHaveBeenCalled();
+  });
+
   it('keeps a regular customer role unchanged', async () => {
     findUnique.mockResolvedValue({
       id: 'customer-1',

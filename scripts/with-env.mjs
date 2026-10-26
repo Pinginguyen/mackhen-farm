@@ -13,6 +13,8 @@ const commands = {
   next: require.resolve('next/dist/bin/next'),
   prisma: require.resolve('prisma/build/index.js'),
   seed: path.resolve('prisma/seed.js'),
+  ensureAdmin: path.resolve('scripts/ensure-admin.mjs'),
+  'scripts/ensure-admin.mjs': path.resolve('scripts/ensure-admin.mjs'),
   seedMacKhen: path.resolve('prisma/seed-mac-khen-products.js'),
   markCompletedOrdersPaid: path.resolve('scripts/mark-completed-orders-paid.mjs'),
   rollback: path.resolve('prisma/rollback.mjs'),
