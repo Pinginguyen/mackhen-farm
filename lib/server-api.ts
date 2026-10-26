@@ -27,7 +27,8 @@ export async function fetchApi<T>(path: string): Promise<T> {
 export async function fetchApiWithFallback<T>(path: string, fallback: T): Promise<{ data: T; unavailable: boolean }> {
   try {
     return { data: await fetchApi<T>(path), unavailable: false };
-  } catch {
+  } catch (error) {
+    console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
     return { data: fallback, unavailable: true };
   }
 }

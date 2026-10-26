@@ -61,12 +61,14 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
           ratingCounts[group.rating - 1] = group._count._all;
           reviewCount += group._count._all;
         });
-      } catch {
+      } catch (error) {
+        console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
         reviewCount = reviews.length;
         ratingCounts = [1, 2, 3, 4, 5].map((rating) => reviews.filter((review) => review.rating === rating).length);
       }
     }
-  } catch {
+  } catch (error) {
+    console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
     console.warn('Không kết nối được DB, dùng dữ liệu chi tiết sản phẩm mặc định');
   }
 

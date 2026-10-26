@@ -10,12 +10,13 @@ if (connectionString.startsWith('DATABASE_URL=')) {
   connectionString = connectionString.replace(/^DATABASE_URL=/, '').trim();
 }
 connectionString = connectionString.replace(/^['"]|['"]$/g, '').trim();
-connectionString = connectionString.replace(/&channel_binding=[^&]+/g, '');
 
 let datasourceUrl: URL | undefined;
 if (connectionString) {
   try {
     datasourceUrl = new URL(connectionString);
+    datasourceUrl.hash = '';
+    datasourceUrl.searchParams.delete('channel_binding');
   } catch {
     console.error('DATABASE_URL is not a valid URL; database requests will fail until deployment configuration is corrected.');
   }

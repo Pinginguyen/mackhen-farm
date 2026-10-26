@@ -36,7 +36,7 @@ export default async function AdminCustomersPage({ searchParams }: { searchParam
       }),
     ]);
   } catch (error) {
-    console.error('Admin customer listing failed:', error instanceof Error ? error.name : 'UnknownError');
+    console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
     unavailable = true;
   }
   const spentByUser = new Map(spending.filter((item) => item.userId).map((item) => [item.userId!, item._sum.totalAmount ?? 0]));

@@ -18,7 +18,8 @@ export default async function ProductsPage({ searchParams }: { searchParams?: { 
       console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
       products = DEFAULT_PRODUCTS;
     }
-  } catch {
+  } catch (error) {
+    console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
     console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
     products = DEFAULT_PRODUCTS;
   }
