@@ -14,7 +14,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
-    <header className="topbar site-header sticky top-0 z-50 w-full bg-[#FDFBF7]/90 backdrop-blur-md border-b border-stone-200/80 shadow-sm transition-all duration-200 !sticky !top-0 !z-40 !bg-[#FAF7F2]/90 !backdrop-blur-md !border-b !border-stone-200/60 !py-2 !shadow-none">
+    <header className="topbar site-header sticky top-0 z-50 w-full backdrop-blur-md bg-[#FDFBF7]/90 border-b border-gray-200/60 shadow-sm transition-all duration-200 !py-2">
       <Link className="brand-wrap" href="/">
         <span className="brand-badge">M</span>
         <span>

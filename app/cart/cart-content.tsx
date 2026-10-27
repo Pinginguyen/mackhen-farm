@@ -49,10 +49,12 @@ function CartItemRow({
   }
 
   return (
-    <div className={`table-row cart-item micro-opacity${saving ? ' is-pending' : ''}`}>
-      <img className="cart-item-image" src={item.image} alt={item.name} />
-      <div className="cart-item-info">
-        <strong>{item.name}</strong>
+    <div className={`cart-item micro-opacity flex w-full max-w-none flex-nowrap items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-[box-shadow,opacity] duration-150 hover:shadow-md${saving ? ' is-pending' : ''}`}>
+      <div className="cart-item-image">
+        <img src={item.image} alt={item.name} />
+      </div>
+      <div className="cart-item-info min-w-0 flex-1">
+        <h3 className="truncate font-semibold text-gray-900">{item.name}</h3>
         {item.variantLabel && <div>{item.variantLabel}</div>}
         <div className="cart-item-meta">
           <span>{formatCurrency(unitPrice)} / đơn</span>
@@ -81,7 +83,7 @@ function CartItemRow({
           </div>
         </div>
       </div>
-      <strong className="cart-item-total">{formatCurrency(unitPrice * item.quantity)}</strong>
+      <strong className="cart-item-total w-28 shrink-0 text-right font-bold text-[#9B2424]">{formatCurrency(unitPrice * item.quantity)}</strong>
       <button className="cart-item-remove micro-tactile micro-tactile--small" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
     </div>
   );
@@ -149,7 +151,7 @@ export default function CartContent({ initialItems }: { initialItems: CartItem[]
 
   return (
     <div className="checkout-layout cart-content-layout">
-      <div ref={cartListRef}>
+      <div ref={cartListRef} className="w-full max-w-none">
         {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`}</p></div><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
         {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
       </div>
