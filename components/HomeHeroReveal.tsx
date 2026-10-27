@@ -7,8 +7,6 @@ export default function HomeHeroReveal() {
   useGSAP(() => {
     gsap.registerPlugin(useGSAP);
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
     const hero = document.querySelector<HTMLElement>('.home-page .hero');
     if (!hero) return;
 

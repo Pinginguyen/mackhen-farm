@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 type RevealGroup = {
   selector: string;
@@ -11,7 +11,7 @@ type RevealGroup = {
 
 export default function ScrollReveal({ groups }: { groups: RevealGroup[] }) {
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+    if (!('IntersectionObserver' in window)) return;
 
     const observedElements: HTMLElement[] = [];
     const observer = new IntersectionObserver((entries) => {
@@ -47,14 +47,12 @@ export default function ScrollReveal({ groups }: { groups: RevealGroup[] }) {
 }
 
 export function ScrollRevealItem({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
-  const reducedMotion = useReducedMotion();
-
   return (
     <motion.li
-      initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: reducedMotion ? 0 : 0.5, delay: reducedMotion ? 0 : delay }}
+      transition={{ duration: 0.5, delay }}
     >
       {children}
     </motion.li>

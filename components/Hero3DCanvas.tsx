@@ -67,7 +67,6 @@ export default function Hero3DCanvas() {
     let frameTimer = 0;
     let lastFrame = 0;
     let elapsed = 0;
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     let isInView = false;
     let isPageVisible = document.visibilityState === 'visible';
 
@@ -75,7 +74,7 @@ export default function Hero3DCanvas() {
       particles.forEach((particle, index) => {
         transform.position.set(
           particle.x,
-          particle.y + (reducedMotion ? 0 : Math.sin(time * 0.45 + particle.phase) * 0.045),
+          particle.y + Math.sin(time * 0.45 + particle.phase) * 0.045,
           particle.z,
         );
         transform.scale.setScalar(particle.size);
@@ -114,7 +113,7 @@ export default function Hero3DCanvas() {
 
     function animate(now: number) {
       frameId = 0;
-      if (reducedMotion || !isInView || !isPageVisible) return;
+      if (!isInView || !isPageVisible) return;
       if (lastFrame && now - lastFrame < frameInterval) {
         frameTimer = window.setTimeout(() => {
           frameTimer = 0;
@@ -151,7 +150,7 @@ export default function Hero3DCanvas() {
     }
 
     function syncAnimation() {
-      if (reducedMotion || !isInView || !isPageVisible) {
+      if (!isInView || !isPageVisible) {
         stopAnimation();
         return;
       }

@@ -37,7 +37,7 @@ export default function HorizontalShowcase({ products }: { products: CatalogProd
     const pin = pinRef.current;
     const track = trackRef.current;
     const parallax = parallaxRef.current;
-    if (!section || !pin || !track || !parallax || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!section || !pin || !track || !parallax) return;
 
     const getDistance = () => Math.max(0, track.scrollWidth - pin.clientWidth);
     if (!getDistance()) return;

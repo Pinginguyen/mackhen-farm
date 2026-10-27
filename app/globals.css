@@ -790,12 +790,6 @@ textarea {
   animation: float 3.5s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-float {
-    animation: none;
-  }
-}
-
 .photo-card .hero-image-english {
   object-position: right center;
   transform: scale(1.8);
@@ -4301,22 +4295,6 @@ textarea {
   animation: toast-in 180ms ease-out;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .micro-tactile,
-  .micro-opacity,
-  .free-shipping-track span {
-    transition: none;
-  }
-
-  .micro-tactile:active {
-    transform: none;
-  }
-
-  .copy-toast {
-    animation: none;
-  }
-}
-
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
@@ -5821,17 +5799,6 @@ body {
   background: var(--surface);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
 .page-shell > section {
   margin-top: 64px;
 }
@@ -5964,20 +5931,6 @@ body {
 
 .product-card.holographic-card.is-tilting::after {
   opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .product-card.holographic-card,
-  .product-card.holographic-card.is-resetting,
-  .product-card.holographic-card.is-tilting {
-    transform: none;
-    transition: none;
-  }
-
-  .product-card.holographic-card:hover {
-    translate: none;
-    scale: none;
-  }
 }
 
 .product-card .image-box {
@@ -6951,16 +6904,6 @@ body {
   .review-summary-panel {
     gap: 16px;
     padding: 17px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .review-breakdown-track > span,
-  .review-write-toggle,
-  .review-form-panel,
-  .review-item-card,
-  .review-stars-picker button {
-    transition: none;
   }
 }
 
@@ -10017,22 +9960,6 @@ body {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .horizontal-showcase-track {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .horizontal-showcase-window {
-    overflow: visible;
-  }
-
-  .horizontal-showcase-card,
-  .before-after-frame {
-    scroll-margin-top: 20px;
-  }
-}
-
 @media (min-width: 768px) {
   .home-page > section {
     padding-block: 80px;
@@ -11456,16 +11383,6 @@ body {
   to {
     background-color: rgba(139, 35, 35, 0.05);
     color: #8b2323;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-scroll-reveal],
-  .comparison-table[data-scroll-reveal='visible'][data-highlight-on-reveal='true'] .comparison-featured {
-    animation: none;
-    opacity: 1;
-    transform: none;
-    transition: none;
   }
 }
 

@@ -10,7 +10,6 @@ import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
 function animateFlyToCart(image: string, origin: DOMRect) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const cart = document.querySelector<HTMLElement>('.header-cart');
   if (!cart) return;
 

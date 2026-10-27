@@ -20,7 +20,6 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
 
   function handleTilt(event: MouseEvent<HTMLElement>) {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const card = event.currentTarget;
     const bounds = card.getBoundingClientRect();
     const pointerX = (event.clientX - bounds.left) / bounds.width;
