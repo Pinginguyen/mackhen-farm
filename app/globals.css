@@ -362,6 +362,16 @@ textarea {
   line-height: 1;
 }
 
+@keyframes cart-badge-arrive {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.55); }
+  100% { transform: scale(1); }
+}
+
+.header-cart-count.is-arriving {
+  animation: cart-badge-arrive 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .admin-role-badge {
   padding: 8px 11px;
   border-radius: 999px;
@@ -769,6 +779,21 @@ textarea {
 
 .photo-card {
   overflow: hidden;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float {
+    animation: none;
+  }
 }
 
 .photo-card .hero-image-english {
@@ -5900,6 +5925,59 @@ body {
   border-radius: 16px;
   background: var(--card);
   box-shadow: 0 8px 24px rgba(41, 29, 20, 0.045);
+}
+
+.product-card.holographic-card {
+  position: relative;
+  isolation: isolate;
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 110ms linear, box-shadow 300ms ease, border-color 300ms ease, translate 300ms ease, scale 300ms ease;
+}
+
+.product-card.holographic-card:hover {
+  translate: 0 -8px;
+  scale: 1.01;
+  border-color: rgba(155, 36, 36, 0.4);
+  box-shadow: 0 24px 48px rgba(28, 25, 23, 0.2);
+}
+
+.product-card.holographic-card.is-resetting {
+  transition: transform 500ms ease-out, box-shadow 300ms ease, border-color 300ms ease, translate 300ms ease, scale 300ms ease;
+}
+
+.product-card.holographic-card::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgba(255, 255, 255, 0.4) 0%, transparent 60%);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.product-card.holographic-card.is-tilting {
+  transition: transform 80ms linear, box-shadow 300ms ease, border-color 300ms ease, translate 300ms ease, scale 300ms ease;
+}
+
+.product-card.holographic-card.is-tilting::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-card.holographic-card,
+  .product-card.holographic-card.is-resetting,
+  .product-card.holographic-card.is-tilting {
+    transform: none;
+    transition: none;
+  }
+
+  .product-card.holographic-card:hover {
+    translate: none;
+    scale: none;
+  }
 }
 
 .product-card .image-box {

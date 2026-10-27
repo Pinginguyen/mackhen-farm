@@ -3,10 +3,67 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus } from 'lucide-react';
+import gsap from 'gsap';
 import { toast } from 'sonner';
 
 import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+
+function animateFlyToCart(image: string, origin: DOMRect) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cart = document.querySelector<HTMLElement>('.header-cart');
+  if (!cart) return;
+
+  const target = cart.getBoundingClientRect();
+  const startX = origin.left + origin.width / 2;
+  const startY = origin.top + origin.height / 2;
+  const endX = target.left + target.width / 2;
+  const endY = target.top + target.height / 2;
+  const controlX = (startX + endX) / 2;
+  const controlY = Math.min(startY, endY) - 150;
+  const ghost = document.createElement('img');
+  const flight = { progress: 0 };
+
+  ghost.src = image;
+  ghost.alt = '';
+  ghost.setAttribute('aria-hidden', 'true');
+  Object.assign(ghost.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '60px',
+    height: '60px',
+    borderRadius: '12px',
+    objectFit: 'cover',
+    pointerEvents: 'none',
+    zIndex: '9999',
+    willChange: 'transform, opacity',
+  });
+  document.body.appendChild(ghost);
+  gsap.set(ghost, { x: startX - 30, y: startY - 30 });
+
+  gsap.to(flight, {
+    progress: 1,
+    duration: 0.8,
+    ease: 'power2.in',
+    onUpdate: () => {
+      const progress = flight.progress;
+      const inverse = 1 - progress;
+      const x = inverse * inverse * startX + 2 * inverse * progress * controlX + progress * progress * endX;
+      const y = inverse * inverse * startY + 2 * inverse * progress * controlY + progress * progress * endY;
+      gsap.set(ghost, { x: x - 30, y: y - 30, scale: inverse, opacity: inverse });
+    },
+    onComplete: () => {
+      ghost.remove();
+      const badge = document.querySelector<HTMLElement>('.header-cart-count');
+      if (!badge) return;
+      badge.classList.remove('is-arriving');
+      void badge.offsetWidth;
+      badge.classList.add('is-arriving');
+      window.setTimeout(() => badge.classList.remove('is-arriving'), 500);
+    },
+  });
+}
 
 export default function AddToCart({ productId, productSlug, name, image, price, originalPrice, unit, variants }: {
   productId: string;
@@ -21,6 +78,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const router = useRouter();
   const [variantId, setVariantId] = useState(variants[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
+  const [isAdded, setIsAdded] = useState(false);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [productUnavailable, setProductUnavailable] = useState(false);
@@ -58,7 +116,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
     }
   }
 
-  async function addItem(buyNow = false) {
+  async function addItem(buyNow = false, origin?: DOMRect) {
     if (saving) return;
     setMessage('');
     setSaving(true);
@@ -100,6 +158,9 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
       else {
         window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
         toast.success('🎉 Đã thêm sản phẩm vào giỏ hàng!', { duration: 2500 });
+        setIsAdded(true);
+        window.setTimeout(() => setIsAdded(false), 1500);
+        if (origin) animateFlyToCart(image, origin);
       }
     } catch {
       if (buyNow) clearBuyNowSnapshot();
@@ -133,7 +194,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className="primary-action micro-tactile transition-all duration-200 active:scale-90 hover:scale-[1.02] hover:shadow-lg" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
+        <button className={`primary-action micro-tactile transition-all duration-200 active:scale-90 hover:scale-[1.02] hover:shadow-lg ${isAdded ? 'bg-emerald-600 text-white animate-bounce' : 'bg-[#9B2424] text-white'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
         <button className="secondary-action micro-tactile" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">

@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import { ArrowRight, Eye } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
@@ -12,13 +13,41 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export default function ProductCard({ product, index }: { product: CatalogProduct; index: number }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false);
+  const resetTimerRef = useRef<number | null>(null);
   const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
   const productName = translateProductName(product.name);
   const secondImage = product.images?.find((image) => image && image !== product.image);
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
 
+  function handleTilt(event: MouseEvent<HTMLElement>) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const card = event.currentTarget;
+    const bounds = card.getBoundingClientRect();
+    const pointerX = (event.clientX - bounds.left) / bounds.width;
+    const pointerY = (event.clientY - bounds.top) / bounds.height;
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
+    card.classList.remove('is-resetting');
+    card.classList.add('is-tilting');
+    card.style.setProperty('--tilt-x', `${(0.5 - pointerY) * 24}deg`);
+    card.style.setProperty('--tilt-y', `${(pointerX - 0.5) * 24}deg`);
+    card.style.setProperty('--glare-x', `${pointerX * 100}%`);
+    card.style.setProperty('--glare-y', `${pointerY * 100}%`);
+  }
+
+  function resetTilt(event: MouseEvent<HTMLElement>) {
+    const card = event.currentTarget;
+    card.classList.remove('is-tilting');
+    card.classList.add('is-resetting');
+    card.style.setProperty('--tilt-x', '0deg');
+    card.style.setProperty('--tilt-y', '0deg');
+    resetTimerRef.current = window.setTimeout(() => {
+      card.classList.remove('is-resetting');
+      resetTimerRef.current = null;
+    }, 520);
+  }
+
   return (
-    <article className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-xs transition-all duration-300 hover:!shadow-md hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
+    <article className={`product-card holographic-card cursor-pointer${product.stock === 0 ? ' is-out-of-stock' : ''}`} onMouseMove={handleTilt} onMouseLeave={resetTilt} style={{ animationDelay: `${index * 35}ms` }}>
       <div className={`image-box product-card-media group !overflow-hidden !rounded-xl${secondImage ? ' has-secondary' : ''}`}>
         <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
           <Image className="product-card-image is-primary transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />

@@ -60,7 +60,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           </ul>
         </div>
         <div className="hero-media">
-          <div className="photo-card">
+          <div className="photo-card animate-float">
             <LocalizedHeroImage />
           </div>
         </div>
