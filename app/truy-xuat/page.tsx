@@ -1,13 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle2, Cog, Flame, Leaf, LoaderCircle, Search, ShieldCheck } from 'lucide-react';
-import gsap from 'gsap';
-import { useGSAP } from '@gsap/react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
-
-if (typeof window !== 'undefined') gsap.registerPlugin(useGSAP);
 
 type TraceabilityData = {
   batchCode: string;
@@ -24,48 +20,20 @@ type TraceabilityResponse = { success: boolean; data?: TraceabilityData; error?:
 const quickSearches = ['BATCH-KB-2026-01', 'BATCH-CC-2026-02'];
 const stepIcons = [Leaf, Cog, Flame, ShieldCheck];
 const englishStepLabels = ['Raw Materials', 'Processing', 'Dehydration & Packaging', 'Quality Inspection'];
+const timelineStepAnimations = [
+  'animate-in fade-in slide-in-from-bottom-6 duration-500 fill-mode-both',
+  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-150 fill-mode-both',
+  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-300 fill-mode-both',
+  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-500 fill-mode-both',
+];
 
 export default function TraceabilityPage() {
   const { locale } = useLocaleCurrency();
-  const containerRef = useRef<HTMLElement>(null);
   const text = (value: string) => translateContent(value, locale);
   const [query, setQuery] = useState('');
   const [batch, setBatch] = useState<TraceabilityData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useGSAP(() => {
-    const timelineElement = containerRef.current?.querySelector('.traceability-timeline');
-    const line = containerRef.current?.querySelector('.traceability-timeline-line');
-    const steps = gsap.utils.toArray<HTMLElement>('.traceability-step', containerRef.current);
-    if (!timelineElement || !line || !steps.length) return;
-
-    const media = gsap.matchMedia();
-    media.add({
-      isMobile: '(max-width: 760px)',
-      reduceMotion: '(prefers-reduced-motion: reduce)',
-    }, (context) => {
-      const isMobile = Boolean(context.conditions?.isMobile);
-      if (context.conditions?.reduceMotion) {
-        gsap.set(line, { scaleX: 1, scaleY: 1 });
-        gsap.set(steps, { autoAlpha: 1, y: 0 });
-        return;
-      }
-
-      const reveal = gsap.timeline();
-      reveal.fromTo(line,
-        isMobile ? { scaleX: 1, scaleY: 0 } : { scaleX: 0, scaleY: 1 },
-        { scaleX: 1, scaleY: 1, duration: steps.length * 0.15 + 0.35, ease: 'power1.out' },
-        0,
-      ).fromTo(steps,
-        { autoAlpha: 0, y: 18, scale: 0.96 },
-        { autoAlpha: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.15, ease: 'back.out(1.5)' },
-        0,
-      );
-    });
-
-    return () => media.revert();
-  }, { scope: containerRef, dependencies: [batch], revertOnUpdate: true });
 
   async function searchBatch(batchCode: string) {
     const normalizedCode = batchCode.trim().toUpperCase();
@@ -130,7 +98,7 @@ export default function TraceabilityPage() {
         {error && <p className="traceability-api-message is-error" role="alert">{error}</p>}
       </section>
 
-      <section ref={containerRef} className="traceability-journey" aria-labelledby="traceability-journey-title">
+      <section className="traceability-journey" aria-labelledby="traceability-journey-title">
         <div className="traceability-shell">
           <div className="traceability-journey-heading">
             <div><p className="traceability-kicker">SUPPLIER → BATCH → FINISHED GOODS</p><h2 id="traceability-journey-title">{text('Hành trình chuỗi cung ứng')}</h2></div>
@@ -147,11 +115,11 @@ export default function TraceabilityPage() {
               </dl>
             </section>
             <div className="traceability-timeline-wrap">
-              <span className="traceability-timeline-line" aria-hidden="true" />
+              <span className="traceability-timeline-line animate-in fade-in duration-500 fill-mode-both" aria-hidden="true" />
               <ol className="traceability-timeline">
                 {batch.steps.map((step, index) => {
                   const StepIcon = stepIcons[index];
-                  return <li className="traceability-step" key={step.label}>
+                  return <li className={`traceability-step ${timelineStepAnimations[index] ?? ''}`} key={step.label}>
                     <div className="traceability-step-marker"><StepIcon size={20} aria-hidden="true" /><span>{String(index + 1).padStart(2, '0')}</span></div>
                     <div className="traceability-step-content"><p className="traceability-step-date">{locale === 'en' ? 'STAGE' : 'CÔNG ĐOẠN'} {String(index + 1).padStart(2, '0')}</p><h3>{locale === 'en' ? englishStepLabels[index] ?? text(step.label) : step.label}</h3><p>{text(step.detail)}</p></div>
                   </li>;

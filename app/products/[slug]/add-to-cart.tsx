@@ -99,7 +99,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
       if (buyNow) router.push('/checkout?mode=buy_now');
       else {
         window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
-        toast.success('Đã thêm sản phẩm vào giỏ hàng');
+        toast.success('🎉 Đã thêm sản phẩm vào giỏ hàng!', { duration: 2500 });
       }
     } catch {
       if (buyNow) clearBuyNowSnapshot();
@@ -133,7 +133,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className="primary-action micro-tactile" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
+        <button className="primary-action micro-tactile transition-all duration-200 active:scale-90 hover:scale-[1.02] hover:shadow-lg" type="button" onClick={() => addItem()} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
         <button className="secondary-action micro-tactile" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
       {showStickyBuyBar && <div className="mobile-sticky-buy-bar">

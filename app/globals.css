@@ -1677,7 +1677,7 @@ textarea {
   right: 12%;
   left: 12%;
   height: 1px;
-  transform: scaleX(0);
+  transform: scaleX(1);
   transform-origin: left center;
   background: #bdcbb5;
 }
@@ -1806,7 +1806,7 @@ textarea {
     right: auto;
     width: 1px;
     height: auto;
-    transform: scaleY(0);
+    transform: scaleY(1);
     transform-origin: top center;
   }
 
