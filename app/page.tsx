@@ -10,6 +10,8 @@ import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
+import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
+import HorizontalShowcase from '@/components/home/HorizontalShowcase';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -66,6 +68,8 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
       </section>
 
+      <BeforeAfterSlider />
+
       <section className="comparison-section">
         <div className="section-heading home-section-heading"><div><p className="eyebrow"><LocalizedText text="So sánh lựa chọn" /></p><h2><LocalizedText text="Đậm vị thực vật, chi phí tối ưu" /></h2></div></div>
         <div className="table-card comparison-table">
@@ -83,6 +87,8 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       </section>
 
       <HomeTransparencyTabs />
+
+      <HorizontalShowcase products={products} />
 
       <section className="catalog-section">
         <div className="section-heading home-section-heading catalog-heading">
