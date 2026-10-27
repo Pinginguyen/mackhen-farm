@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Link from 'next/link';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { Minus, Plus, Trash2, Truck } from 'lucide-react';
 
 import { formatCurrency } from '@/lib/store-data';
 import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
@@ -50,7 +50,7 @@ function CartItemRow({
 
   return (
     <div className={`table-row cart-item micro-opacity${saving ? ' is-pending' : ''}`}>
-      <img src={item.image} alt={item.name} />
+      <img className="cart-item-image" src={item.image} alt={item.name} />
       <div className="cart-item-info">
         <strong>{item.name}</strong>
         {item.variantLabel && <div>{item.variantLabel}</div>}
@@ -81,10 +81,8 @@ function CartItemRow({
           </div>
         </div>
       </div>
-      <div className="cart-item-actions">
-        <strong className="cart-item-total">{formatCurrency(unitPrice * item.quantity)}</strong>
-        <button className="cart-item-remove micro-tactile micro-tactile--small" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
-      </div>
+      <strong className="cart-item-total">{formatCurrency(unitPrice * item.quantity)}</strong>
+      <button className="cart-item-remove micro-tactile micro-tactile--small" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
     </div>
   );
 }
@@ -150,9 +148,9 @@ export default function CartContent({ initialItems }: { initialItems: CartItem[]
   }
 
   return (
-    <div className="checkout-layout">
+    <div className="checkout-layout cart-content-layout">
       <div ref={cartListRef}>
-        {items.length > 0 && <section className={`free-shipping-progress${freeShipping ? ' is-free' : ''}`} aria-live="polite"><p>{freeShipping ? '🎉 Chúc mừng! Đơn hàng của bạn đã được MIỄN PHÍ VẬN CHUYỂN toàn quốc!' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ nữa để được FREESHIP toàn quốc! 🚚`}</p><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
+        {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`}</p></div><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
         {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
       </div>
       <aside className="summary-card">

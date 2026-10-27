@@ -3,12 +3,11 @@
 import { useRef, useState } from 'react';
 import { CheckCircle2, Cog, Flame, Leaf, LoaderCircle, Search, ShieldCheck } from 'lucide-react';
 import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
 
-if (typeof window !== 'undefined') gsap.registerPlugin(ScrollTrigger);
+if (typeof window !== 'undefined') gsap.registerPlugin(useGSAP);
 
 type TraceabilityData = {
   batchCode: string;
@@ -36,10 +35,10 @@ export default function TraceabilityPage() {
   const [error, setError] = useState('');
 
   useGSAP(() => {
-    const timeline = containerRef.current?.querySelector('.traceability-timeline');
+    const timelineElement = containerRef.current?.querySelector('.traceability-timeline');
     const line = containerRef.current?.querySelector('.traceability-timeline-line');
     const steps = gsap.utils.toArray<HTMLElement>('.traceability-step', containerRef.current);
-    if (!timeline || !line || !steps.length) return;
+    if (!timelineElement || !line || !steps.length) return;
 
     const media = gsap.matchMedia();
     media.add({
@@ -53,25 +52,16 @@ export default function TraceabilityPage() {
         return;
       }
 
-      gsap.fromTo(line,
+      const reveal = gsap.timeline();
+      reveal.fromTo(line,
         isMobile ? { scaleX: 1, scaleY: 0 } : { scaleX: 0, scaleY: 1 },
-        {
-          scaleX: 1,
-          scaleY: 1,
-          ease: 'none',
-          scrollTrigger: { trigger: timeline, start: 'top center', end: 'bottom center', scrub: true },
-        },
+        { scaleX: 1, scaleY: 1, duration: steps.length * 0.15 + 0.35, ease: 'power1.out' },
+        0,
+      ).fromTo(steps,
+        { autoAlpha: 0, y: 18, scale: 0.96 },
+        { autoAlpha: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.15, ease: 'back.out(1.5)' },
+        0,
       );
-
-      steps.forEach((step) => {
-        gsap.fromTo(step, { autoAlpha: 0, y: 20 }, {
-          autoAlpha: 1,
-          y: 0,
-          duration: 0.6,
-          ease: 'power2.out',
-          scrollTrigger: { trigger: step, start: 'top 80%', toggleActions: 'play none none reverse' },
-        });
-      });
     });
 
     return () => media.revert();

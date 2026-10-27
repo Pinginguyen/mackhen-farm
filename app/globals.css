@@ -2777,38 +2777,70 @@ textarea {
 
 .cart-item {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) minmax(120px, 140px) auto;
-  align-items: start;
-  gap: 14px;
+  grid-template-columns: 80px minmax(120px, 1fr) 120px minmax(90px, max-content) 36px;
+  grid-template-areas: "image info controls price remove";
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
 }
 
-.cart-item > img {
-  width: 76px;
+.cart-item-image {
+  grid-area: image;
+  width: 80px;
   aspect-ratio: 1;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   object-fit: cover;
 }
 
-.cart-item-info,
-.cart-item-total {
-  padding-top: 8px;
+.cart-item-info {
+  grid-area: info;
+  min-width: 0;
+}
+
+.cart-item-info > strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.cart-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .cart-item-controls {
-  display: grid;
+  grid-area: controls;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
 }
 
-.cart-item-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 8px;
+.cart-item-controls .field {
+  gap: 4px;
+  font-size: 0.78rem;
+}
+
+.cart-item-total {
+  grid-area: price;
+  justify-self: end;
+  padding: 0;
+  color: #9b2424;
+  font-size: 1rem;
+  white-space: nowrap;
 }
 
 .cart-item-remove {
+  grid-area: remove;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
@@ -2849,22 +2881,25 @@ textarea {
   }
 
   .cart-item {
-    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-columns: 80px minmax(0, 1fr) 36px;
+    grid-template-areas:
+      "image info remove"
+      "image controls price";
+    gap: 10px 12px;
+    padding: 12px;
   }
 
-  .cart-item > img {
-    width: 56px;
+  .cart-item-info {
+    align-self: end;
   }
 
-  .cart-item-controls,
-  .cart-item-actions {
-    grid-column: 2;
+  .cart-item-controls {
+    min-width: 0;
   }
 
-  .cart-item-actions {
-    grid-row: 3;
-    padding-top: 0;
-    justify-content: flex-start;
+  .cart-item-total {
+    align-self: center;
+    font-size: 0.92rem;
   }
 }
 
@@ -3841,6 +3876,91 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fffaf0;
+}
+
+.cart-content-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  align-items: start;
+  gap: 28px;
+}
+
+.cart-content-layout > * {
+  min-width: 0;
+}
+
+.cart-content-layout > .summary-card {
+  margin-top: 0;
+}
+
+.cart-free-shipping {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 180px) max-content;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.cart-free-shipping.is-free {
+  border: 0;
+  background: transparent;
+}
+
+.cart-free-shipping-message {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-free-shipping-message svg {
+  flex: 0 0 auto;
+  color: #9b2424;
+}
+
+.cart-free-shipping-message p,
+.cart-free-shipping.is-free .cart-free-shipping-message p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.cart-free-shipping .free-shipping-track {
+  height: 6px;
+}
+
+.cart-free-shipping .free-shipping-track span,
+.cart-free-shipping.is-free .free-shipping-track span {
+  background: #9b2424;
+}
+
+.cart-free-shipping small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .cart-content-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cart-free-shipping {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 8px 12px;
+  }
+
+  .cart-free-shipping-message {
+    grid-column: 1 / -1;
+  }
 }
 
 .free-shipping-progress p {
