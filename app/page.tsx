@@ -9,6 +9,7 @@ import { fetchApiWithFallback } from '@/lib/server-api';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
+import HomeHeroReveal from '@/components/HomeHeroReveal';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -21,6 +22,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
   return (
     <main className="page-shell home-page">
       <ScrollReveal groups={homeRevealGroups} />
+      <HomeHeroReveal />
       {searchParams.error === 'forbidden' && <p className="role-notice" role="alert"><LocalizedText text="Bạn không có quyền truy cập khu vực quản trị." /></p>}
 
       <section className="hero">
