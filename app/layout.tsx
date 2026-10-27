@@ -39,19 +39,23 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
-      <body className={beVietnamPro.variable}>
-        <LocaleCurrencyProvider>
-          <SmoothScroll>
-            <div className="app-viewport overflow-x-hidden">
-              <SiteHeaderVisibility><Header /></SiteHeaderVisibility>
-              {children}
-              <SiteFooter />
-              <FloatingContact />
-              <ExitIntentPopup />
-            </div>
-          </SmoothScroll>
-        </LocaleCurrencyProvider>
+      <body className={beVietnamPro.className}>
+        {/* Lenis cuộn mượt và Toaster thông báo */}
+        <SmoothScroll />
         <Toaster position="top-right" richColors />
+
+        {/* Khôi phục đầy đủ Header, Footer và Bộ đổi tiền */}
+        <LocaleCurrencyProvider>
+          <div className="app-viewport overflow-x-hidden">
+            <SiteHeaderVisibility>
+              <Header />
+            </SiteHeaderVisibility>
+            {children}
+            <SiteFooter />
+            <FloatingContact />
+            <ExitIntentPopup />
+          </div>
+        </LocaleCurrencyProvider>
       </body>
     </html>
   );
