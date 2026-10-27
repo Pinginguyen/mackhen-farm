@@ -622,6 +622,26 @@ textarea {
   animation: checkout-spin 0.9s linear infinite;
 }
 
+.micro-tactile {
+  transition: transform 150ms ease-out;
+}
+
+.micro-tactile:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.98);
+}
+
+.micro-tactile--small:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.96);
+}
+
+.micro-opacity {
+  transition: opacity 150ms ease-out;
+}
+
+.micro-opacity.is-pending {
+  opacity: 0.6;
+}
+
 @keyframes checkout-spin {
   to { transform: rotate(360deg); }
 }
@@ -1647,6 +1667,21 @@ textarea {
   color: #8b1e1e;
 }
 
+.traceability-timeline-wrap {
+  position: relative;
+}
+
+.traceability-timeline-line {
+  position: absolute;
+  top: 22px;
+  right: 12%;
+  left: 12%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: #bdcbb5;
+}
+
 .traceability-timeline {
   position: relative;
   display: grid;
@@ -1655,16 +1690,6 @@ textarea {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.traceability-timeline::before {
-  position: absolute;
-  top: 22px;
-  right: 12%;
-  left: 12%;
-  height: 1px;
-  background: #bdcbb5;
-  content: '';
 }
 
 .traceability-step {
@@ -1774,12 +1799,15 @@ textarea {
     gap: 20px;
   }
 
-  .traceability-timeline::before {
+  .traceability-timeline-line {
     top: 20px;
     bottom: 20px;
     left: 22px;
+    right: auto;
     width: 1px;
     height: auto;
+    transform: scaleY(0);
+    transform-origin: top center;
   }
 
   .traceability-step {
@@ -3846,7 +3874,8 @@ textarea {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
-  transition: width 300ms ease, background-color 300ms ease;
+  transform-origin: left center;
+  transition: transform 150ms ease-out;
 }
 
 .free-shipping-progress:not(.is-free) .free-shipping-track span {
@@ -4065,6 +4094,22 @@ textarea {
   background: #edf5ec;
   color: var(--forest);
   animation: toast-in 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .micro-tactile,
+  .micro-opacity,
+  .free-shipping-track span {
+    transition: none;
+  }
+
+  .micro-tactile:active {
+    transform: none;
+  }
+
+  .copy-toast {
+    animation: none;
+  }
 }
 
 @keyframes toast-in {
@@ -12397,3 +12442,5 @@ body {
     min-width: 340px;
   }
 }
+
+@tailwind utilities;

@@ -2,7 +2,7 @@ import { withSentryConfig } from '@sentry/nextjs/config';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   typescript: {
     // Bỏ qua lỗi TypeScript nhỏ để đảm bảo build thành công trên Vercel

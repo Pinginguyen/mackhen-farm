@@ -5,9 +5,9 @@ import FloatingContact from './floating-contact';
 import Header from '@/components/layout/Header';
 import SiteHeaderVisibility from '@/components/layout/SiteHeaderVisibility';
 import SmoothScroll from '@/components/SmoothScroll';
-import CartToast from '@/components/CartToast';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { LocaleCurrencyProvider } from '@/lib/i18n-context';
+import { Toaster } from 'sonner';
 import { Be_Vietnam_Pro } from 'next/font/google';
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -47,11 +47,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
               <SiteFooter />
               <FloatingContact />
-              <CartToast />
               <ExitIntentPopup />
             </div>
           </SmoothScroll>
         </LocaleCurrencyProvider>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

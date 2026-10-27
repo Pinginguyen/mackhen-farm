@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { readCartSnapshot } from '@/lib/cart-server';
-import CheckoutForm, { BuyNowCartRecovery } from './checkout-form';
+import CheckoutForm, { BuyNowCartRecovery, CheckoutHeading } from './checkout-form';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import CheckoutOrderSummary from './checkout-order-summary';
@@ -35,7 +35,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
         <div className="page-title">
           <div>
             <p className="eyebrow">Checkout</p>
-            <h2>Thanh toán & giao hàng</h2>
+            <CheckoutHeading />
           </div>
         </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { getVietnamAddressData, type VietnamAddressData } from '@/lib/vietnam-addresses';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 function normalizeName(value: string) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase()
@@ -26,6 +27,8 @@ function splitAddress(value: string, data: VietnamAddressData) {
 }
 
 export default function VietnamAddressFields({ initialAddress = '' }: { initialAddress?: string }) {
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
   const [data, setData] = useState<VietnamAddressData>();
   const [initialized, setInitialized] = useState(false);
   const [provinceId, setProvinceId] = useState('');
@@ -67,13 +70,13 @@ export default function VietnamAddressFields({ initialAddress = '' }: { initialA
 
   return (
     <fieldset className="address-fields">
-      <legend>Địa chỉ nhận hàng</legend>
+      <legend>{isEN ? 'Delivery address' : 'Địa chỉ nhận hàng'}</legend>
       <div className="address-select-grid">
-        <div className="field"><label htmlFor="province">Tỉnh / thành phố</label><select id="province" name="province" value={province?.name ?? ''} onChange={(event) => { const selected = data?.provinces.find((item) => item.name === event.target.value); setProvinceId(selected?.idProvince ?? ''); setDistrictId(''); setCommuneId(''); }} disabled={!data} required><option value="">{data ? 'Chọn tỉnh / thành phố' : 'Đang tải địa chỉ...'}</option>{data?.provinces.map((item) => <option key={item.idProvince} value={item.name}>{displayProvince(item.name)}</option>)}</select></div>
-        <div className="field"><label htmlFor="district">Quận / huyện</label><select id="district" name="district" value={district?.name ?? ''} onChange={(event) => { const selected = districts.find((item) => item.name === event.target.value); setDistrictId(selected?.idDistrict ?? ''); setCommuneId(''); }} disabled={!province} required><option value="">Chọn quận / huyện</option>{districts.map((item) => <option key={item.idDistrict} value={item.name}>{displayDistrict(item.name)}</option>)}</select></div>
-        <div className="field"><label htmlFor="ward">Phường / xã</label><select id="ward" name="ward" value={commune?.name ?? ''} onChange={(event) => { const selected = communes.find((item) => item.name === event.target.value); setCommuneId(selected?.idCommune ?? ''); }} disabled={!district} required><option value="">Chọn phường / xã</option>{communes.map((item) => <option key={item.idCommune} value={item.name}>{item.name}</option>)}</select></div>
+        <div className="field"><label htmlFor="province">{isEN ? 'Province / city' : 'Tỉnh / thành phố'}</label><select id="province" name="province" value={province?.name ?? ''} onChange={(event) => { const selected = data?.provinces.find((item) => item.name === event.target.value); setProvinceId(selected?.idProvince ?? ''); setDistrictId(''); setCommuneId(''); }} disabled={!data} required><option value="">{data ? (isEN ? 'Select a province / city' : 'Chọn tỉnh / thành phố') : (isEN ? 'Loading addresses...' : 'Đang tải địa chỉ...')}</option>{data?.provinces.map((item) => <option key={item.idProvince} value={item.name}>{displayProvince(item.name)}</option>)}</select></div>
+        <div className="field"><label htmlFor="district">{isEN ? 'District' : 'Quận / huyện'}</label><select id="district" name="district" value={district?.name ?? ''} onChange={(event) => { const selected = districts.find((item) => item.name === event.target.value); setDistrictId(selected?.idDistrict ?? ''); setCommuneId(''); }} disabled={!province} required><option value="">{isEN ? 'Select a district' : 'Chọn quận / huyện'}</option>{districts.map((item) => <option key={item.idDistrict} value={item.name}>{displayDistrict(item.name)}</option>)}</select></div>
+        <div className="field"><label htmlFor="ward">{isEN ? 'Ward / commune' : 'Phường / xã'}</label><select id="ward" name="ward" value={commune?.name ?? ''} onChange={(event) => { const selected = communes.find((item) => item.name === event.target.value); setCommuneId(selected?.idCommune ?? ''); }} disabled={!district} required><option value="">{isEN ? 'Select a ward / commune' : 'Chọn phường / xã'}</option>{communes.map((item) => <option key={item.idCommune} value={item.name}>{item.name}</option>)}</select></div>
       </div>
-      <div className="field"><label htmlFor="street-address">Số nhà, tên đường, thôn / ấp</label><input id="street-address" name="address" autoComplete="street-address" value={streetAddress} onChange={(event) => setStreetAddress(event.target.value)} required /></div>
+      <div className="field"><label htmlFor="street-address">{isEN ? 'Street address, hamlet / village' : 'Số nhà, tên đường, thôn / ấp'}</label><input id="street-address" name="address" autoComplete="street-address" value={streetAddress} onChange={(event) => setStreetAddress(event.target.value)} required /></div>
     </fieldset>
   );
 }

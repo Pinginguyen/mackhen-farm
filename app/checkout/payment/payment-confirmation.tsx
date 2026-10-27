@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { celebratePayment } from '@/lib/payment-celebration';
 
 type PaymentItem = { productId: string; productName: string; variantLabel: string | null; quantity: number; price: number };
 
@@ -92,6 +93,7 @@ export default function PaymentConfirmation({
         return;
       }
       setConfirmed(true);
+      celebratePayment(orderCode);
       persistOrder('PAID');
       setMessage('Thanh toán đã được ghi nhận; đơn hàng chuyển sang trạng thái đang xử lý.');
       router.push(redirectToTracking
@@ -112,7 +114,7 @@ export default function PaymentConfirmation({
       <p className={secondsLeft ? 'payment-countdown' : 'payment-expired'}>
         {secondsLeft ? `Mã QR hết hạn sau ${minutes}:${seconds}` : 'Mã QR đã hết hạn'}
       </p>
-      <button className="primary-action payment-confirm-button" type="button" onClick={confirmTransfer} disabled={submitting || confirmed || secondsLeft === 0}>
+      <button className="primary-action payment-confirm-button micro-tactile" type="button" onClick={confirmTransfer} disabled={submitting || confirmed || secondsLeft === 0}>
         {confirmed ? 'Đã xác nhận thanh toán' : submitting ? 'Đang xác nhận...' : 'Tôi đã chuyển khoản'}
       </button>
       {message && <p role="status">{message}</p>}

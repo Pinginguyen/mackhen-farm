@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Link from 'next/link';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 
@@ -48,7 +49,7 @@ function CartItemRow({
   }
 
   return (
-    <div className="table-row cart-item">
+    <div className={`table-row cart-item micro-opacity${saving ? ' is-pending' : ''}`}>
       <img src={item.image} alt={item.name} />
       <div className="cart-item-info">
         <strong>{item.name}</strong>
@@ -82,7 +83,7 @@ function CartItemRow({
       </div>
       <div className="cart-item-actions">
         <strong className="cart-item-total">{formatCurrency(unitPrice * item.quantity)}</strong>
-        <button className="cart-item-remove" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
+        <button className="cart-item-remove micro-tactile micro-tactile--small" type="button" aria-label={`Xóa ${item.name} khỏi giỏ hàng`} title="Xóa sản phẩm" disabled={saving} onClick={() => void update(0)}><Trash2 size={17} /></button>
       </div>
     </div>
   );
@@ -90,6 +91,7 @@ function CartItemRow({
 
 export default function CartContent({ initialItems }: { initialItems: CartItem[] }) {
   const [items, setItems] = useState(initialItems);
+  const [cartListRef] = useAutoAnimate();
   const itemsRef = useRef(initialItems);
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug));
@@ -149,8 +151,8 @@ export default function CartContent({ initialItems }: { initialItems: CartItem[]
 
   return (
     <div className="checkout-layout">
-      <div>
-        {items.length > 0 && <section className={`free-shipping-progress${freeShipping ? ' is-free' : ''}`} aria-live="polite"><p>{freeShipping ? '🎉 Chúc mừng! Đơn hàng của bạn đã được MIỄN PHÍ VẬN CHUYỂN toàn quốc!' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ nữa để được FREESHIP toàn quốc! 🚚`}</p><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span style={{ width: `${progress}%` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
+      <div ref={cartListRef}>
+        {items.length > 0 && <section className={`free-shipping-progress${freeShipping ? ' is-free' : ''}`} aria-live="polite"><p>{freeShipping ? '🎉 Chúc mừng! Đơn hàng của bạn đã được MIỄN PHÍ VẬN CHUYỂN toàn quốc!' : `Mua thêm ${(FREE_SHIPPING_THRESHOLD - subtotal).toLocaleString('vi-VN')}đ nữa để được FREESHIP toàn quốc! 🚚`}</p><div className="free-shipping-track" role="progressbar" aria-label="Tiến trình đạt miễn phí vận chuyển" aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
         {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">Giỏ hàng của bạn đang trống.</p>}
       </div>
       <aside className="summary-card">
@@ -163,8 +165,8 @@ export default function CartContent({ initialItems }: { initialItems: CartItem[]
         {freeShippingApplied && <p className="automatic-shipping-banner" role="status">Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).</p>}
         {!freeShippingApplied && items.length > 0 && shipping === 0 && <p className="free-shipping-note">Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).</p>}
         <div className="cart-footer">
-          <Link href="/products" className="secondary-action">Tiếp tục mua</Link>
-          <Link href="/checkout" aria-disabled={!items.length} className={`primary-action${items.length ? '' : ' is-disabled'}`}>Thanh toán</Link>
+          <Link href="/products" className="secondary-action micro-tactile">Tiếp tục mua</Link>
+          <Link href="/checkout" aria-disabled={!items.length} className={`primary-action micro-tactile${items.length ? '' : ' is-disabled'}`}>Thanh toán</Link>
         </div>
       </aside>
     </div>

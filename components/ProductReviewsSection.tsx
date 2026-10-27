@@ -6,6 +6,7 @@ import { MessageCircle, Send, Star, Store } from 'lucide-react';
 import ProductRating from '@/components/ProductRating';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import { getErrorMessage } from '@/lib/error-message';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 type Review = {
   id: string;
@@ -35,6 +36,8 @@ export default function ProductReviewsSection({
   initialReviewCount: number;
   initialRatingCounts: number[];
 }) {
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
   const [reviews, setReviews] = useState(initialReviews);
   const [reviewCount, setReviewCount] = useState(initialReviewCount);
   const [ratingCounts, setRatingCounts] = useState(initialRatingCounts);
@@ -103,26 +106,26 @@ export default function ProductReviewsSection({
       const result = await response.json() as { review?: Review; error?: unknown };
 
       if (!response.ok || !result.review) {
-        setMessage(getErrorMessage(result.error, 'Không thể gửi đánh giá.'));
+        setMessage(getErrorMessage(result.error, isEN ? 'Could not submit your review.' : 'Không thể gửi đánh giá.'));
         return;
       }
 
       const nextReview: Review = {
         ...result.review,
-        customerName: result.review.customerName || name.trim() || 'Khách hàng',
+        customerName: result.review.customerName || name.trim() || (isEN ? 'Customer' : 'Khách hàng'),
         createdAt: result.review.createdAt || new Date().toISOString(),
       };
       setReviews((current) => [nextReview, ...current]);
       setReviewCount((current) => current + 1);
       setRatingCounts((current) => current.map((count, index) => index + 1 === rating ? count + 1 : count));
-      setMessage('Cảm ơn bạn! Đánh giá của bạn đã được thêm ngay lập tức.');
+      setMessage(isEN ? 'Thank you! Your review has been added.' : 'Cảm ơn bạn! Đánh giá của bạn đã được thêm ngay lập tức.');
       setName('');
       setPhone('');
       setOrderCode('');
       setComment('');
       setRating(5);
     } catch {
-      setMessage('Không thể kết nối. Vui lòng thử lại.');
+      setMessage(isEN ? 'Connection failed. Please try again.' : 'Không thể kết nối. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -140,14 +143,14 @@ export default function ProductReviewsSection({
       });
       const result = await response.json() as { reply?: ReviewReply; error?: unknown };
       if (!response.ok || !result.reply) {
-        setMessage(getErrorMessage(result.error, 'Không thể gửi bình luận.'));
+        setMessage(getErrorMessage(result.error, isEN ? 'Could not post your reply.' : 'Không thể gửi bình luận.'));
         return;
       }
       setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, replies: [...review.replies, result.reply!] } : review));
       setThreadReplyOpen(null);
-      setMessage('Bình luận của bạn đã được thêm.');
+      setMessage(isEN ? 'Your reply has been posted.' : 'Bình luận của bạn đã được thêm.');
     } catch {
-      setMessage('Không thể kết nối. Vui lòng thử lại.');
+      setMessage(isEN ? 'Connection failed. Please try again.' : 'Không thể kết nối. Vui lòng thử lại.');
     } finally {
       setPendingReply(null);
     }
@@ -163,46 +166,48 @@ export default function ProductReviewsSection({
       });
       const result = await response.json() as { item?: { adminReply: string | null; adminReplyAt: string | null }; error?: unknown };
       if (!response.ok || !result.item) {
-        setMessage(getErrorMessage(result.error, 'Không thể lưu phản hồi của shop.'));
+        setMessage(getErrorMessage(result.error, isEN ? 'Could not save the store reply.' : 'Không thể lưu phản hồi của shop.'));
         return;
       }
       setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, ...result.item } : review));
       setAdminReplyOpen(null);
       setAdminReplyDraft('');
-      setMessage(value.trim() ? 'Đã lưu phản hồi của shop.' : 'Đã xóa phản hồi của shop.');
+      setMessage(value.trim() ? (isEN ? 'Store reply saved.' : 'Đã lưu phản hồi của shop.') : (isEN ? 'Store reply deleted.' : 'Đã xóa phản hồi của shop.'));
     } catch {
-      setMessage('Không thể kết nối. Vui lòng thử lại.');
+      setMessage(isEN ? 'Connection failed. Please try again.' : 'Không thể kết nối. Vui lòng thử lại.');
     } finally {
       setPendingReply(null);
     }
   }
 
   const visibleRatingCount = ratingCounts.reduce((sum, value) => sum + value, 0);
-  const ratingLabels: Record<number, string> = { 1: 'Rất thất vọng', 2: 'Chưa hài lòng', 3: 'Bình thường / Tạm ổn', 4: 'Hài lòng', 5: 'Tuyệt vời / Rất thích' };
+  const ratingLabels: Record<number, string> = isEN
+    ? { 1: 'Very disappointed', 2: 'Not satisfied', 3: 'Average / Okay', 4: 'Satisfied', 5: 'Excellent / Loved it' }
+    : { 1: 'Rất thất vọng', 2: 'Chưa hài lòng', 3: 'Bình thường / Tạm ổn', 4: 'Hài lòng', 5: 'Tuyệt vời / Rất thích' };
   return (
     <section className="page-card product-reviews" aria-labelledby="product-reviews-title">
       <header className="reviews-section-heading">
-        <p className="eyebrow">Đánh giá khách hàng</p>
-        <h2 id="product-reviews-title">Người mua nói gì</h2>
+        <p className="eyebrow">{isEN ? 'Customer reviews' : 'Đánh giá khách hàng'}</p>
+        <h2 id="product-reviews-title">{isEN ? 'What customers say' : 'Người mua nói gì'}</h2>
       </header>
 
       <div className="reviews-layout">
-        <aside className="review-summary-panel" aria-label="Tổng quan đánh giá">
+        <aside className="review-summary-panel" aria-label={isEN ? 'Review summary' : 'Tổng quan đánh giá'}>
           <div className="review-score-row">
             <strong className="review-average-score whitespace-nowrap shrink-0">{averageRating.toFixed(1)}</strong>
             <div>
               <ProductRating rating={averageRating} showValue={false} />
-              <p>Dựa trên {reviewCount} lượt đánh giá từ người mua thực tế</p>
+              <p>{isEN ? `Based on ${reviewCount} verified customer review${reviewCount === 1 ? '' : 's'}` : `Dựa trên ${reviewCount} lượt đánh giá từ người mua thực tế`}</p>
             </div>
           </div>
-          <div className="review-breakdown" aria-label="Phân bố số sao">
+          <div className="review-breakdown" aria-label={isEN ? 'Rating breakdown' : 'Phân bố số sao'}>
             {[5, 4, 3, 2, 1].map((star) => {
               const count = ratingCounts[star - 1] ?? 0;
               const percentage = visibleRatingCount ? Math.round((count / visibleRatingCount) * 100) : 0;
               return (
                 <div className="review-breakdown-row" key={star}>
                   <span>{star} ★</span>
-                  <div className="review-breakdown-track" role="progressbar" aria-label={`${star} sao`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}>
+                  <div className="review-breakdown-track" role="progressbar" aria-label={isEN ? `${star} stars` : `${star} sao`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}>
                     <span style={{ width: `${percentage}%` }} />
                   </div>
                   <small><span>{percentage}%</span><span>{count}</span></small>
@@ -211,7 +216,7 @@ export default function ProductReviewsSection({
             })}
           </div>
           <button className="review-write-toggle" type="button" aria-expanded={formOpen} aria-controls="review-form-panel" onClick={() => setFormOpen((open) => !open)}>
-            {formOpen ? 'Đóng biểu mẫu' : 'Viết đánh giá của bạn'}
+            {formOpen ? (isEN ? 'Close form' : 'Đóng biểu mẫu') : (isEN ? 'Write a review' : 'Viết đánh giá của bạn')}
           </button>
         </aside>
 
@@ -219,26 +224,26 @@ export default function ProductReviewsSection({
           <div ref={reviewPanelRef} id="review-form-panel" className={`review-form-panel${formOpen ? ' is-open' : ''}`} aria-hidden={!formOpen}>
             <form className="review-form" onSubmit={submit}>
               <div className="review-form-heading">
-                <div><p className="eyebrow">Chia sẻ trải nghiệm</p><h3>Đánh giá sản phẩm</h3></div>
+                <div><p className="eyebrow">{isEN ? 'Share your experience' : 'Chia sẻ trải nghiệm'}</p><h3>{isEN ? 'Product review' : 'Đánh giá sản phẩm'}</h3></div>
                 <span className="review-product-badge">{productName}</span>
               </div>
               <div className="review-form-short-fields">
                 <div className="field">
-                  <label htmlFor="review-name">Họ và tên</label>
+                  <label htmlFor="review-name">{isEN ? 'Full name' : 'Họ và tên'}</label>
                   <input id="review-name" value={name} onChange={(event) => setName(event.target.value)} required />
                 </div>
                 <div className="field">
-                  <label htmlFor="review-phone">Số điện thoại đặt hàng</label>
+                  <label htmlFor="review-phone">{isEN ? 'Order phone number' : 'Số điện thoại đặt hàng'}</label>
                   <ValidatedPhoneInput id="review-phone" value={phone} onChange={(event) => setPhone(event.target.value)} required />
                 </div>
               </div>
               <div className="field">
-                <label htmlFor="review-order-code">Mã đơn hàng</label>
-                <input id="review-order-code" value={orderCode} onChange={(event) => setOrderCode(event.target.value)} placeholder="MKF-123456 · Tra cứu trên phiếu xác nhận đơn" required />
+                <label htmlFor="review-order-code">{isEN ? 'Order number' : 'Mã đơn hàng'}</label>
+                <input id="review-order-code" value={orderCode} onChange={(event) => setOrderCode(event.target.value)} placeholder={isEN ? 'MKF-123456 · Find it on your order confirmation' : 'MKF-123456 · Tra cứu trên phiếu xác nhận đơn'} required />
               </div>
               <div className="review-rating-control">
-                <div className="review-rating-prompt"><span>Đánh giá của bạn</span><small>{ratingLabels[hoverRating || rating]}</small></div>
-                <div className="review-stars-picker" role="group" aria-label="Chọn số sao đánh giá" onMouseLeave={() => setHoverRating(0)}>
+                <div className="review-rating-prompt"><span>{isEN ? 'Your rating' : 'Đánh giá của bạn'}</span><small>{ratingLabels[hoverRating || rating]}</small></div>
+                <div className="review-stars-picker" role="group" aria-label={isEN ? 'Select a star rating' : 'Chọn số sao đánh giá'} onMouseLeave={() => setHoverRating(0)}>
                   {[1, 2, 3, 4, 5].map((value) => (
                     <button
                       key={value}
@@ -248,20 +253,20 @@ export default function ProductReviewsSection({
                       onMouseEnter={() => setHoverRating(value)}
                       onFocus={() => setHoverRating(value)}
                       onBlur={() => setHoverRating(0)}
-                      aria-label={`${value} sao`}
+                      aria-label={isEN ? `${value} stars` : `${value} sao`}
                       aria-pressed={rating === value}
                     ><Star size={34} strokeWidth={1.8} aria-hidden="true" /></button>
                   ))}
                 </div>
               </div>
               <div className="field review-comment-field">
-                <label htmlFor="review-comment">Bình luận</label>
-                <textarea id="review-comment" rows={4} value={comment} onChange={(event) => setComment(event.target.value)} minLength={10} maxLength={500} required placeholder="Hãy chia sẻ cảm nhận thực tế về hương vị, độ dai ngon và chất lượng đóng gói sản phẩm để giúp các khách hàng khác nhé..." />
-                <small>{comment.length}/500 ký tự · Tối thiểu 10 ký tự</small>
+                <label htmlFor="review-comment">{isEN ? 'Review' : 'Bình luận'}</label>
+                <textarea id="review-comment" rows={4} value={comment} onChange={(event) => setComment(event.target.value)} minLength={10} maxLength={500} required placeholder={isEN ? 'Share your experience with the flavor, texture, and packaging to help other customers...' : 'Hãy chia sẻ cảm nhận thực tế về hương vị, độ dai ngon và chất lượng đóng gói sản phẩm để giúp các khách hàng khác nhé...'} />
+                <small>{isEN ? `${comment.length}/500 characters · At least 10 characters` : `${comment.length}/500 ký tự · Tối thiểu 10 ký tự`}</small>
               </div>
               <button className="review-submit-button" type="submit" disabled={isSubmitting || comment.trim().length < 10}>
                 {isSubmitting && <span className="review-submit-spinner" aria-hidden="true" />}
-                {isSubmitting ? 'Đang gửi đánh giá...' : 'Gửi đánh giá'}
+                {isSubmitting ? (isEN ? 'Submitting review...' : 'Đang gửi đánh giá...') : (isEN ? 'Submit review' : 'Gửi đánh giá')}
               </button>
               {message && <p className="review-submit-message" role="status">{message}</p>}
             </form>
@@ -274,42 +279,42 @@ export default function ProductReviewsSection({
                   <div className="review-avatar" aria-hidden="true">{review.customerName.trim().charAt(0).toUpperCase() || 'K'}</div>
                   <div className="review-user-meta">
                     <strong>{review.customerName}</strong>
-                    <span className="review-purchased-badge"><span aria-hidden="true">✓</span> Đã mua hàng tại Mắc Khén Farm</span>
+                    <span className="review-purchased-badge"><span aria-hidden="true">✓</span> {isEN ? 'Purchased at Mac Khen Farm' : 'Đã mua hàng tại Mắc Khén Farm'}</span>
                   </div>
                 </header>
                 <div className="review-card-rating-row">
                   <ProductRating rating={review.rating} showValue={false} size="sm" />
                   <span aria-hidden="true">·</span>
-                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString('vi-VN')}</time>
+                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString(isEN ? 'en-SG' : 'vi-VN')}</time>
                 </div>
                 <p className="review-comment-text">{review.comment}</p>
                 {review.adminReply && <div className="review-merchant-reply">
-                  <header><Store size={15} aria-hidden="true" /><strong>Phản hồi từ Mắc Khén Farm</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString('vi-VN') : ''}</time></header>
+                  <header><Store size={15} aria-hidden="true" /><strong>{isEN ? 'Reply from Mac Khen Farm' : 'Phản hồi từ Mắc Khén Farm'}</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN') : ''}</time></header>
                   <p>{review.adminReply}</p>
                 </div>}
                 {isAdmin && <button type="button" className="review-admin-reply-toggle" onClick={() => { setAdminReplyDraft(review.adminReply ?? ''); setAdminReplyOpen(adminReplyOpen === review.id ? null : review.id); }}>
-                  <MessageCircle size={14} aria-hidden="true" /> {review.adminReply ? 'Phản hồi / Sửa phản hồi' : 'Phản hồi'}
+                  <MessageCircle size={14} aria-hidden="true" /> {review.adminReply ? (isEN ? 'Edit store reply' : 'Phản hồi / Sửa phản hồi') : (isEN ? 'Reply' : 'Phản hồi')}
                 </button>}
                 {isAdmin && adminReplyOpen === review.id && <form className="review-admin-reply-form" onSubmit={(event) => { event.preventDefault(); void saveAdminReply(review.id, adminReplyDraft); }}>
-                  <label htmlFor={`merchant-reply-${review.id}`}>Phản hồi chính thức của shop</label>
+                  <label htmlFor={`merchant-reply-${review.id}`}>{isEN ? 'Official store reply' : 'Phản hồi chính thức của shop'}</label>
                   <textarea id={`merchant-reply-${review.id}`} rows={3} maxLength={2000} value={adminReplyDraft} onChange={(event) => setAdminReplyDraft(event.target.value)} />
-                  <div><button type="submit" disabled={pendingReply === review.id || !adminReplyDraft.trim()}><Send size={14} />{pendingReply === review.id ? 'Đang lưu...' : 'Gửi phản hồi'}</button>{review.adminReply && <button type="button" className="review-admin-reply-clear" disabled={pendingReply === review.id} onClick={() => void saveAdminReply(review.id, '')}>Xóa phản hồi</button>}</div>
+                  <div><button type="submit" disabled={pendingReply === review.id || !adminReplyDraft.trim()}><Send size={14} />{pendingReply === review.id ? (isEN ? 'Saving...' : 'Đang lưu...') : (isEN ? 'Send reply' : 'Gửi phản hồi')}</button>{review.adminReply && <button type="button" className="review-admin-reply-clear" disabled={pendingReply === review.id} onClick={() => void saveAdminReply(review.id, '')}>{isEN ? 'Delete reply' : 'Xóa phản hồi'}</button>}</div>
                 </form>}
                 {!!review.replies.length && <div className="review-thread-replies">
                   {review.replies.map((reply) => <article className={reply.authorRole === 'ADMIN' ? 'is-admin-reply' : ''} key={reply.id}>
-                    <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString('vi-VN')}</time></header>
+                    <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</time></header>
                     <p>{reply.content}</p>
                   </article>)}
                 </div>}
-                <button type="button" className="review-thread-toggle" onClick={() => setThreadReplyOpen(threadReplyOpen === review.id ? null : review.id)}><MessageCircle size={14} />{threadReplyOpen === review.id ? 'Đóng thảo luận' : `Trả lời (${review.replies.length})`}</button>
+                <button type="button" className="review-thread-toggle" onClick={() => setThreadReplyOpen(threadReplyOpen === review.id ? null : review.id)}><MessageCircle size={14} />{threadReplyOpen === review.id ? (isEN ? 'Close discussion' : 'Đóng thảo luận') : (isEN ? `Reply (${review.replies.length})` : `Trả lời (${review.replies.length})`)}</button>
                 {threadReplyOpen === review.id && <form className="review-thread-form" onSubmit={(event) => void submitThreadReply(event, review.id)}>
-                  <label>Tên hiển thị<input name="authorName" maxLength={100} required placeholder="Tên của bạn" /></label>
-                  <label>Thảo luận<textarea name="content" rows={3} maxLength={1000} required placeholder="Hỏi thêm hoặc chia sẻ với người mua khác..." /></label>
-                  <button type="submit" disabled={pendingReply === review.id}>{pendingReply === review.id ? 'Đang gửi...' : 'Gửi bình luận'}</button>
+                  <label>{isEN ? 'Display name' : 'Tên hiển thị'}<input name="authorName" maxLength={100} required placeholder={isEN ? 'Your name' : 'Tên của bạn'} /></label>
+                  <label>{isEN ? 'Discussion' : 'Thảo luận'}<textarea name="content" rows={3} maxLength={1000} required placeholder={isEN ? 'Ask a question or share with other customers...' : 'Hỏi thêm hoặc chia sẻ với người mua khác...'} /></label>
+                  <button type="submit" disabled={pendingReply === review.id}>{pendingReply === review.id ? (isEN ? 'Sending...' : 'Đang gửi...') : (isEN ? 'Post reply' : 'Gửi bình luận')}</button>
                 </form>}
               </article>
             )) : (
-              <p className="review-empty-state">Chưa có đánh giá cho sản phẩm này. Hãy là người đầu tiên chia sẻ trải nghiệm.</p>
+              <p className="review-empty-state">{isEN ? 'No reviews yet. Be the first to share your experience.' : 'Chưa có đánh giá cho sản phẩm này. Hãy là người đầu tiên chia sẻ trải nghiệm.'}</p>
             )}
           </div>
         </div>

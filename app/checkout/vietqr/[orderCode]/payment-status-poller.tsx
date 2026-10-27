@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { celebratePayment } from '@/lib/payment-celebration';
 
 export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initiallyPaid = false, children }: { orderCode: string; orderId: string; canPoll: boolean; initiallyPaid?: boolean; children: ReactNode }) {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
 
   useEffect(() => {
     if (paid) {
+      celebratePayment(orderCode);
       router.push(`/cam-on?orderCode=${encodeURIComponent(orderCode)}`);
       return;
     }
@@ -40,7 +42,7 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
         });
         if (!response.ok) return;
         const result = await response.json() as { status?: string; paymentStatus?: string };
-        if (active && (result.status === 'PAID' || result.paymentStatus === 'PAID')) setPaid(true);
+        if (active && (['PAID', 'SUCCESS'].includes(result.status ?? '') || ['PAID', 'SUCCESS'].includes(result.paymentStatus ?? ''))) setPaid(true);
       } catch {
         return;
       }

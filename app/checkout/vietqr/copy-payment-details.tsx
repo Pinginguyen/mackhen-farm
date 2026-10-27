@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Copy } from 'lucide-react';
+import { toast as sonnerToast } from 'sonner';
 
 export default function CopyPaymentDetails({ accountNumber, transferContent }: { accountNumber: string; transferContent: string }) {
   const [toast, setToast] = useState('');
@@ -15,11 +16,12 @@ export default function CopyPaymentDetails({ accountNumber, transferContent }: {
   async function copy(label: string, value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setToast(`Đã sao chép ${label}.`);
+      setToast('');
+      sonnerToast.success('Đã sao chép vào bộ nhớ tạm');
     } catch {
       setToast('Trình duyệt không cho phép sao chép. Vui lòng chọn và sao chép thủ công.');
     }
   }
 
-  return <div className="payment-copy-actions"><button className="secondary-action" type="button" onClick={() => copy('số tài khoản', accountNumber)}><Copy size={16} /> Sao chép số tài khoản</button><button className="secondary-action" type="button" onClick={() => copy('nội dung chuyển khoản', transferContent)}><Copy size={16} /> Sao chép nội dung chuyển khoản</button>{toast && <p className="copy-toast" role="status">{toast}</p>}</div>;
+  return <div className="payment-copy-actions"><button className="secondary-action micro-tactile" type="button" onClick={() => copy('số tài khoản', accountNumber)}><Copy size={16} /> Sao chép số tài khoản</button><button className="secondary-action micro-tactile" type="button" onClick={() => copy('nội dung chuyển khoản', transferContent)}><Copy size={16} /> Sao chép nội dung chuyển khoản</button>{toast && <p className="copy-toast" role="status">{toast}</p>}</div>;
 }
