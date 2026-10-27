@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Khôi phục đầy đủ Header, Footer và Bộ đổi tiền */}
         <LocaleCurrencyProvider>
-          <div className="app-viewport overflow-x-clip pt-20">
+          <div className="app-viewport overflow-x-clip">
             <SiteHeaderVisibility>
               <Header />
             </SiteHeaderVisibility>

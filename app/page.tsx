@@ -11,7 +11,6 @@ import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
-import HorizontalShowcase from '@/components/home/HorizontalShowcase';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -87,8 +86,6 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       </section>
 
       <HomeTransparencyTabs />
-
-      <HorizontalShowcase products={products} />
 
       <section className="catalog-section">
         <div className="section-heading home-section-heading catalog-heading">

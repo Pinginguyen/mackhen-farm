@@ -13,5 +13,8 @@ export default async function Header() {
       user = null;
     }
   }
-  return <HeaderContent user={user} />;
+  return <>
+    <HeaderContent user={user} />
+    <div className="h-20 w-full" aria-hidden="true" />
+  </>;
 }
