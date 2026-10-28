@@ -6,9 +6,11 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
 
 export default function ExportDocumentPreview({ document }: { document: ExportDocument }) {
-  const { locale } = useLocaleCurrency();
-  const text = (value: string) => translateContent(value, locale);
-  const productName = translateProductName('Chẳm Chéo Ướt Chuẩn Vị Điện Biên', locale);
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
+  const contentLocale = isEN ? 'en' : 'vi';
+  const text = (value: string) => translateContent(value, contentLocale);
+  const productName = translateProductName('Chẳm Chéo Ướt Chuẩn Vị Điện Biên', contentLocale);
 
   return (
     <main className="export-document-page">
@@ -35,7 +37,7 @@ export default function ExportDocumentPreview({ document }: { document: ExportDo
           <dl className="export-document-facts">
             <div><dt>{text('Sản phẩm')}</dt><dd>{productName}</dd></div>
             {document.id === 'product-specification' && <>
-              <div><dt>{text('Thành phần chính')}</dt><dd>Ớt thóc, tỏi nếp Điện Biên, rau mùi tàu, mắc khén, hạt dổi và muối hầm.</dd></div>
+              <div><dt>{text('Thành phần chính')}</dt><dd>{text('Ớt thóc, tỏi nếp Điện Biên, rau mùi tàu, mắc khén, hạt dổi và muối hầm.')}</dd></div>
               <div><dt>{text('Quy cách đóng gói')}</dt><dd>{text('Hũ nắp nhôm 250g')}</dd></div>
               <div><dt>{text('Khối lượng tịnh')}</dt><dd>250g</dd></div>
             </>}

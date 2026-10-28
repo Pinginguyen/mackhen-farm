@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { celebratePayment } from '@/lib/payment-celebration';
+import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initiallyPaid = false, children }: { orderCode: string; orderId: string; canPoll: boolean; initiallyPaid?: boolean; children: ReactNode }) {
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
   const router = useRouter();
   const [paid, setPaid] = useState(initiallyPaid);
 
@@ -60,9 +63,9 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
     <div className="payment-qr-layout" data-payment-paid={paid ? 'true' : undefined}>
       {paid && <div className="payment-success-overlay" role="status" aria-live="assertive">
         <CheckCircle2 size={78} strokeWidth={1.7} aria-hidden="true" />
-        <h2>ĐÃ NHẬN THANH TOÁN THÀNH CÔNG!</h2>
-        <p>Đơn hàng {orderCode} đang được xác nhận.</p>
-        <span>Đang chuyển đến xác nhận đơn hàng...</span>
+        <h2>{isEN ? 'PAYMENT RECEIVED SUCCESSFULLY!' : 'ĐÃ NHẬN THANH TOÁN THÀNH CÔNG!'}</h2>
+        <p>{isEN ? `Order ${orderCode} is being confirmed.` : `Đơn hàng ${orderCode} đang được xác nhận.`}</p>
+        <span>{isEN ? 'Redirecting to your order confirmation...' : 'Đang chuyển đến xác nhận đơn hàng...'}</span>
       </div>}
       {!paid && children}
     </div>

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import TrackingForm from './tracking-form';
 import ReturnRequestForm from './return-request-form';
 import { ArrowRight, Camera, MessageCircle, PackageCheck, ShieldCheck } from 'lucide-react';
+import LocalizedText from '@/components/LocalizedText';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,28 +39,28 @@ export default async function TrackingPage({ searchParams }: { searchParams?: { 
   return (
     <main className="page-shell return-page">
       <section className="page-card return-tracking-card">
-        <p className="eyebrow">Theo dõi giao hàng</p>
-        <h1>Đơn hàng của bạn đang ở đâu?</h1>
-        {paymentVerified && <p className="payment-tracking-notice" role="status">Thanh toán đã được hệ thống xác nhận. Nhập số điện thoại đặt hàng để xem trạng thái đơn.</p>}
-        <Suspense fallback={<p className="empty-state" role="status">Đang tải biểu mẫu tra cứu...</p>}>
+        <p className="eyebrow"><LocalizedText text="Theo dõi giao hàng" /></p>
+        <h1><LocalizedText text="Đơn hàng của bạn đang ở đâu?" /></h1>
+        {paymentVerified && <p className="payment-tracking-notice" role="status"><LocalizedText text="Thanh toán đã được hệ thống xác nhận. Nhập số điện thoại đặt hàng để xem trạng thái đơn." /></p>}
+        <Suspense fallback={<p className="empty-state" role="status"><LocalizedText text="Đang tải biểu mẫu tra cứu..." /></p>}>
           <TrackingForm />
         </Suspense>
       </section>
 
       <section className="return-policy" aria-labelledby="return-policy-title">
         <header className="return-policy-heading">
-          <p className="eyebrow">Chính sách hỗ trợ khách hàng</p>
-          <h2 id="return-policy-title">Chính sách &amp; Hướng dẫn Đổi trả - Hoàn tiền</h2>
-          <p>Nếu đơn hàng giao sai hoặc sản phẩm gặp lỗi bao bì, ẩm mốc, Mắc Khén Farm sẽ hỗ trợ bạn nhanh chóng.</p>
+          <p className="eyebrow"><LocalizedText text="Chính sách hỗ trợ khách hàng" /></p>
+          <h2 id="return-policy-title"><LocalizedText text="Chính sách & Hướng dẫn Đổi trả - Hoàn tiền" /></h2>
+          <p><LocalizedText text="Nếu đơn hàng giao sai hoặc sản phẩm gặp lỗi bao bì, ẩm mốc, Mắc Khén Farm sẽ hỗ trợ bạn nhanh chóng." /></p>
         </header>
 
         <ol className="return-steps">
           {steps.map(({ title, description, icon: Icon }, index) => (
             <li key={title}>
-              <span className="return-step-number">Bước {index + 1}</span>
+              <span className="return-step-number"><LocalizedText text="Bước" /> {index + 1}</span>
               <span className="return-step-icon"><Icon size={22} /></span>
-              <h3>{title}</h3>
-              <p>{description}</p>
+              <h3><LocalizedText text={title} /></h3>
+              <p><LocalizedText text={description} /></p>
               {index < steps.length - 1 && <ArrowRight className="return-step-arrow" size={18} aria-hidden="true" />}
             </li>
           ))}
@@ -68,8 +69,8 @@ export default async function TrackingPage({ searchParams }: { searchParams?: { 
         <section className="return-form-panel" aria-labelledby="return-form-title">
           <header className="return-form-heading">
             <div>
-              <p className="eyebrow">Chúng tôi sẵn sàng hỗ trợ</p>
-              <h3 id="return-form-title">Gửi yêu cầu đổi trả nhanh</h3>
+              <p className="eyebrow"><LocalizedText text="Chúng tôi sẵn sàng hỗ trợ" /></p>
+              <h3 id="return-form-title"><LocalizedText text="Gửi yêu cầu đổi trả nhanh" /></h3>
             </div>
             <a
               className="return-zalo-link"
@@ -78,7 +79,7 @@ export default async function TrackingPage({ searchParams }: { searchParams?: { 
               rel={supportZaloUrl ? 'noopener noreferrer' : undefined}
             >
               <MessageCircle size={18} />
-              {supportZaloUrl ? 'Zalo hỗ trợ trực tiếp' : 'Điền form hỗ trợ'}
+              <LocalizedText text={supportZaloUrl ? 'Zalo hỗ trợ trực tiếp' : 'Điền form hỗ trợ'} />
             </a>
           </header>
           <ReturnRequestForm />
@@ -87,8 +88,8 @@ export default async function TrackingPage({ searchParams }: { searchParams?: { 
         <aside className="return-guarantee">
           <ShieldCheck size={26} aria-hidden="true" />
           <div>
-            <strong>BẢO HÀNH VỊ GIÁC</strong>
-            <p>Chúng tôi cam kết chịu 100% chi phí vận chuyển đơn gửi bù. Bạn không cần mang kiện hàng lỗi đi trả!</p>
+            <strong><LocalizedText text="BẢO HÀNH VỊ GIÁC" /></strong>
+            <p><LocalizedText text="Chúng tôi cam kết chịu 100% chi phí vận chuyển đơn gửi bù. Bạn không cần mang kiện hàng lỗi đi trả!" /></p>
           </div>
         </aside>
       </section>

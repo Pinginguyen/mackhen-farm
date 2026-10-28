@@ -11,8 +11,9 @@ const successNotice = 'Yêu cầu đã được ghi nhận. Quản lý phát tri
 const emailNotice = 'Yêu cầu đã được lưu, nhưng email thông báo quản trị chưa gửi được. Vui lòng thử lại sau.';
 
 export default function B2BPartnershipPage() {
-  const { locale } = useLocaleCurrency();
-  const text = (value: string) => translateContent(value, locale);
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
+  const text = (value: string) => translateContent(value, isEN ? 'en' : 'vi');
   const [toast, setToast] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,11 +36,11 @@ export default function B2BPartnershipPage() {
         body: JSON.stringify(Object.fromEntries(formData.entries())),
       });
       const result = await response.json() as { emailSent?: boolean; error?: { message?: string } };
-      if (!response.ok) throw new Error(text(result.error?.message ?? 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
+      if (!response.ok) throw new Error(isEN ? text('Không thể gửi yêu cầu. Vui lòng thử lại.') : text(result.error?.message ?? 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
       form.reset();
       setToast(text(result.emailSent === false ? emailNotice : successNotice));
     } catch (error) {
-      setToast(text(error instanceof Error ? error.message : 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
+      setToast(isEN ? text('Không thể gửi yêu cầu. Vui lòng thử lại.') : text(error instanceof Error ? error.message : 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
     } finally {
       setSubmitting(false);
     }

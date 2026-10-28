@@ -1,11 +1,7 @@
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 
 import { prisma } from '@/lib/prisma';
-import { formatCurrency } from '@/lib/store-data';
-import PaymentConfirmation from '../../payment/payment-confirmation';
-import CopyPaymentDetails from '../copy-payment-details';
-import PaymentStatusPoller from './payment-status-poller';
+import VietQrPaymentDetails from './payment-details';
 
 export const dynamic = 'force-dynamic';
 const defaultCheckoutAmount = 155000;
@@ -77,38 +73,20 @@ export default async function VietQrOrderPage({
   return (
     <main className="page-shell">
       <section className="page-card payment-page">
-        <div className="page-title">
-          <div><p className="eyebrow">Đơn hàng {transferContent}</p><h1>Quét mã để chuyển khoản</h1></div>
-          <strong className="payment-total">{formatCurrency(amount)}</strong>
-        </div>
-        {isLocalOnly && <p className="payment-order-unavailable" role="status">Đơn chưa được lưu hoặc xác minh trực tuyến. Thông tin này chỉ để tra cứu; vui lòng liên hệ cửa hàng để đối soát trước khi chuyển khoản.</p>}
-        <PaymentStatusPoller orderCode={orderCode} orderId={order?.id ?? orderCode} canPoll={Boolean(order)} initiallyPaid={order?.paymentStatus === 'PAID'}>
-          <div className="relative isolate overflow-hidden rounded-2xl p-px">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-[-100%] animate-border-beam bg-[conic-gradient(transparent_0deg,#9B2424_70deg,transparent_130deg)] motion-reduce:animate-none" />
-            <div className="payment-qr-panel relative z-10 border-0"><Image src={qrUrl} alt={`Mã VietQR thanh toán ${formatCurrency(amount)}`} width={520} height={520} sizes="(max-width: 768px) 90vw, 520px" unoptimized /></div>
-          </div>
-          <div className="payment-information">
-            <dl>
-              <div><dt>Ngân hàng</dt><dd>{bankId === 'MB' ? 'MB Bank' : bankId}</dd></div>
-              <div><dt>Số tài khoản</dt><dd>{accountNumber}</dd></div>
-              <div><dt>Chủ tài khoản</dt><dd>{accountName}</dd></div>
-              <div><dt>Số tiền</dt><dd>{formatCurrency(amount)}</dd></div>
-              <div><dt>Nội dung chuyển khoản</dt><dd>{transferContent}</dd></div>
-            </dl>
-            <CopyPaymentDetails accountNumber={accountNumber} transferContent={transferContent} />
-            <PaymentConfirmation
-              orderId={order?.id}
-              orderCode={transferContent}
-              totalAmount={amount}
-              createdAt={order?.createdAt.toISOString() ?? paymentCreatedAt.toISOString()}
-              items={items}
-              expiresAt={expiresAt}
-              alreadyConfirmed={order?.paymentStatus === 'PAID' && payment?.status === 'PAID'}
-              paymentMethod="VIETQR"
-              isLocalOnly={isLocalOnly}
-            />
-          </div>
-        </PaymentStatusPoller>
+        <VietQrPaymentDetails
+          orderCode={transferContent}
+          amount={amount}
+          bankId={bankId}
+          accountNumber={accountNumber}
+          accountName={accountName}
+          qrUrl={qrUrl}
+          orderId={order?.id}
+          createdAt={order?.createdAt.toISOString() ?? paymentCreatedAt.toISOString()}
+          items={items}
+          expiresAt={expiresAt}
+          alreadyConfirmed={order?.paymentStatus === 'PAID' && payment?.status === 'PAID'}
+          isLocalOnly={isLocalOnly}
+        />
       </section>
     </main>
   );

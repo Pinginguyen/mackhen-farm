@@ -28,8 +28,9 @@ const timelineStepAnimations = [
 ];
 
 export default function TraceabilityPage() {
-  const { locale } = useLocaleCurrency();
-  const text = (value: string) => translateContent(value, locale);
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
+  const text = (value: string) => translateContent(value, isEN ? 'en' : 'vi');
   const [query, setQuery] = useState('');
   const [batch, setBatch] = useState<TraceabilityData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,7 +54,7 @@ export default function TraceabilityPage() {
       if (response.status === 404) {
         setError(text('Không tìm thấy dữ liệu cho mã lô này. Vui lòng kiểm tra lại ký tự in dưới đáy bao bì.'));
       } else if (!response.ok || !result.success || !result.data) {
-        setError(text(result.error ?? 'Không thể tra cứu mã lô. Vui lòng thử lại.'));
+        setError(isEN ? text('Không thể tra cứu mã lô. Vui lòng thử lại.') : text(result.error ?? 'Không thể tra cứu mã lô. Vui lòng thử lại.'));
       } else {
         setBatch(result.data);
       }
@@ -106,7 +107,7 @@ export default function TraceabilityPage() {
           </div>
           {batch ? <>
             <section className="traceability-product" aria-label={text('Thông tin sản phẩm')}>
-              <div className="traceability-product-heading"><p className="traceability-kicker">{batch.batchCode}</p><h3>{translateProductName(batch.productName, locale)}</h3></div>
+              <div className="traceability-product-heading"><p className="traceability-kicker">{batch.batchCode}</p><h3>{translateProductName(batch.productName, isEN ? 'en' : 'vi')}</h3></div>
               <dl className="traceability-product-facts">
                 <div><dt>{text('Ngày sản xuất')}</dt><dd>{batch.manufacturingDate}</dd></div>
                 <div><dt>{text('Hạn sử dụng')}</dt><dd>{batch.expiryDate}</dd></div>
@@ -121,7 +122,7 @@ export default function TraceabilityPage() {
                   const StepIcon = stepIcons[index];
                   return <li className={`traceability-step ${timelineStepAnimations[index] ?? ''}`} key={step.label}>
                     <div className="traceability-step-marker"><StepIcon size={20} aria-hidden="true" /><span>{String(index + 1).padStart(2, '0')}</span></div>
-                    <div className="traceability-step-content"><p className="traceability-step-date">{locale === 'en' ? 'STAGE' : 'CÔNG ĐOẠN'} {String(index + 1).padStart(2, '0')}</p><h3>{locale === 'en' ? englishStepLabels[index] ?? text(step.label) : step.label}</h3><p>{text(step.detail)}</p></div>
+                    <div className="traceability-step-content"><p className="traceability-step-date">{isEN ? 'STAGE' : 'CÔNG ĐOẠN'} {String(index + 1).padStart(2, '0')}</p><h3>{isEN ? englishStepLabels[index] ?? text(step.label) : step.label}</h3><p>{text(step.detail)}</p></div>
                   </li>;
                 })}
               </ol>

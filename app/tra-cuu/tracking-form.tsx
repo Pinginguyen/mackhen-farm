@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Box, Check, House, PackageCheck, Printer, Star, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+import { translateContent, translateProductName } from '@/lib/translations';
 import WarrantyRequest from './warranty-request';
 
 type TrackedItem = { productId: string; productName: string; productSlug?: string; quantity: number; price: number };
@@ -39,6 +41,7 @@ const steps = [
   { label: 'Đang vận chuyển', icon: Truck },
   { label: 'Giao thành công', icon: House },
 ];
+const englishSteps = ['Order received', 'Preparing order', 'In transit', 'Delivered'];
 
 function normalizeOrder(value: unknown): TrackedOrder | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
@@ -93,6 +96,9 @@ function activeStep(status: string): number {
 }
 
 export default function TrackingForm() {
+  const { locale, currency, formatCurrency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
+  const text = (value: string) => translateContent(value, isEN ? 'en' : 'vi');
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<TrackedOrder[]>([]);
   const [cachedOrder, setCachedOrder] = useState<TrackedOrder | null>(null);
@@ -173,18 +179,18 @@ export default function TrackingForm() {
         if (matchingCachedOrder) {
           setOrders([matchingCachedOrder]);
           setUsingCachedOrder(true);
-          setError('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.');
+          setError(text('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.'));
         } else {
-          setError(getErrorMessage(result?.error ?? result, 'Không thể tra cứu đơn hàng.'));
+          setError(isEN ? text('Không thể tra cứu đơn hàng.') : getErrorMessage(result?.error ?? result, 'Không thể tra cứu đơn hàng.'));
         }
       } else {
         const matchingOrders = normalizeOrders(result?.items);
         if (!matchingOrders.length && matchingCachedOrder) {
           setOrders([matchingCachedOrder]);
           setUsingCachedOrder(true);
-          setError('Không tìm thấy đơn trên hệ thống. Đang hiển thị bản lưu gần nhất trên thiết bị; trạng thái chưa được xác minh.');
+          setError(text('Không tìm thấy đơn trên hệ thống. Đang hiển thị bản lưu gần nhất trên thiết bị; trạng thái chưa được xác minh.'));
         } else if (!matchingOrders.length) {
-          setError('Không tìm thấy đơn hàng phù hợp. Vui lòng kiểm tra thông tin và thử lại.');
+          setError(text('Không tìm thấy đơn hàng phù hợp. Vui lòng kiểm tra thông tin và thử lại.'));
         } else {
           setOrders(matchingOrders);
         }
@@ -193,9 +199,9 @@ export default function TrackingForm() {
       if (matchingCachedOrder) {
         setOrders([matchingCachedOrder]);
         setUsingCachedOrder(true);
-        setError('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.');
+        setError(text('Không thể kết nối hệ thống. Đang hiển thị thông tin đã lưu trên thiết bị; trạng thái chưa được xác minh.'));
       } else {
-        setError('Không thể kết nối. Vui lòng thử lại.');
+        setError(text('Không thể kết nối. Vui lòng thử lại.'));
       }
     } finally {
       setLoading(false);
@@ -225,27 +231,27 @@ export default function TrackingForm() {
     <div className="tracking-content">
       <form ref={formRef} className="tracking-search" onSubmit={lookup}>
         <div className="field">
-          <label htmlFor="tracking-code">Mã đơn hàng</label>
+          <label htmlFor="tracking-code">{text('Mã đơn hàng')}</label>
           <input id="tracking-code" name="orderCode" placeholder="MKF-123456" defaultValue={searchParams.get('orderCode') ?? ''} required />
         </div>
-        <span>và</span>
+        <span>{text('và')}</span>
         <div className="field">
-          <label htmlFor="tracking-phone">Số điện thoại</label>
+          <label htmlFor="tracking-phone">{text('Số điện thoại')}</label>
           <input id="tracking-phone" name="phone" type="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required />
         </div>
-        <button className="primary-action" disabled={loading}>{loading ? 'Đang tra cứu...' : 'Tra cứu đơn hàng'}</button>
+        <button className="primary-action" disabled={loading}>{loading ? text('Đang tra cứu...') : text('Tra cứu đơn hàng')}</button>
       </form>
 
       {error && (
         <div className="tracking-not-found" role="alert">
           <p>{error}</p>
           <button className="secondary-action" type="button" onClick={() => void retryLookup()} disabled={loading}>
-            {loading ? 'Đang thử lại...' : 'Thử lại'}
+            {loading ? text('Đang thử lại...') : text('Thử lại')}
           </button>
         </div>
       )}
 
-      {usingCachedOrder && <p className="tracking-cache-notice" role="status">Bản lưu cục bộ chỉ để tham khảo; trạng thái chính thức cần được xác minh từ hệ thống.</p>}
+      {usingCachedOrder && <p className="tracking-cache-notice" role="status">{text('Bản lưu cục bộ chỉ để tham khảo; trạng thái chính thức cần được xác minh từ hệ thống.')}</p>}
 
       {orders.map((order) => {
         const orderItems = order?.items ?? [];
@@ -257,21 +263,21 @@ export default function TrackingForm() {
         return (
           <article className={`tracking-order${printOrderCode === order.orderCode ? ' is-print-target' : ''}`} key={order.orderCode}>
             <header>
-              <div><p className="eyebrow">Mã đơn</p><h2>{order.orderCode}</h2></div>
-              <strong>{order.totalAmount.toLocaleString('vi-VN')}đ</strong>
-              <button type="button" className="secondary-action tracking-print-button" onClick={() => printOrder(order.orderCode)}><Printer size={16} /> In hóa đơn / Phiếu đóng gói</button>
+              <div><p className="eyebrow">{text('Mã đơn')}</p><h2>{order.orderCode}</h2></div>
+              <strong>{formatCurrency(order.totalAmount)}</strong>
+              <button type="button" className="secondary-action tracking-print-button" onClick={() => printOrder(order.orderCode)}><Printer size={16} /> {text('In hóa đơn / Phiếu đóng gói')}</button>
             </header>
 
             <div className="tracking-invoice-meta">
-              <p><strong>Ngày đặt:</strong> {new Date(order.createdAt).toLocaleString('vi-VN')}</p>
-              <p><strong>Người nhận:</strong> {order.customerName ?? 'Khách hàng'}</p>
-              <p><strong>Điện thoại:</strong> {order.phone ?? order.maskedPhone ?? 'Không có'}</p>
-              <p><strong>Địa chỉ:</strong> {order.address ?? order.maskedAddress ?? 'Không có'}</p>
-              <p><strong>Thanh toán:</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'COD' ? 'COD' : 'Chưa xác minh'}</p>
+              <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</p>
+              <p><strong>{text('Người nhận:')}</strong> {order.customerName ?? text('Khách hàng')}</p>
+              <p><strong>{text('Điện thoại:')}</strong> {order.phone ?? order.maskedPhone ?? text('Không có')}</p>
+              <p><strong>{text('Địa chỉ:')}</strong> {order.address ?? order.maskedAddress ?? text('Không có')}</p>
+              <p><strong>{text('Thanh toán:')}</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'COD' ? 'COD' : text('Chưa xác minh')}</p>
             </div>
 
             {orderStatus === 'CANCELLED' ? (
-              <p className="form-error">Đơn hàng đã hủy.</p>
+              <p className="form-error">{text('Đơn hàng đã hủy.')}</p>
             ) : (
               <div className="tracking-timeline">
                 <div className="tracking-progress"><span style={{ width: `${progress}%` }} /></div>
@@ -281,7 +287,7 @@ export default function TrackingForm() {
                     return (
                       <li className={index <= current ? 'is-complete' : ''} key={`${step.label}-${index}`}>
                         <span><Icon size={17} /></span>
-                        <strong>{step.label}</strong>
+                        <strong>{isEN ? englishSteps[index] ?? text(step.label) : step.label}</strong>
                       </li>
                     );
                   })}
@@ -290,32 +296,32 @@ export default function TrackingForm() {
             )}
 
             <div className="tracking-carrier">
-              <span>Đơn vị vận chuyển: {order.carrier === 'SPX' ? 'SPX Express' : order.carrier === 'GHTK' ? 'GHTK' : order.carrier === 'VIETTEL_POST' ? 'Viettel Post' : 'Chưa bàn giao'}</span>
-              {order.trackingCode && <span>Mã vận đơn: <strong>{order.trackingCode}</strong></span>}
-              {order.maskedPhone && <span>Điện thoại: <strong>{order.maskedPhone}</strong></span>}
-              {order.maskedAddress && <span>Khu vực giao hàng: <strong>{order.maskedAddress}</strong></span>}
+              <span>{text('Đơn vị vận chuyển:')} {order.carrier === 'SPX' ? 'SPX Express' : order.carrier === 'GHTK' ? 'GHTK' : order.carrier === 'VIETTEL_POST' ? 'Viettel Post' : text('Chưa bàn giao')}</span>
+              {order.trackingCode && <span>{text('Mã vận đơn:')} <strong>{order.trackingCode}</strong></span>}
+              {order.maskedPhone && <span>{text('Điện thoại:')} <strong>{order.maskedPhone}</strong></span>}
+              {order.maskedAddress && <span>{text('Khu vực giao hàng:')} <strong>{order.maskedAddress}</strong></span>}
             </div>
 
             <div className="tracking-items">
               {orderItems.map((item) => (
                 <div key={`${order.orderCode}-${item.productId}`}>
-                  <span>{item.productName} × {item.quantity}</span>
-                  <strong>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</strong>
+                  <span>{translateProductName(item.productName, isEN ? 'en' : 'vi')} × {item.quantity}</span>
+                  <strong>{formatCurrency(item.price * item.quantity)}</strong>
                   {delivered && item.productSlug && order.phone && <Link
                     className="tracking-review-action"
                     href={`/products/${encodeURIComponent(item.productSlug)}?${new URLSearchParams({ review: '1', orderCode: order.orderCode, phone: order.phone }).toString()}#product-reviews-title`}
-                  ><Star size={13} aria-hidden="true" /> Đánh giá</Link>}
+                  ><Star size={13} aria-hidden="true" /> {text('Đánh giá')}</Link>}
                 </div>
               ))}
-              {!orderItems.length && <p>Đơn hàng chưa có thông tin sản phẩm.</p>}
+              {!orderItems.length && <p>{text('Đơn hàng chưa có thông tin sản phẩm.')}</p>}
             </div>
             <div className="tracking-invoice-totals">
-              {order.subtotal !== undefined && <p><span>Tạm tính</span><strong>{order.subtotal.toLocaleString('vi-VN')}đ</strong></p>}
-              {order.discountAmount ? <p><span>Giảm giá</span><strong>−{order.discountAmount.toLocaleString('vi-VN')}đ</strong></p> : null}
-              {order.shippingFee !== undefined && <p><span>Vận chuyển</span><strong>{order.shippingFee ? `${order.shippingFee.toLocaleString('vi-VN')}đ` : 'Miễn phí'}</strong></p>}
-              <p><span>Tổng cộng</span><strong>{order.totalAmount.toLocaleString('vi-VN')}đ</strong></p>
+              {order.subtotal !== undefined && <p><span>{text('Tạm tính')}</span><strong>{formatCurrency(order.subtotal)}</strong></p>}
+              {order.discountAmount ? <p><span>{text('Giảm giá')}</span><strong>−{formatCurrency(order.discountAmount)}</strong></p> : null}
+              {order.shippingFee !== undefined && <p><span>{text('Vận chuyển')}</span><strong>{order.shippingFee ? formatCurrency(order.shippingFee) : text('Miễn phí')}</strong></p>}
+              <p><span>{text('Tổng cộng')}</span><strong>{formatCurrency(order.totalAmount)}</strong></p>
             </div>
-            <p className="tracking-invoice-guarantee">Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.</p>
+            <p className="tracking-invoice-guarantee">{text('Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.')}</p>
 
             {delivered && (
               <WarrantyRequest orderCode={order.orderCode} phone={phone} deliveredAt={order.deliveredAt ?? order.createdAt} existingReason={order.warrantyRequest?.reason} />

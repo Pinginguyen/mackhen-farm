@@ -172,7 +172,7 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       if (!response.ok || typeof result.discount !== 'number') {
         setVoucherFeedback({
           type: 'error',
-          text: result.error?.message ?? (isEN ? 'This discount code does not exist or has expired.' : 'Mã giảm giá không tồn tại hoặc đã hết hạn.'),
+          text: isEN ? 'This discount code does not exist or has expired.' : result.error?.message ?? 'Mã giảm giá không tồn tại hoặc đã hết hạn.',
           requiresLogin: result.error?.code === 'VOUCHER_LOGIN_REQUIRED',
         });
         return;
@@ -195,12 +195,12 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
       const response = await fetch('/api/vouchers', { cache: 'no-store' });
       const result = await response.json() as { items?: AvailableVoucher[]; error?: string | { message?: string } };
       if (!response.ok || !result.items) {
-        const errorMessage = typeof result.error === 'string' ? result.error : result.error?.message;
-        throw new Error(errorMessage ?? (isEN ? 'Could not load vouchers.' : 'Không thể tải danh sách voucher.'));
+        const errorMessage = isEN ? 'Could not load vouchers.' : typeof result.error === 'string' ? result.error : result.error?.message;
+        throw new Error(errorMessage ?? 'Không thể tải danh sách voucher.');
       }
       setAvailableVouchers(result.items);
     } catch (error) {
-      setVoucherListError(error instanceof Error ? error.message : (isEN ? 'Could not load vouchers.' : 'Không thể tải danh sách voucher.'));
+      setVoucherListError(isEN ? 'Could not load vouchers.' : error instanceof Error ? error.message : 'Không thể tải danh sách voucher.');
     } finally {
       setLoadingVouchers(false);
     }
@@ -273,15 +273,15 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
             setVoucher('');
             setAppliedVoucher('');
             setVoucherDiscount(0);
-            setVoucherFeedback({ type: 'error', text: serverError.message ?? (isEN ? 'This discount code is no longer eligible and has been removed.' : 'Mã giảm giá không còn đủ điều kiện và đã được hủy.') });
+            setVoucherFeedback({ type: 'error', text: isEN ? 'This discount code is no longer eligible and has been removed.' : serverError.message ?? 'Mã giảm giá không còn đủ điều kiện và đã được hủy.' });
           }
           const retryable = response.status >= 500 || response.status === 408 || response.status === 429;
           submitLock.current = false;
           setSubmitting(false);
           setRetryAvailable(retryable);
           setMessage(retryable
-            ? getErrorMessage(result.error, isEN ? 'Your order is still being processed. No confirmation has arrived; check its status to retry safely without sending a new request.' : 'Hệ thống đang xử lý đơn hàng. Chưa nhận được xác nhận; bấm kiểm tra trạng thái để thử lại an toàn, tránh gửi yêu cầu mới.')
-            : getErrorMessage(result.error, isEN ? 'Could not create your order. Please check your details and try again.' : 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
+            ? isEN ? 'Your order is still being processed. No confirmation has arrived; check its status to retry safely without sending a new request.' : getErrorMessage(result.error, 'Hệ thống đang xử lý đơn hàng. Chưa nhận được xác nhận; bấm kiểm tra trạng thái để thử lại an toàn, tránh gửi yêu cầu mới.')
+            : isEN ? 'Could not create your order. Please check your details and try again.' : getErrorMessage(result.error, 'Không thể tạo đơn hàng. Vui lòng kiểm tra thông tin và thử lại.'));
           return;
         }
 
