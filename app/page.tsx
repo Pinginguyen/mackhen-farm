@@ -11,6 +11,7 @@ import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
+import MarqueeBanner from '@/components/home/MarqueeBanner';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -66,6 +67,8 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           </div>
         </div>
       </section>
+
+      <MarqueeBanner />
 
       <BeforeAfterSlider />
 

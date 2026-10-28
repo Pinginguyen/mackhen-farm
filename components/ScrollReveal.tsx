@@ -16,10 +16,8 @@ export default function ScrollReveal({ groups }: { groups: RevealGroup[] }) {
     const observedElements: HTMLElement[] = [];
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
         const element = entry.target as HTMLElement;
-        element.dataset.scrollReveal = 'visible';
-        observer.unobserve(element);
+        element.dataset.scrollReveal = entry.isIntersecting ? 'visible' : 'pending';
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -32px 0px' });
 
@@ -51,7 +49,7 @@ export function ScrollRevealItem({ children, delay = 0 }: { children: ReactNode;
     <motion.li
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
+      viewport={{ once: false, amount: 0.2 }}
       transition={{ duration: 0.5, delay }}
     >
       {children}

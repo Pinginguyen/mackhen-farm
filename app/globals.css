@@ -1031,6 +1031,7 @@ textarea {
 .catalog-filter-tabs {
   display: flex;
   gap: 8px;
+  position: relative;
   overflow-x: auto;
   margin: 18px 0 20px;
   padding: 2px 0 6px;
@@ -1038,6 +1039,8 @@ textarea {
 }
 
 .catalog-filter-tabs button {
+  position: relative;
+  isolation: isolate;
   flex: 0 0 auto;
   min-height: 40px;
   padding: 0 15px;
@@ -1049,13 +1052,25 @@ textarea {
   font-size: 0.84rem;
   font-weight: 600;
   white-space: nowrap;
-  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: color 200ms ease, border-color 200ms ease;
 }
 
 .catalog-filter-tabs button.is-active {
-  border-color: var(--forest);
-  background: var(--forest);
+  border-color: transparent;
+  background: transparent;
   color: white;
+}
+
+.catalog-tab-indicator {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: inherit;
+  background: #9b2424;
+}
+
+.catalog-tab-label {
+  position: relative;
 }
 
 .catalog-products > .product-card {
@@ -9446,6 +9461,41 @@ body {
   padding-block: 48px;
 }
 
+.home-page > .home-marquee {
+  position: relative;
+  left: 50%;
+  width: 100vw;
+  margin: -48px 0 0 -50vw;
+  overflow: hidden;
+  background: #9b2424;
+  color: #fffdfa;
+}
+
+.marquee-content {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 48px;
+}
+
+.marquee-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 18px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.marquee-separator {
+  color: #e4bf79;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-container { animation-play-state: paused; }
+}
+
 .home-page .hero-copy h1 {
   margin: 0 0 16px;
   color: #111827;
@@ -12981,6 +13031,27 @@ body {
   .nutrition-facts .mobile-table-scroll > table {
     min-width: 340px;
   }
+
+}
+/* --- HIỆU ỨNG RUY-BĂNG CHẠY VÔ TẬN 60FPS --- */
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-container {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 22s linear infinite;
+  will-change: transform;
+}
+
+.marquee-container:hover {
+  animation-play-state: paused; /* Rê chuột vào sẽ tạm dừng để đọc */
 }
 
 @tailwind utilities;

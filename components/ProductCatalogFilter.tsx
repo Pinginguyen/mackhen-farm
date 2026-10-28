@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
@@ -60,7 +61,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
   return (
     <>
       <div className="catalog-filter-tabs" role="tablist" aria-label={text('Lọc danh mục sản phẩm')}>
-        {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{tab.label}</button>)}
+        {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{filter === tab.id && <motion.span layoutId="catalog-active-tab" className="catalog-tab-indicator" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}<span className="catalog-tab-label">{tab.label}</span></button>)}
       </div>
       <div className="catalog-facet-filters">
         <label className="field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>

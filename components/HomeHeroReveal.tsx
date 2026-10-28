@@ -1,7 +1,10 @@
 'use client';
 
 import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
+
+if (typeof window !== 'undefined') gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 export default function HomeHeroReveal() {
   useGSAP(() => {
@@ -15,7 +18,13 @@ export default function HomeHeroReveal() {
       hero,
     );
     const heroImage = hero.querySelector<HTMLElement>('.hero-media .photo-card');
-    const reveal = gsap.timeline();
+    const reveal = gsap.timeline({
+      scrollTrigger: {
+        trigger: hero,
+        start: 'top 80%',
+        toggleActions: 'play reverse play reverse',
+      },
+    });
 
     if (content.length) {
       reveal.fromTo(content,
