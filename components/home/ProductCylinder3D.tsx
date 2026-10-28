@@ -1,13 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, WheelEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
 
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateProductName } from '@/lib/translations';
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 type Props = { products: CatalogProduct[] };
 
@@ -15,15 +20,27 @@ export default function ProductCylinder3D({ products }: Props) {
   const { locale, currency, formatCurrency } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
   const [activeIndex, setActiveIndex] = useState(0);
-  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLElement>(null);
+  const count = products.length;
 
-  useEffect(() => () => {
-    if (wheelTimer.current) clearTimeout(wheelTimer.current);
-  }, []);
+  useGSAP(() => {
+    if (!containerRef.current || count === 0) return;
+
+    ScrollTrigger.create({
+      trigger: containerRef.current,
+      start: 'top top',
+      end: '+=2000',
+      pin: true,
+      scrub: 0.8,
+      onUpdate: (self) => {
+        const nextIndex = Math.min(Math.floor(self.progress * count), count - 1);
+        setActiveIndex((current) => current === nextIndex ? current : nextIndex);
+      },
+    });
+  }, { scope: containerRef, dependencies: [count], revertOnUpdate: true });
 
   if (!products.length) return null;
 
-  const count = products.length;
   const currentIndex = activeIndex % count;
 
   function getOffset(index: number) {
@@ -37,17 +54,6 @@ export default function ProductCylinder3D({ products }: Props) {
     setActiveIndex((index) => (index + direction + count) % count);
   }
 
-  function handleWheel(event: WheelEvent<HTMLDivElement>) {
-    if (event.deltaY === 0) return;
-    event.preventDefault();
-    const direction = event.deltaY > 0 ? 1 : -1;
-    if (wheelTimer.current) clearTimeout(wheelTimer.current);
-    wheelTimer.current = setTimeout(() => {
-      moveToProduct(direction);
-      wheelTimer.current = null;
-    }, 350);
-  }
-
   function activateCard(event: MouseEvent<HTMLElement>, index: number) {
     if (index === currentIndex) return;
     event.preventDefault();
@@ -55,13 +61,13 @@ export default function ProductCylinder3D({ products }: Props) {
   }
 
   return (
-    <section className="home-cylinder-section" aria-labelledby="product-cylinder-title">
+    <section ref={containerRef} className="home-cylinder-section" aria-labelledby="product-cylinder-title">
       <div className="home-cylinder-heading">
         <p className="home-cylinder-kicker">MẮC KHÉN FARM</p>
         <h2 id="product-cylinder-title">{isEN ? '360° NORTHWEST PRODUCT SHOWCASE' : 'TRIỂN LÃM NÔNG SẢN TÂY BẮC 360°'}</h2>
       </div>
 
-      <div className="product-cylinder-stage" role="region" aria-roledescription="carousel" aria-label={isEN ? 'Northwest products' : 'Sản phẩm Tây Bắc'} onWheel={handleWheel}>
+      <div className="product-cylinder-stage" role="region" aria-roledescription="carousel" aria-label={isEN ? 'Northwest products' : 'Sản phẩm Tây Bắc'}>
         <div className="product-cylinder-track">
           {products.map((product, index) => {
             const offset = getOffset(index);
@@ -75,7 +81,7 @@ export default function ProductCylinder3D({ products }: Props) {
             let filter = 'brightness(50%)';
 
             if (isFront) {
-              transform = 'translateX(0px) translateZ(100px) rotateY(0deg) scale(1.08)';
+              transform = 'translate3d(0px, 0px, 0px) rotateY(0deg) scale(1.08)';
               opacity = 1;
               zIndex = 30;
               filter = 'brightness(100%)';
