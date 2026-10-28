@@ -12,6 +12,7 @@ import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
 import MarqueeBanner from '@/components/home/MarqueeBanner';
+import ProductCylinder3D from '@/components/home/ProductCylinder3D';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -69,6 +70,8 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       </section>
 
       <MarqueeBanner />
+
+      <ProductCylinder3D products={products} />
 
       <BeforeAfterSlider />
 
