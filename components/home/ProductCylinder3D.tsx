@@ -28,7 +28,10 @@ export default function ProductCylinder3D({ products }: Props) {
 
     ScrollTrigger.create({
       trigger: containerRef.current,
-      start: 'top top',
+      start: () => {
+        const headerHeight = document.querySelector<HTMLElement>('header')?.getBoundingClientRect().height ?? 0;
+        return `top top+=${Math.ceil(headerHeight)}`;
+      },
       end: '+=2000',
       pin: true,
       scrub: 0.8,
@@ -60,6 +63,25 @@ export default function ProductCylinder3D({ products }: Props) {
     setActiveIndex(index);
   }
 
+  function tiltCard(event: MouseEvent<HTMLElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    event.currentTarget.style.setProperty('--tilt-x', `${-y * 14}deg`);
+    event.currentTarget.style.setProperty('--tilt-y', `${x * 14}deg`);
+    event.currentTarget.style.setProperty('--sheen-x', `${(x + 0.5) * 100}%`);
+    event.currentTarget.style.setProperty('--sheen-y', `${(y + 0.5) * 100}%`);
+    event.currentTarget.classList.add('is-tilting');
+  }
+
+  function resetCardTilt(event: MouseEvent<HTMLElement>) {
+    event.currentTarget.style.setProperty('--tilt-x', '0deg');
+    event.currentTarget.style.setProperty('--tilt-y', '0deg');
+    event.currentTarget.style.setProperty('--sheen-x', '50%');
+    event.currentTarget.style.setProperty('--sheen-y', '50%');
+    event.currentTarget.classList.remove('is-tilting');
+  }
+
   return (
     <section ref={containerRef} className="home-cylinder-section" aria-labelledby="product-cylinder-title">
       <div className="home-cylinder-heading">
@@ -68,6 +90,8 @@ export default function ProductCylinder3D({ products }: Props) {
       </div>
 
       <div className="product-cylinder-stage" role="region" aria-roledescription="carousel" aria-label={isEN ? 'Northwest products' : 'Sản phẩm Tây Bắc'}>
+        <div className="product-cylinder-glow" aria-hidden="true" />
+        <div className="product-cylinder-ground-shadow" aria-hidden="true" />
         <div className="product-cylinder-track">
           {products.map((product, index) => {
             const offset = getOffset(index);
@@ -75,29 +99,43 @@ export default function ProductCylinder3D({ products }: Props) {
             const isFront = offset === 0;
             const isVisible = distance <= 2;
             const productName = translateProductName(product.name, isEN ? 'en' : 'vi');
-            let transform = `translateX(${offset * 180}px) translateZ(-180px) rotateY(${-offset * 35}deg) scale(0.5)`;
+            let xDesktop = offset * 180;
+            let xMobile = offset * 108;
+            let transform = `translate3d(var(--card-x), 0px, -420px) rotateY(${-offset * 46}deg) scale(0.5)`;
             let opacity = 0;
             let zIndex = 0;
-            let filter = 'brightness(50%)';
+            let filter = 'brightness(50%) blur(3px)';
 
             if (isFront) {
-              transform = 'translate3d(0px, 0px, 0px) rotateY(0deg) scale(1.08)';
               opacity = 1;
               zIndex = 30;
-              filter = 'brightness(100%)';
+              filter = 'brightness(100%) blur(0px)';
             } else if (distance === 1) {
-              transform = `translateX(${offset * 220}px) translateZ(0px) rotateY(${-offset * 25}deg) scale(0.85)`;
-              opacity = 0.75;
+              xDesktop = offset * 270;
+              xMobile = offset * 145;
+              transform = `translate3d(var(--card-x), 0px, -120px) rotateY(${-offset * 26}deg) scale(0.85)`;
+              opacity = 0.6;
               zIndex = 20;
-              filter = 'brightness(85%)';
+              filter = 'brightness(70%) blur(1px)';
             } else if (distance === 2) {
-              transform = `translateX(${offset * 180}px) translateZ(-100px) rotateY(${-offset * 35}deg) scale(0.68)`;
-              opacity = 0.4;
+              xDesktop = offset * 210;
+              xMobile = offset * 116;
+              transform = `translate3d(var(--card-x), 0px, -260px) rotateY(${-offset * 38}deg) scale(0.68)`;
+              opacity = 0.25;
               zIndex = 10;
-              filter = 'brightness(60%)';
+              filter = 'brightness(50%) blur(2px)';
             }
 
-            const cardStyle = { transform, opacity, zIndex, filter, pointerEvents: isVisible ? 'auto' : 'none' } as CSSProperties;
+            if (isFront) transform = 'translate3d(var(--card-x), 0px, 80px) rotateY(0deg) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale(1.08)';
+            const cardStyle = {
+              '--card-x-desktop': `${xDesktop}px`,
+              '--card-x-mobile': `${xMobile}px`,
+              transform,
+              opacity,
+              zIndex,
+              filter,
+              pointerEvents: isVisible ? 'auto' : 'none',
+            } as CSSProperties;
 
             return (
               <article
@@ -106,6 +144,8 @@ export default function ProductCylinder3D({ products }: Props) {
                 aria-hidden={!isVisible}
                 style={cardStyle}
                 onClick={(event) => activateCard(event, index)}
+                onMouseMove={isFront ? tiltCard : undefined}
+                onMouseLeave={isFront ? resetCardTilt : undefined}
               >
                 <Link className="product-cylinder-image-link" href={`/products/${product.slug}`} tabIndex={isVisible ? 0 : -1} aria-label={`${isEN ? 'View' : 'Xem'} ${productName}`} onClick={(event) => activateCard(event, index)}>
                   <img src={product.image} alt={productName} loading={index < 3 ? 'eager' : 'lazy'} decoding="async" />
@@ -128,7 +168,9 @@ export default function ProductCylinder3D({ products }: Props) {
           <ChevronLeft size={22} aria-hidden="true" />
         </button>
         <div className="product-cylinder-counter" aria-live="polite">
-          {String(currentIndex + 1).padStart(2, '0')} <span>/</span> {String(count).padStart(2, '0')}
+          <span className="product-cylinder-current-page" key={currentIndex}>{String(currentIndex + 1).padStart(2, '0')}</span>
+          <span className="product-cylinder-page-divider">/</span>
+          <span>{String(count).padStart(2, '0')}</span>
         </div>
         <button className="product-cylinder-arrow" type="button" aria-label={isEN ? 'Next product' : 'Sản phẩm tiếp theo'} onClick={() => moveToProduct(1)}>
           <ChevronRight size={22} aria-hidden="true" />
