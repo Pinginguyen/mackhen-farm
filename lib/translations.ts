@@ -324,6 +324,7 @@ const contentTranslations: Record<string, string> = {
   'Chưa bàn giao': 'Not yet handed to the carrier',
   'Mã vận đơn:': 'Tracking number:',
   'Khu vực giao hàng:': 'Delivery area:',
+  'Khu vực chưa cập nhật': 'Delivery area not provided',
   'Đánh giá': 'Review',
   'Đơn hàng chưa có thông tin sản phẩm.': 'No product details are available for this order.',
   'Tạm tính': 'Subtotal',

@@ -272,7 +272,7 @@ export default function TrackingForm() {
               <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</p>
               <p><strong>{text('Người nhận:')}</strong> {order.customerName ?? text('Khách hàng')}</p>
               <p><strong>{text('Điện thoại:')}</strong> {order.phone ?? order.maskedPhone ?? text('Không có')}</p>
-              <p><strong>{text('Địa chỉ:')}</strong> {order.address ?? order.maskedAddress ?? text('Không có')}</p>
+              <p><strong>{text('Địa chỉ:')}</strong> {order.address ?? text(order.maskedAddress ?? 'Không có')}</p>
               <p><strong>{text('Thanh toán:')}</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'COD' ? 'COD' : text('Chưa xác minh')}</p>
             </div>
 
@@ -299,7 +299,7 @@ export default function TrackingForm() {
               <span>{text('Đơn vị vận chuyển:')} {order.carrier === 'SPX' ? 'SPX Express' : order.carrier === 'GHTK' ? 'GHTK' : order.carrier === 'VIETTEL_POST' ? 'Viettel Post' : text('Chưa bàn giao')}</span>
               {order.trackingCode && <span>{text('Mã vận đơn:')} <strong>{order.trackingCode}</strong></span>}
               {order.maskedPhone && <span>{text('Điện thoại:')} <strong>{order.maskedPhone}</strong></span>}
-              {order.maskedAddress && <span>{text('Khu vực giao hàng:')} <strong>{order.maskedAddress}</strong></span>}
+              {order.maskedAddress && <span>{text('Khu vực giao hàng:')} <strong>{text(order.maskedAddress)}</strong></span>}
             </div>
 
             <div className="tracking-items">

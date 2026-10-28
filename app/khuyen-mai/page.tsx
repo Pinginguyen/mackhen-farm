@@ -54,7 +54,7 @@ function voucherTitle(voucher: Voucher, isEN: boolean, text: (value: string) => 
   const fallback = voucher.freeShipping ? 'Ưu đãi vận chuyển' : voucher.firstOrderOnly ? 'Quà cho thành viên mới' : 'Ưu đãi đơn hàng';
   if (!voucher.name) return text(fallback);
   const translated = text(voucher.name);
-  if (!isEN || translated !== voucher.name || !/[À-ỹ]/.test(voucher.name)) return translated;
+  if (!isEN || translated !== voucher.name) return translated;
   return text(fallback);
 }
 
