@@ -22,14 +22,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
   let products: CatalogProduct[] = [];
-  let featuredProducts: CatalogProduct[] = [];
+  let bestSellers: CatalogProduct[] = [];
   try {
-    const [databaseProducts, databaseFeaturedProducts] = await Promise.all([
+    const [databaseProducts, databaseBestSellers] = await Promise.all([
       prisma.product.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
-      prisma.product.findMany({ where: { active: true, isFeatured: true }, orderBy: { updatedAt: 'desc' }, take: 4 }),
+      prisma.product.findMany({ where: { active: true }, take: 4, orderBy: { createdAt: 'desc' } }),
     ]);
     products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
-    featuredProducts = databaseFeaturedProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
+    bestSellers = databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
   } catch (error) {
     console.error('[HOME_PRODUCTS_DB_ERROR]', error instanceof Error ? error.message : error);
   }
@@ -112,7 +112,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           <Link href="/products"><LocalizedText text="Xem tất cả sản phẩm" /> <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
 
-        <ProductCatalogFilter products={featuredProducts} showFilters={false} />
+        <ProductCatalogFilter products={bestSellers} showFilters={false} />
       </section>
 
       <section className="story-block">

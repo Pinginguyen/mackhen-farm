@@ -11,10 +11,9 @@ describe('CheckoutEmptyState', () => {
     expect(html).toContain('Giỏ hàng của bạn đang trống');
     expect(html).toContain('đặc sản sấy Tây Bắc thơm ngon');
     expect(html).toContain('href="/products"');
-    expect(html).toContain('Tiếp tục mua sắm');
+    expect(html).toContain('Quay lại mua sắm');
     expect(html).toContain('href="/tra-cuu-don"');
     expect(html).not.toContain('Không thể đặt đơn hàng trống');
-    expect(html).not.toContain('Quay lại mua sắm');
     expect(html).not.toContain('Mở giỏ hàng');
   });
 });

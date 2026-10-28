@@ -12,6 +12,11 @@ import CheckoutOrderSummary from './checkout-order-summary';
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
   const cart = await readCartSnapshot({ buyNow });
+  const cartItems = Array.isArray(cart?.items) ? cart.items : [];
+  const cartUnavailable = !cart || Boolean(cart.unavailable);
+  const subtotal = cart?.subtotal ?? 0;
+  const shipping = cart?.shipping ?? 0;
+  const total = cart?.total ?? 0;
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   let profile = null;
   if (session) {
@@ -22,11 +27,11 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
     }
   }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
-  const freeShippingApplied = cart.subtotal >= FREE_SHIPPING_THRESHOLD;
+  const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
   const orderSummary = <CheckoutOrderSummary
-    items={cart.items.map((item) => ({ id: `${item.productId}-${item.variantId ?? 'single'}`, name: item.name ?? 'Sản phẩm', quantity: item.quantity ?? 1, total: item.total ?? 0 }))}
-    shipping={cart.shipping}
-    total={cart.total}
+    items={cartItems.map((item) => ({ id: `${item.productId}-${item.variantId ?? 'single'}`, name: item.name ?? 'Sản phẩm', quantity: item.quantity ?? 1, total: item.total ?? 0 }))}
+    shipping={shipping}
+    total={total}
     freeShippingApplied={freeShippingApplied}
   />;
   return (
@@ -39,17 +44,17 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
           </div>
         </div>
 
-        {buyNow && <BuyNowCartRecovery items={cart.items} />}
-        <div className={`checkout-layout${cart.unavailable || cart.items.length === 0 ? ' is-empty' : ''}`}>
+        {buyNow && <BuyNowCartRecovery items={cartItems} />}
+        <div className={`checkout-layout${cartUnavailable || cartItems.length === 0 ? ' is-empty' : ''}`}>
           <div>
-            {cart.unavailable || cart.items.length === 0 ? (
-              <CheckoutEmptyState unavailable={cart.unavailable} buyNow={buyNow} />
+            {cartUnavailable || cartItems.length === 0 ? (
+              <CheckoutEmptyState unavailable={cartUnavailable} buyNow={buyNow} />
             ) : (
-              <CheckoutForm items={cart.items} initialCustomer={initialCustomer ?? undefined} subtotal={cart.subtotal} shipping={cart.shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
+              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
             )}
           </div>
 
-          {!cart.unavailable && cart.items.length > 0 && <aside className="summary-card checkout-desktop-summary">{orderSummary}</aside>}
+          {!cartUnavailable && cartItems.length > 0 && <aside className="summary-card checkout-desktop-summary">{orderSummary}</aside>}
         </div>
       </section>
     </main>

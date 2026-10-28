@@ -12,6 +12,7 @@ import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 import VietnamAddressFields from './vietnam-address-fields';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { formatApproxVnd } from '@/lib/translations';
+import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 
 type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number };
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
@@ -105,7 +106,8 @@ function rememberUserOrder(orderCode: string) {
   }
 }
 
-export default function CheckoutForm({ items, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items: CheckoutItem[]; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
+export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
+  const items = Array.isArray(receivedItems) ? receivedItems : [];
   const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
   const router = useRouter();
@@ -314,6 +316,8 @@ export default function CheckoutForm({ items, initialCustomer, subtotal, shippin
         : (isEN ? 'Order processing is taking longer than expected. Your order may have been recorded; check its status using the same request ID to avoid a duplicate.' : 'Hệ thống đang xử lý đơn hàng nhưng phản hồi chậm. Đơn có thể đã được ghi nhận; hãy kiểm tra lại trạng thái bằng cùng mã yêu cầu, tránh tạo trùng.'));
     }
   }
+
+  if (!items.length) return <CheckoutEmptyState unavailable={checkoutUnavailable} buyNow={buyNow} />;
 
   return (
     <form ref={formRef} className="form-list" onSubmit={submitOrder}>

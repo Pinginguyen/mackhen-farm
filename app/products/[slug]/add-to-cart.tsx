@@ -139,10 +139,16 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
       }
     }
     try {
+      const payload = {
+        productId,
+        quantity,
+        ...(selectedVariant ? { variantId: selectedVariant.id } : {}),
+        ...(buyNow ? { buyNow: true } : {}),
+      };
       const response = await fetch('/api/cart/items', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ productId, variantId: variantId || undefined, quantity, buyNow }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       const result = await response.json() as { error?: { code?: string; message?: string }; cartCount?: number };
       if (!response.ok) {
