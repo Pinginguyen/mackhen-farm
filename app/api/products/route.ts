@@ -201,6 +201,7 @@ export async function POST(request: Request) {
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
+    || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
@@ -227,6 +228,7 @@ export async function POST(request: Request) {
         badge,
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
+        isFeatured: body.isFeatured === true,
         ...(variants?.length ? { variants: { create: variants.map(variantFields) } } : {}),
       } satisfies Prisma.ProductCreateInput,
       ...(variants?.length ? { include: { variants: true } } : {}),
@@ -275,6 +277,7 @@ export async function PATCH(request: Request) {
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || (body.ingredients != null && typeof body.ingredients !== 'string') || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants)
+    || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
@@ -302,6 +305,7 @@ export async function PATCH(request: Request) {
         images: [image],
         badge,
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
+        ...(typeof body.isFeatured === 'boolean' ? { isFeatured: body.isFeatured } : {}),
         ...(variantsProvided ? { variants: syncVariants(variants ?? []) } : {}),
       },
       include: { variants: true },

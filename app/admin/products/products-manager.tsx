@@ -24,6 +24,7 @@ type ProductDraft = {
   description: string;
   ingredients: string;
   badge: string;
+  isFeatured: boolean;
   variants: VariantDraft[];
   nutritionFacts: NutritionFacts;
 };
@@ -54,6 +55,7 @@ const emptyDraft: ProductDraft = {
   description: '',
   ingredients: '',
   badge: '',
+  isFeatured: false,
   variants: [],
   nutritionFacts: defaultNutritionFacts(true),
 };
@@ -118,6 +120,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       description: product.description,
       ingredients: product.ingredients ?? '',
       badge: product.badge ?? '',
+      isFeatured: product.isFeatured ?? false,
       variants: (product.variants ?? []).map((variant) => ({
         id: variant.id,
         title: variant.title,
@@ -156,6 +159,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           description: String(draft.description).trim(),
           ingredients: String(draft.ingredients).trim(),
           badge: draft.badge.trim() || null,
+          isFeatured: draft.isFeatured,
           variants: draft.variants.map((variant) => ({
             ...(variant.id ? { id: variant.id } : {}),
             title: variant.title.trim(),
@@ -351,6 +355,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 )}
               </div>
               <label className="field admin-product-full-width">Nhãn nổi bật (Badge tag) - Tùy chọn<input value={draft.badge} onChange={(event) => setDraft({ ...draft, badge: event.target.value })} maxLength={60} placeholder="Ví dụ: Sản phẩm mới, Bán chạy, Giảm 15%..." /><small>Để trống nếu không muốn hiển thị nhãn đỏ trên ảnh sản phẩm.</small></label>
+              <label className="admin-nutrition-toggle admin-product-full-width"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => setDraft((current) => ({ ...current, isFeatured: event.target.checked }))} /> Hiển thị trong mục Sản phẩm bán chạy trên trang chủ</label>
               <fieldset className="admin-nutrition-fields admin-product-full-width">
                 <legend>Bảng giá trị dinh dưỡng (Nutrition Facts)</legend>
                 <label className="admin-nutrition-toggle"><input type="checkbox" checked={draft.nutritionFacts.enabled} onChange={(event) => setDraft((current) => ({ ...current, nutritionFacts: { ...current.nutritionFacts, enabled: event.target.checked } }))} /> Hiển thị bảng dinh dưỡng cho sản phẩm này</label>

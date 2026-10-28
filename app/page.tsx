@@ -5,8 +5,8 @@ import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
-import { fetchApiWithFallback } from '@/lib/server-api';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import { prisma } from '@/lib/prisma';
+import { normalizeNutritionFacts } from '@/lib/store-data';
 import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
@@ -21,7 +21,18 @@ const homeRevealGroups = [
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
-  const { data: { items: products } } = await fetchApiWithFallback<{ items: CatalogProduct[] }>('/api/products', { items: DEFAULT_PRODUCTS });
+  let products: CatalogProduct[] = [];
+  let featuredProducts: CatalogProduct[] = [];
+  try {
+    const [databaseProducts, databaseFeaturedProducts] = await Promise.all([
+      prisma.product.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.product.findMany({ where: { active: true, isFeatured: true }, orderBy: { updatedAt: 'desc' }, take: 4 }),
+    ]);
+    products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
+    featuredProducts = databaseFeaturedProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
+  } catch (error) {
+    console.error('[HOME_PRODUCTS_DB_ERROR]', error instanceof Error ? error.message : error);
+  }
   return (
     <main className="page-shell home-page">
       <ScrollReveal groups={homeRevealGroups} />
@@ -98,10 +109,10 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           <div>
             <h2 className="catalog-section-title"><LocalizedText text="SẢN PHẨM BÁN CHẠY" /></h2>
           </div>
-          <Link href="/products"><LocalizedText text="Xem tất cả" /></Link>
+          <Link href="/products"><LocalizedText text="Xem tất cả sản phẩm" /> <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
 
-        <ProductCatalogFilter products={products} />
+        <ProductCatalogFilter products={featuredProducts} showFilters={false} />
       </section>
 
       <section className="story-block">

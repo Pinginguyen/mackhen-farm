@@ -112,6 +112,7 @@ const contentTranslations: Record<string, string> = {
   'Giảm va đập trên hành trình giao hàng.': 'Cushions the product throughout delivery.',
   'SẢN PHẨM BÁN CHẠY': 'BEST SELLERS',
   'Xem tất cả': 'View all',
+  'Xem tất cả sản phẩm': 'View all products',
   'Vì sao lựa chọn Mắc Khén Farm?': 'Why choose Mac Khen Farm?',
   'Tận dụng trọn nguyên liệu, giữ trọn vị ngon.': 'Make the most of every ingredient. Keep every bit of flavor.',
   'Mô hình Upcycled Food biến bã đậu nành sau sản xuất thành nguồn đạm thực vật cho món ăn vặt.': 'Our upcycled food process turns soy pulp into plant protein for flavorful snacks.',

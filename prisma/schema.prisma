@@ -98,6 +98,7 @@ model Product {
   highlights    String[]         @default([])
   nutritionFacts Json?
   active        Boolean          @default(true)
+  isFeatured    Boolean          @default(false)
   variants      ProductVariant[]
   cartItems     CartItem[]
   orderItems    OrderItem[]
@@ -107,6 +108,7 @@ model Product {
     productionLots ProductionLot[]
 
   @@index([active, category])
+  @@index([active, isFeatured])
 }
 
 model ProductVariant {

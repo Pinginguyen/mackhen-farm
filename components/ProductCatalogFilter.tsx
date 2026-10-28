@@ -27,10 +27,11 @@ export type CatalogProduct = {
   images?: string[];
   highlight: string;
   badge?: string | null;
+  isFeatured?: boolean;
   nutritionFacts?: NutritionFacts | null;
 };
 
-export default function ProductCatalogFilter({ products, initialQuery = '' }: { products: CatalogProduct[]; initialQuery?: string }) {
+export default function ProductCatalogFilter({ products, initialQuery = '', showFilters = true }: { products: CatalogProduct[]; initialQuery?: string; showFilters?: boolean }) {
   const [filter, setFilter] = useState<'ALL' | 'PLANT' | 'SPICE'>('ALL');
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_50' | '50_100' | 'OVER_150'>('ALL');
   const [proteinOnly, setProteinOnly] = useState(false);
@@ -60,15 +61,17 @@ export default function ProductCatalogFilter({ products, initialQuery = '' }: { 
 
   return (
     <>
-      <div className="catalog-filter-tabs" role="tablist" aria-label={text('Lọc danh mục sản phẩm')}>
-        {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{filter === tab.id && <motion.span layoutId="catalog-active-tab" className="catalog-tab-indicator" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}<span className="catalog-tab-label">{tab.label}</span></button>)}
-      </div>
-      <div className="catalog-facet-filters">
-        <label className="field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>
-        <label className="catalog-protein-toggle"><input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />{text('Giàu đạm (>20g Protein)')}</label>
-        <label className="catalog-search-field"><span className="visually-hidden">{text('Tìm trong danh mục')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Tìm sản phẩm trong danh mục')} /></label>
-        <span className="catalog-filter-count">{visibleProducts.length} {text('sản phẩm')}</span>
-      </div>
+      {showFilters && <>
+        <div className="catalog-filter-tabs" role="tablist" aria-label={text('Lọc danh mục sản phẩm')}>
+          {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{filter === tab.id && <motion.span layoutId="catalog-active-tab" className="catalog-tab-indicator" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}<span className="catalog-tab-label">{tab.label}</span></button>)}
+        </div>
+        <div className="catalog-facet-filters">
+          <label className="field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>
+          <label className="catalog-protein-toggle"><input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />{text('Giàu đạm (>20g Protein)')}</label>
+          <label className="catalog-search-field"><span className="visually-hidden">{text('Tìm trong danh mục')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Tìm sản phẩm trong danh mục')} /></label>
+          <span className="catalog-filter-count">{visibleProducts.length} {text('sản phẩm')}</span>
+        </div>
+      </>}
       <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
         {visibleProducts.map((product, index) => (
           <article key={product.id} className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-xs transition-all duration-300 hover:!shadow-md hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>

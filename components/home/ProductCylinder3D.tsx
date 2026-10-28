@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import type { CSSProperties, MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties, MouseEvent, WheelEvent } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -15,6 +15,12 @@ export default function ProductCylinder3D({ products }: Props) {
   const { locale, currency, formatCurrency } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
   const [activeIndex, setActiveIndex] = useState(0);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (wheelTimer.current) clearTimeout(wheelTimer.current);
+  }, []);
+
   if (!products.length) return null;
 
   const count = products.length;
@@ -31,6 +37,17 @@ export default function ProductCylinder3D({ products }: Props) {
     setActiveIndex((index) => (index + direction + count) % count);
   }
 
+  function handleWheel(event: WheelEvent<HTMLDivElement>) {
+    if (event.deltaY === 0) return;
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? 1 : -1;
+    if (wheelTimer.current) clearTimeout(wheelTimer.current);
+    wheelTimer.current = setTimeout(() => {
+      moveToProduct(direction);
+      wheelTimer.current = null;
+    }, 350);
+  }
+
   function activateCard(event: MouseEvent<HTMLElement>, index: number) {
     if (index === currentIndex) return;
     event.preventDefault();
@@ -40,14 +57,11 @@ export default function ProductCylinder3D({ products }: Props) {
   return (
     <section className="home-cylinder-section" aria-labelledby="product-cylinder-title">
       <div className="home-cylinder-heading">
-        <p className="home-cylinder-kicker">MẮC KHÉN FARM · NORTHWEST VIETNAM</p>
+        <p className="home-cylinder-kicker">MẮC KHÉN FARM</p>
         <h2 id="product-cylinder-title">{isEN ? '360° NORTHWEST PRODUCT SHOWCASE' : 'TRIỂN LÃM NÔNG SẢN TÂY BẮC 360°'}</h2>
       </div>
 
-      <div className="product-cylinder-stage" role="region" aria-roledescription="carousel" aria-label={isEN ? 'Northwest products' : 'Sản phẩm Tây Bắc'}>
-        <button className="product-cylinder-arrow is-previous" type="button" aria-label={isEN ? 'Previous product' : 'Sản phẩm trước'} onClick={() => moveToProduct(-1)}>
-          <ChevronLeft size={22} aria-hidden="true" />
-        </button>
+      <div className="product-cylinder-stage" role="region" aria-roledescription="carousel" aria-label={isEN ? 'Northwest products' : 'Sản phẩm Tây Bắc'} onWheel={handleWheel}>
         <div className="product-cylinder-track">
           {products.map((product, index) => {
             const offset = getOffset(index);
@@ -61,7 +75,7 @@ export default function ProductCylinder3D({ products }: Props) {
             let filter = 'brightness(50%)';
 
             if (isFront) {
-              transform = 'translateX(0px) translateZ(100px) rotateY(0deg) scale(1.12)';
+              transform = 'translateX(0px) translateZ(100px) rotateY(0deg) scale(1.08)';
               opacity = 1;
               zIndex = 30;
               filter = 'brightness(100%)';
@@ -102,12 +116,17 @@ export default function ProductCylinder3D({ products }: Props) {
             );
           })}
         </div>
-        <button className="product-cylinder-arrow is-next" type="button" aria-label={isEN ? 'Next product' : 'Sản phẩm tiếp theo'} onClick={() => moveToProduct(1)}>
+      </div>
+      <div className="product-cylinder-controls">
+        <button className="product-cylinder-arrow" type="button" aria-label={isEN ? 'Previous product' : 'Sản phẩm trước'} onClick={() => moveToProduct(-1)}>
+          <ChevronLeft size={22} aria-hidden="true" />
+        </button>
+        <div className="product-cylinder-counter" aria-live="polite">
+          {String(currentIndex + 1).padStart(2, '0')} <span>/</span> {String(count).padStart(2, '0')}
+        </div>
+        <button className="product-cylinder-arrow" type="button" aria-label={isEN ? 'Next product' : 'Sản phẩm tiếp theo'} onClick={() => moveToProduct(1)}>
           <ChevronRight size={22} aria-hidden="true" />
         </button>
-      </div>
-      <div className="product-cylinder-counter" aria-live="polite">
-        {String(currentIndex + 1).padStart(2, '0')} <span>/</span> {String(count).padStart(2, '0')}
       </div>
     </section>
   );
