@@ -81,7 +81,7 @@ export default function ProductCylinder3D({ products }: Props) {
   }
 
   return (
-    <section ref={containerRef} className="home-cylinder-section" aria-labelledby="product-cylinder-title">
+    <section ref={containerRef} className="home-cylinder-section relative min-h-screen flex flex-col items-center justify-center py-16 bg-[#1b3d2f]" aria-labelledby="product-cylinder-title">
       <div className="home-cylinder-heading">
         <p className="home-cylinder-kicker">MẮC KHÉN FARM</p>
         <h2 id="product-cylinder-title">{isEN ? '360° NORTHWEST PRODUCT SHOWCASE' : 'TRIỂN LÃM NÔNG SẢN TÂY BẮC 360°'}</h2>
