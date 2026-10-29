@@ -28,15 +28,13 @@ export default function ProductCylinder3D({ products }: Props) {
 
     ScrollTrigger.create({
       trigger: containerRef.current,
-      start: () => {
-        const headerHeight = document.querySelector<HTMLElement>('header')?.getBoundingClientRect().height ?? 0;
-        return `top top+=${Math.ceil(headerHeight)}`;
-      },
-      end: '+=2000',
+      start: 'top top',
+      end: `+=${count * 110}`,
       pin: true,
-      scrub: 0.8,
+      scrub: 0.3,
+      snap: count > 1 ? 1 / (count - 1) : 0,
       onUpdate: (self) => {
-        const nextIndex = Math.min(Math.floor(self.progress * count), count - 1);
+        const nextIndex = Math.min(Math.round(self.progress * (count - 1)), count - 1);
         setActiveIndex((current) => current === nextIndex ? current : nextIndex);
       },
     });
