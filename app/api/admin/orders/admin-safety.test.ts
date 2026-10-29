@@ -113,12 +113,12 @@ describe('admin operational safety', () => {
   });
 
   it('writes an audit entry for order status changes and voucher creation', async () => {
-    const statusResponse = await patchOrder(makeRequest('PATCH', { orderCode: 'MKF-100001', status: 'PROCESSING' }, '/api/admin/orders'));
+    const statusResponse = await patchOrder(makeRequest('PATCH', { orderCode: 'MKF-100001', status: 'CONFIRMED' }, '/api/admin/orders'));
     const voucherResponse = await createVoucher(makeRequest('POST', validVoucher, '/api/admin/vouchers'));
 
     expect(statusResponse.status).toBe(200);
     expect(voucherResponse.status).toBe(201);
-    expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'UPDATE_ORDER_STATUS', oldValue: expect.objectContaining({ orderStatus: 'PENDING' }), newValue: expect.objectContaining({ orderStatus: 'PROCESSING' }) }));
+    expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'UPDATE_ORDER_STATUS', oldValue: expect.objectContaining({ orderStatus: 'PENDING' }), newValue: expect.objectContaining({ orderStatus: 'CONFIRMED' }) }));
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'CREATE_VOUCHER', targetEntity: 'Voucher' }));
   });
 });

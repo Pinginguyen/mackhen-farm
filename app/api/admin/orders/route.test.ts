@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindMany, orderFindUnique, orderUpdate, productUpdate, variantUpdate, lotUpdateMany, requireAdmin, transaction, prisma } = vi.hoisted(() => {
+const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpdate, variantUpdate, lotUpdateMany, requireAdmin, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(),
+    orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(),
     productUpdate: vi.fn(), variantUpdate: vi.fn(), lotUpdateMany: vi.fn(), requireAdmin: vi.fn(),
   };
   const tx = {
-    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
+    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
     product: { update: mocks.productUpdate },
     productVariant: { update: mocks.variantUpdate },
     productionLot: { updateMany: mocks.lotUpdateMany },
   };
-  const db = { order: { findMany: mocks.orderFindMany, findUnique: mocks.orderFindUnique, update: mocks.orderUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
+  const db = { order: { findMany: mocks.orderFindMany, findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
   return { ...mocks, transaction: tx, prisma: db };
 });
 
@@ -25,6 +25,7 @@ describe('/api/admin/orders', () => {
     orderFindMany.mockReset().mockResolvedValue([]);
     orderFindUnique.mockReset().mockResolvedValue({ orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     orderUpdate.mockReset().mockResolvedValue({ orderCode: 'MKF-100001', orderStatus: 'SHIPPING', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
+    orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     productUpdate.mockReset().mockResolvedValue({});
     variantUpdate.mockReset().mockResolvedValue({});
     lotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
@@ -67,6 +68,7 @@ describe('/api/admin/orders', () => {
   });
 
   it('accepts Viettel Post when handing an order to shipping', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'IN_TRANSIT', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'VIETTEL_POST', trackingCode: 'VT-OLD', deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -81,6 +83,7 @@ describe('/api/admin/orders', () => {
   });
 
   it('generates an SPX tracking code when handing an order to 3PL without one', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'PROCESSING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -94,6 +97,10 @@ describe('/api/admin/orders', () => {
   });
 
   it.each(['DELIVERED', 'COMPLETED'])('marks a %s order paid automatically', async (status) => {
+    orderFindUnique.mockResolvedValueOnce({
+      orderStatus: status === 'DELIVERED' ? 'IN_TRANSIT' : 'DELIVERED',
+      paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null, items: [],
+    });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -111,17 +118,17 @@ describe('/api/admin/orders', () => {
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING', paymentStatus: 'PAID', paymentReason: 'Đối soát sao kê khớp' }),
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PAID', paymentStatus: 'PAID', paymentReason: 'Đối soát sao kê khớp' }),
     }));
 
     expect(response.status).toBe(200);
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ orderStatus: 'PROCESSING', paymentStatus: 'PAID' }),
+      data: expect.objectContaining({ orderStatus: 'PAID', paymentStatus: 'PAID' }),
     }));
   });
 
   it('blocks delivery of an unpaid online order until an admin confirms payment', async () => {
-    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'IN_TRANSIT', paymentStatus: 'PENDING', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderCode: 'MKF-100001', status: 'DELIVERED' }),
@@ -175,6 +182,17 @@ describe('/api/admin/orders', () => {
     expect(orderUpdate).not.toHaveBeenCalled();
   });
 
+  it('rejects backward transitions from completed orders', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'COMPLETED', paymentStatus: 'PAID', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: new Date(), items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PENDING' }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
+
   it('restocks product, variant, and production lot once when an order is returned', async () => {
     orderFindUnique.mockResolvedValueOnce({
       orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
@@ -186,6 +204,10 @@ describe('/api/admin/orders', () => {
     }));
 
     expect(response.status).toBe(200);
+    expect(orderUpdateMany).toHaveBeenCalledWith({
+      where: { orderCode: 'MKF-100001', orderStatus: 'SHIPPING' },
+      data: { orderStatus: 'RETURNED' },
+    });
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
@@ -199,6 +221,24 @@ describe('/api/admin/orders', () => {
       body: JSON.stringify({ orderCode: 'MKF-100001', status: 'RETURNED' }),
     }));
     expect(productUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restock when a concurrent return request loses the status claim', async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
+      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+    });
+    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'RETURNED' }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect(productUpdate).not.toHaveBeenCalled();
+    expect(variantUpdate).not.toHaveBeenCalled();
+    expect(lotUpdateMany).not.toHaveBeenCalled();
   });
 
   it('requires a cancellation reason before changing order state', async () => {

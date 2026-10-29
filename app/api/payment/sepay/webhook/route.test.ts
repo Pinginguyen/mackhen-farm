@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { orderFindUnique, orderUpdate, paymentFindFirst, paymentUpdate, paymentCreate, prisma } = vi.hoisted(() => {
   const mocks = {
@@ -25,16 +25,19 @@ vi.mock('@/lib/prisma', () => ({ prisma }));
 
 import { POST } from './route';
 
-function makeRequest(body: unknown) {
+const secret = 'sepay-test-secret';
+
+function makeRequest(body: unknown, authorization: string | null = `Apikey ${secret}`) {
   return new Request('https://mackhen.example/api/payment/sepay/webhook', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(authorization ? { authorization } : {}) },
     body: JSON.stringify(body),
   });
 }
 
 describe('POST /api/payment/sepay/webhook', () => {
   beforeEach(() => {
+    vi.stubEnv('SEPAY_WEBHOOK_SECRET', secret);
     orderFindUnique.mockReset().mockResolvedValue({
       id: 'order-1', numericCode: 123456, totalAmount: 65000,
       paymentMethod: 'VIETQR', paymentStatus: 'PENDING', orderStatus: 'PENDING',
@@ -43,6 +46,30 @@ describe('POST /api/payment/sepay/webhook', () => {
     paymentFindFirst.mockReset().mockResolvedValue({ id: 'payment-1' });
     paymentUpdate.mockReset().mockResolvedValue({ id: 'payment-1' });
     paymentCreate.mockReset().mockResolvedValue({ id: 'payment-1' });
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('rejects requests without an authorization header', async () => {
+    const response = await POST(makeRequest({ content: 'MKF-123456', transferAmount: 65000 }, null));
+
+    expect(response.status).toBe(401);
+    expect(orderFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the webhook secret is not configured', async () => {
+    vi.stubEnv('SEPAY_WEBHOOK_SECRET', '');
+    const response = await POST(makeRequest({ content: 'MKF-123456', transferAmount: 65000 }));
+
+    expect(response.status).toBe(401);
+    expect(orderFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid authorization key', async () => {
+    const response = await POST(makeRequest({ content: 'MKF-123456', transferAmount: 65000 }, 'ApiKey wrong-secret'));
+
+    expect(response.status).toBe(401);
+    expect(orderFindUnique).not.toHaveBeenCalled();
   });
 
   it('marks a matching order paid and stores the SePay reference code', async () => {
@@ -101,7 +128,7 @@ describe('POST /api/payment/sepay/webhook', () => {
   it('acknowledges malformed JSON with HTTP 200', async () => {
     const response = await POST(new Request('https://mackhen.example/api/payment/sepay/webhook', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Apikey ${secret}` },
       body: '{',
     }));
 

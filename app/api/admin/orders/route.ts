@@ -10,8 +10,21 @@ import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
-const statuses = ['PENDING', 'CONFIRMED', 'PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] as const;
+const statuses = ['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] as const;
 const carriers = ['GHTK', 'SPX', 'VIETTEL_POST'] as const;
+const allowedTransitions = {
+  PENDING: ['CONFIRMED', 'PAID', 'CANCELLED'],
+  CONFIRMED: ['PAID', 'PROCESSING', 'CANCELLED'],
+  PAID: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['HANDED_OFF', 'CANCELLED'],
+  HANDED_OFF: ['IN_TRANSIT', 'SHIPPING', 'RETURNED'],
+  IN_TRANSIT: ['SHIPPING', 'DELIVERED', 'RETURNED'],
+  SHIPPING: ['DELIVERED', 'RETURNED'],
+  DELIVERED: ['COMPLETED'],
+  COMPLETED: [],
+  RETURNED: [],
+  CANCELLED: [],
+} as const satisfies Record<(typeof statuses)[number], readonly (typeof statuses)[number][]>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -118,6 +131,10 @@ export async function PATCH(request: Request) {
       const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { orderStatus: true, paymentStatus: true, paymentMethod: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const targetStatus = requestedStatus ?? currentOrder.orderStatus;
+      const nextStatuses: readonly string[] = allowedTransitions[currentOrder.orderStatus];
+      if (requestedStatus && requestedStatus !== currentOrder.orderStatus && !nextStatuses.includes(requestedStatus)) {
+        return NextResponse.json({ error: { message: 'Chuyển trạng thái không hợp lệ.' } }, { status: 409 });
+      }
       if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (!(body.carrier || currentOrder.carrier) || !(trackingCode || currentOrder.trackingCode))) {
         return NextResponse.json({ error: { message: 'Nhập hãng vận chuyển và mã vận đơn trước khi bàn giao.' } }, { status: 400 });
       }
@@ -149,6 +166,12 @@ export async function PATCH(request: Request) {
       const order = ['RETURNED', 'CANCELLED'].includes(targetStatus)
         ? await prisma.$transaction(async (transaction) => {
           if (currentOrder.orderStatus !== targetStatus) {
+            const claimed = await transaction.order.updateMany({
+              where: { orderCode, orderStatus: currentOrder.orderStatus },
+              data: { orderStatus: targetStatus },
+            });
+            if (claimed.count !== 1) return null;
+
             for (const item of currentOrder.items) {
               await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
               if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
@@ -174,6 +197,7 @@ export async function PATCH(request: Request) {
             deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
           },
         });
+      if (!order) return NextResponse.json({ error: { message: 'Xung đột trạng thái đơn hàng.' } }, { status: 409 });
       const statusChanged = targetStatus !== currentOrder.orderStatus;
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',

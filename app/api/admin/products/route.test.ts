@@ -43,21 +43,20 @@ describe('GET /api/admin/products', () => {
     expect(productFindMany).toHaveBeenCalledWith({ include: { variants: true }, orderBy: { createdAt: 'desc' } });
   });
 
-  it('returns the complete fallback catalog when newer database columns are unavailable', async () => {
-    productFindMany.mockRejectedValueOnce(new Error('The column Product.ingredients does not exist'));
-    const response = await GET(new Request('https://mackhen.example/api/admin/products'));
-    const result = await response.json() as { items: { id: string; active: boolean }[] };
-
-    expect(response.status).toBe(200);
-    expect(result.items).toHaveLength(8);
-    expect(result.items.every((item) => item.active)).toBe(true);
-  });
-
-  it('shows fallback products when the database has no catalog rows', async () => {
+  it('returns an empty list when the database has no catalog rows', async () => {
     const response = await GET(new Request('https://mackhen.example/api/admin/products'));
     const result = await response.json() as { items: { id: string }[] };
 
-    expect(result.items).toHaveLength(8);
+    expect(response.status).toBe(200);
+    expect(result.items).toEqual([]);
+  });
+
+  it('does not replace a failed database query with sample products', async () => {
+    const databaseError = new Error('The column Product.ingredients does not exist');
+    databaseError.name = 'PrismaClientKnownRequestError';
+    productFindMany.mockRejectedValueOnce(databaseError);
+
+    await expect(GET(new Request('https://mackhen.example/api/admin/products'))).rejects.toThrow(databaseError);
   });
 
   it('delegates collection create, update, and delete to the guarded product handlers', async () => {

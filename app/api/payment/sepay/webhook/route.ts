@@ -32,6 +32,12 @@ function getTransferAmount(value: unknown): number | null {
 }
 
 export async function POST(request: Request) {
+  const expected = process.env.SEPAY_WEBHOOK_SECRET;
+  const supplied = request.headers.get('authorization')?.replace(/^Apikey\s+/i, '');
+  if (!expected || supplied !== expected) {
+    return NextResponse.json({ success: false, message: 'Unauthorized webhook' }, { status: 401 });
+  }
+
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) return NextResponse.json({ success: true });
