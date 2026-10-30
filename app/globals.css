@@ -9542,8 +9542,12 @@ body {
   width: 100vw;
   margin: -48px 0 0 -50vw;
   overflow: hidden;
-  background: #9b2424;
-  color: #fffdfa;
+  border-top: 1px solid rgb(120 53 15 / 30%);
+  border-bottom: 1px solid rgb(120 53 15 / 30%);
+  background: linear-gradient(to right, #7a1c1c, #9b2424, #7a1c1c);
+  padding-block: 0.75rem;
+  color: #fdfbf7;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 12%);
 }
 
 .home-page .home-cylinder-section {
@@ -9886,20 +9890,21 @@ body {
   flex: 0 0 auto;
   align-items: center;
   min-height: 48px;
+  color: #fdfbf7;
 }
 
 .marquee-item {
   display: inline-flex;
   align-items: center;
-  gap: 18px;
-  padding-right: 18px;
-  font-size: 0.78rem;
-  font-weight: 700;
+  color: #fdfbf7;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   white-space: nowrap;
 }
 
 .marquee-separator {
-  color: #e4bf79;
+  color: #fcd34d;
 }
 
 @media (prefers-reduced-motion: reduce) {

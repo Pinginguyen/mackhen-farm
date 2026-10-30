@@ -1,26 +1,53 @@
-const messages = [
-  '🌿 100% NGUYÊN LIỆU UPCYCLED',
-  '🔥 MẮC KHÉN SAO KHÔ SƠN LA',
-  '💪 22G ĐẠM THỰC VẬT',
-  '📦 FREESHIP TOÀN QUỐC',
-  '🇸🇬 XUẤT KHẨU SINGAPORE PILOT',
-  '🌶️ ĐẬM VỊ TÂY BẮC',
-];
+'use client';
 
-function MarqueeContent() {
+import Link from 'next/link';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+
+type MarqueeMessage = { text: string; href?: string };
+
+function MarqueeContent({ messages, duplicate = false }: { messages: MarqueeMessage[]; duplicate?: boolean }) {
   return (
-    <span className="marquee-content" aria-hidden="true">
-      {messages.map((message) => <span className="marquee-item" key={message}>{message}<span className="marquee-separator">•</span></span>)}
+    <span className="marquee-content" aria-hidden={duplicate}>
+      {messages.map((message) => (
+        <span className="marquee-item text-[#FDFBF7] text-xs md:text-sm font-medium tracking-widest" key={message.text}>
+          <span className="marquee-separator text-amber-300 text-xs mx-4" aria-hidden="true">✦</span>
+          {message.href
+            ? <Link className="transition-colors hover:text-amber-200 hover:underline" href={message.href} tabIndex={duplicate ? -1 : undefined}>{message.text}</Link>
+            : <span>{message.text}</span>}
+        </span>
+      ))}
     </span>
   );
 }
 
 export default function MarqueeBanner() {
+  const { currency } = useLocaleCurrency();
+  const isEN = currency === 'SGD';
+  const messages: MarqueeMessage[] = isEN ? [
+    { text: '100% UPCYCLED SOYBEAN', href: '/truy-xuat' },
+    { text: 'WILD SICHUAN PEPPER (MẮC KHÉN)' },
+    { text: '22G HIGH PLANT PROTEIN' },
+    { text: 'FREE SHIPPING FROM 250K', href: '/khuyen-mai' },
+    { text: 'SINGAPORE EXPORT PILOT', href: '/hop-tac-b2b' },
+    { text: 'AUTHENTIC NORTHWEST FLAVOR' },
+  ] : [
+    { text: '100% NGUYÊN LIỆU UPCYCLED', href: '/truy-xuat' },
+    { text: 'MẮC KHÉN SAO KHÔ SƠN LA' },
+    { text: '22G ĐẠM THỰC VẬT / 100G' },
+    { text: 'FREESHIP TOÀN QUỐC TỪ 250K', href: '/khuyen-mai' },
+    { text: 'XUẤT KHẨU SINGAPORE PILOT', href: '/hop-tac-b2b' },
+    { text: 'ĐẬM VỊ NÚI RỪNG TÂY BẮC' },
+  ];
+
   return (
-    <div className="home-marquee" role="region" aria-label={messages.join(' • ')}>
+    <div
+      className="home-marquee [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]"
+      role="region"
+      aria-label="Thông điệp thương hiệu Mắc Khén Farm"
+    >
       <div className="marquee-container">
-        <MarqueeContent />
-        <MarqueeContent />
+        <MarqueeContent messages={messages} />
+        <MarqueeContent messages={messages} duplicate />
       </div>
     </div>
   );
