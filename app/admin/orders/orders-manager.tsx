@@ -322,21 +322,25 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             </div>
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-toolbar" onSubmit={(event) => save(event, order)}>
-              <div className="admin-order-toolbar-controls">
+              <div className="admin-order-toolbar-controls grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value !== order.status && (!canSelectStatus(order, value) || value === 'PAID' || value === 'CANCELLED')}>{label}</option>)}</select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID" disabled={order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID'}>Đã thanh toán</option></select></label>
                 <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
                 <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} placeholder="Nhập mã vận đơn..." /></label>
               </div>
-              <div className="admin-order-toolbar-actions">
-                <Link className="admin-order-print-button" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
-                {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PENDING' && ['PENDING', 'CONFIRMED'].includes(order.status) && <button type="button" className="admin-order-simulate-button" onClick={() => void simulateSepayPayment(order)} disabled={pending === order.orderCode}><Zap size={16} /> {pending === order.orderCode ? 'Đang giả lập...' : 'Giả lập Quét VietQR (Demo)'}</button>}
-                {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
-                {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
-                {order.status === 'PROCESSING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao 3PL</button>}
-                {order.status === 'HANDED_OFF' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'IN_TRANSIT')}>Đang giao</button>}
-                {['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(order.status) && <button type="button" className="admin-order-cancel-button" disabled={pending === order.orderCode} onClick={() => { setCancelReason('Khách đổi ý'); setCancellingOrder(order.orderCode); }}>Hủy đơn</button>}
-                <button className="admin-order-save-button" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>
+              <div className="admin-order-toolbar-action-row flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">
+                  <Link className="admin-order-print-button border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
+                  {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PENDING' && ['PENDING', 'CONFIRMED'].includes(order.status) && <button type="button" className="admin-order-simulate-button bg-purple-600 hover:bg-purple-700 text-white font-medium px-3.5 py-1.5 rounded-lg text-sm shadow-sm transition active:scale-95" onClick={() => void simulateSepayPayment(order)} disabled={pending === order.orderCode}><Zap size={16} /> {pending === order.orderCode ? 'Đang giả lập...' : 'Giả lập Quét VietQR (Demo)'}</button>}
+                </div>
+                <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">
+                  {['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(order.status) && <button type="button" className="admin-order-cancel-button" disabled={pending === order.orderCode} onClick={() => { setCancelReason('Khách đổi ý'); setCancellingOrder(order.orderCode); }}>Hủy đơn</button>}
+                  {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
+                  {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
+                  {order.status === 'PROCESSING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao 3PL</button>}
+                  {order.status === 'HANDED_OFF' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'IN_TRANSIT')}>Đang giao</button>}
+                  <button className="admin-order-save-button bg-[#9B2424] hover:bg-[#801b1b] text-white px-4 py-1.5 rounded-lg text-sm font-semibold" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>
+                </div>
               </div>
             </form>
             {manualPaymentOrder === order.orderCode && <div className="admin-manual-payment-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && pending !== order.orderCode) setManualPaymentOrder(null); }}>

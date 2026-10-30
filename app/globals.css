@@ -12551,10 +12551,10 @@ body {
 }
 
 .admin-order-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   margin: 16px -18px -18px;
   padding: 14px 18px 16px;
   border-top: 1px solid #e7e5e4;
@@ -12564,10 +12564,11 @@ body {
 
 .admin-order-toolbar-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(130px, 1fr));
-  align-items: end;
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
   min-width: 0;
+  margin-bottom: 16px;
 }
 
 .admin-order-toolbar-controls .field {
@@ -12599,9 +12600,20 @@ body {
 .admin-order-toolbar-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-order-toolbar-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
 }
 
 .admin-order-print-button,
@@ -13045,11 +13057,7 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .admin-order-toolbar {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-order-toolbar-actions {
+  .admin-order-toolbar-action-row > .admin-order-toolbar-actions:last-child {
     justify-content: flex-start;
   }
 }
@@ -13062,6 +13070,10 @@ body {
 
   .admin-order-toolbar-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-order-toolbar-action-row {
+    justify-content: flex-start;
   }
 }
 
