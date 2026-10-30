@@ -41,7 +41,11 @@ export default function MarqueeBanner() {
 
   return (
     <div
-      className="home-marquee [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]"
+      className="home-marquee w-full overflow-hidden bg-gradient-to-r from-[#7A1C1C] via-[#9B2424] to-[#7A1C1C] !py-2.5 shadow-md"
+      style={{
+        maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+      }}
       role="region"
       aria-label="Thông điệp thương hiệu Mắc Khén Farm"
     >
