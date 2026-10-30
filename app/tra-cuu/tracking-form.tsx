@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Box, Check, House, PackageCheck, Printer, Star, Truck } from 'lucide-react';
+import { Box, Check, FileText, House, PackageCheck, Star, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
@@ -33,6 +33,12 @@ type TrackedOrder = {
   warrantyRequest: { reason: string; status: string; createdAt: string } | null;
   items: TrackedItem[];
   timeline: TrackingTimelineItem[];
+};
+
+const esgImpactFactors = {
+  soyPulpKg: Number(process.env.NEXT_PUBLIC_ESG_SOY_PULP_KG_PER_PACK),
+  waterSavedLiters: Number(process.env.NEXT_PUBLIC_ESG_WATER_LITERS_PER_PACK),
+  co2AvoidedKg: Number(process.env.NEXT_PUBLIC_ESG_CO2_KG_PER_PACK),
 };
 
 const steps = [
@@ -260,13 +266,22 @@ export default function TrackingForm() {
         const current = activeStep(orderStatus);
         const delivered = ['DELIVERED', 'COMPLETED'].includes(orderStatus);
         const progress = orderStatus === 'CANCELLED' ? 0 : (current / Math.max(1, timeline.length - 1)) * 100;
+        const packageCount = orderItems.reduce((total, item) => total + item.quantity, 0);
+        const impactMetrics = [
+          { label: text('Bã đậu nành được tái chế'), factor: esgImpactFactors.soyPulpKg, unit: 'kg' },
+          { label: text('Nước ngọt tiết kiệm'), factor: esgImpactFactors.waterSavedLiters, unit: 'L' },
+          { label: text('CO₂ giảm phát thải'), factor: esgImpactFactors.co2AvoidedKg, unit: 'kg CO₂e' },
+        ];
         return (
           <article className={`tracking-order${printOrderCode === order.orderCode ? ' is-print-target' : ''}`} key={order.orderCode}>
+            <div className="tracking-invoice-brand"><span>M</span><div><small>NÔNG SẢN SẤY VỊ TÂY BẮC</small><strong>MẮC KHÉN FARM</strong></div></div>
             <header>
               <div><p className="eyebrow">{text('Mã đơn')}</p><h2>{order.orderCode}</h2></div>
               <strong>{formatCurrency(order.totalAmount)}</strong>
-              <button type="button" className="secondary-action tracking-print-button" onClick={() => printOrder(order.orderCode)}><Printer size={16} /> {text('In hóa đơn / Phiếu đóng gói')}</button>
+              <button type="button" className="secondary-action tracking-print-button" onClick={() => printOrder(order.orderCode)}><FileText size={16} /> {text('In / Tải Hóa Đơn & Chứng Nhận ESG (PDF)')}</button>
             </header>
+
+            {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PAID' && <p className="tracking-payment-seal">ĐÃ THANH TOÁN QUA VIETQR - MB BANK</p>}
 
             <div className="tracking-invoice-meta">
               <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</p>
@@ -305,7 +320,7 @@ export default function TrackingForm() {
             <div className="tracking-items">
               {orderItems.map((item) => (
                 <div key={`${order.orderCode}-${item.productId}`}>
-                  <span>{translateProductName(item.productName, isEN ? 'en' : 'vi')} × {item.quantity}</span>
+                  <span>{translateProductName(item.productName, isEN ? 'en' : 'vi')} × {item.quantity} · {text('Đơn giá')} {formatCurrency(item.price)}</span>
                   <strong>{formatCurrency(item.price * item.quantity)}</strong>
                   {delivered && item.productSlug && order.phone && <Link
                     className="tracking-review-action"
@@ -321,6 +336,23 @@ export default function TrackingForm() {
               {order.shippingFee !== undefined && <p><span>{text('Vận chuyển')}</span><strong>{order.shippingFee ? formatCurrency(order.shippingFee) : text('Miễn phí')}</strong></p>}
               <p><span>{text('Tổng cộng')}</span><strong>{formatCurrency(order.totalAmount)}</strong></p>
             </div>
+            <section className="tracking-esg-certificate" aria-label={text('Chứng nhận tác động sinh thái')}>
+              <p className="eyebrow">ESG IMPACT CERTIFICATE</p>
+              <h3>{text('Ghi nhận tác động sinh thái')}</h3>
+              <p>{text('Số gói sản phẩm trong đơn')}: <strong>{packageCount}</strong></p>
+              <table>
+                <thead><tr><th>{text('Chỉ số môi trường')}</th><th>{text('Ước tính theo đơn')}</th></tr></thead>
+                <tbody>{impactMetrics.map((metric) => (
+                  <tr key={metric.label}>
+                    <td>{metric.label}</td>
+                    <td>{Number.isFinite(metric.factor) && metric.factor >= 0
+                      ? `${(packageCount * metric.factor).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { maximumFractionDigits: 2 })} ${metric.unit}`
+                      : text('Chưa có hệ số LCA đã xác minh')}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+              <small>{text('Ước tính theo hệ số cấu hình của Mắc Khén Farm; không thay thế kiểm định LCA độc lập.')}</small>
+            </section>
             <p className="tracking-invoice-guarantee">{text('Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.')}</p>
 
             {delivered && (

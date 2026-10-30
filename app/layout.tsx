@@ -18,6 +18,7 @@ const beVietnamPro = Be_Vietnam_Pro({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhen-farm.vercel.app'),
   title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
   description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
   openGraph: {

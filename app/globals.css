@@ -8917,13 +8917,54 @@ body {
     border-bottom: 2px solid #8b2323;
   }
 
+  body.tracking-print-mode .tracking-invoice-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: #1e3f20;
+  }
+
+  body.tracking-print-mode .tracking-invoice-brand > span {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 2px solid #1e3f20;
+    border-radius: 50%;
+    font-weight: 800;
+  }
+
+  body.tracking-print-mode .tracking-invoice-brand small,
+  body.tracking-print-mode .tracking-invoice-brand strong {
+    display: block;
+  }
+
+  body.tracking-print-mode .tracking-invoice-brand small {
+    color: #57534e;
+    font-size: 8pt;
+  }
+
+  body.tracking-print-mode .tracking-invoice-brand strong {
+    font-size: 12pt;
+  }
+
   body.tracking-print-mode .tracking-order.is-print-target > header::before {
-    content: 'MẮC KHÉN FARM · HÓA ĐƠN BÁN LẺ / PHIẾU ĐÓNG GÓI';
+    content: 'HÓA ĐƠN BÁN LẺ / PHIẾU ĐÓNG GÓI';
     display: block;
     margin-bottom: 14px;
     color: #8b2323;
     font-size: 18pt;
     font-weight: 800;
+  }
+
+  body.tracking-print-mode .tracking-payment-seal {
+    margin: 14px 0;
+    padding: 10px;
+    border: 2px solid #1e3f20;
+    color: #1e3f20;
+    font-weight: 800;
+    text-align: center;
   }
 
   body.tracking-print-mode .tracking-invoice-meta {
@@ -8977,6 +9018,40 @@ body {
     padding-top: 12px;
     border-top: 1px solid #d6d3d1;
     font-size: 9pt;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate {
+    margin-top: 20px;
+    padding: 14px;
+    border: 1px solid #72836b;
+    break-inside: avoid;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate h3 {
+    margin: 0 0 6px;
+    font-size: 13pt;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate > p {
+    margin: 4px 0 10px;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate th,
+  body.tracking-print-mode .tracking-esg-certificate td {
+    padding: 7px;
+    border: 1px solid #a8a29e;
+    text-align: left;
+  }
+
+  body.tracking-print-mode .tracking-esg-certificate small {
+    display: block;
+    margin-top: 8px;
+    color: #57534e;
   }
 }
 
@@ -12526,6 +12601,7 @@ body {
 
 .admin-order-print-button,
 .admin-order-manual-trigger,
+.admin-order-simulate-button,
 .admin-order-quick-button,
 .admin-order-save-button {
   display: inline-flex;
@@ -12549,6 +12625,21 @@ body {
   border: 1px solid #d6d3d1;
   background: #fff;
   color: #44403c;
+}
+
+.admin-order-simulate-button {
+  border: 1px solid #5b21b6;
+  background: linear-gradient(120deg, #6d28d9, #2563eb);
+  color: #fff;
+}
+
+.admin-order-simulate-button:hover:not(:disabled) {
+  background: linear-gradient(120deg, #5b21b6, #1d4ed8);
+}
+
+.admin-order-simulate-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .admin-order-print-button:hover,

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Download, Pencil, Printer, Search, X } from 'lucide-react';
+import { Download, FileText, Pencil, Printer, Search, X, Zap } from 'lucide-react';
 import { formatCurrency } from '@/lib/store-data';
 
 export type AdminOrder = {
@@ -171,6 +171,31 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
     }
   }
 
+  async function simulateSepayPayment(order: AdminOrder) {
+    setPending(order.orderCode);
+    setToast('');
+    try {
+      const response = await fetch('/api/admin/sepay/simulate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ orderCode: order.orderCode }),
+      });
+      const result = await response.json() as { paymentStatus?: string; status?: string; error?: { message?: string } };
+      if (!response.ok || result.paymentStatus !== 'PAID') {
+        setToast(result.error?.message ?? 'Webhook chưa xác nhận thanh toán cho đơn hàng.');
+        return;
+      }
+      setOrderList((current) => current.map((item) => item.orderCode === order.orderCode
+        ? { ...item, status: result.status ?? 'PAID', paymentStatus: 'PAID' }
+        : item));
+      setToast(`Đã giả lập VietQR và xác nhận thanh toán đơn ${order.orderCode}.`);
+    } catch {
+      setToast('Không thể kết nối để giả lập thanh toán VietQR.');
+    } finally {
+      setPending(null);
+    }
+  }
+
   async function confirmManualPayment(order: AdminOrder) {
     const reason = manualPaymentReason[order.orderCode]?.trim() ?? '';
     if (!reason) {
@@ -305,6 +330,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
               </div>
               <div className="admin-order-toolbar-actions">
                 <Link className="admin-order-print-button" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
+                {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PENDING' && ['PENDING', 'CONFIRMED'].includes(order.status) && <button type="button" className="admin-order-simulate-button" onClick={() => void simulateSepayPayment(order)} disabled={pending === order.orderCode}><Zap size={16} /> {pending === order.orderCode ? 'Đang giả lập...' : 'Giả lập Quét VietQR (Demo)'}</button>}
                 {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
                 {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
                 {order.status === 'PROCESSING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao 3PL</button>}
