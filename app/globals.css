@@ -12249,6 +12249,19 @@ body {
   box-shadow: 0 0 0 3px rgba(139, 30, 30, 0.08);
 }
 
+.admin-new-product-form .field input[aria-invalid="true"],
+.admin-new-product-form .field select[aria-invalid="true"],
+.admin-new-product-form .field textarea[aria-invalid="true"] {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+.admin-product-field-error {
+  color: #dc2626;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
 .admin-image-url-input:focus {
   border-color: rgba(139, 30, 30, 0.5);
   outline: 0;

@@ -9,8 +9,10 @@ import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import StockControl from './stock-control';
 
 type AdminVariant = { id: string; title: string; price: number; originalPrice: number | null; weight: string; inventory: number; sku: string | null };
-type AdminProduct = CatalogProduct & { active: boolean; variants?: AdminVariant[] };
+type AdminProduct = CatalogProduct & { active: boolean; weight?: number | string | null; categoryId?: string | null; variants?: AdminVariant[] };
 type VariantDraft = { id?: string; title: string; price: string; originalPrice: string; weight: string; inventory: string; sku: string };
+type ProductField = 'name' | 'category' | 'price' | 'weight' | 'stock' | 'description' | 'protein';
+type ProductFieldErrors = Partial<Record<ProductField, string>>;
 
 type ProductDraft = {
   name: string;
@@ -63,6 +65,17 @@ const emptyDraft: ProductDraft = {
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+function numericString(value: unknown): string {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return '';
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? String(value).trim() : '';
+}
+
+function categoryDraftValue(category: string | null | undefined, categoryId: string | null | undefined): ProductDraft['category'] {
+  const value = `${category ?? ''} ${categoryId ?? ''}`.toLocaleLowerCase('vi');
+  return value.includes('gia vị') || value.includes('gia-vi') || value.includes('spice') ? 'Gia vị' : 'Khô bò thực vật';
+}
+
 export default function ProductsManager({ initialProducts }: { initialProducts: AdminProduct[] }) {
   const [products, setProducts] = useState(initialProducts);
   const [open, setOpen] = useState(false);
@@ -71,11 +84,22 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
   const [saving, setSaving] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [notice, setNotice] = useState('');
   const [showImageUrl, setShowImageUrl] = useState(false);
   const [onlineImageUrl, setOnlineImageUrl] = useState('');
   const [draggingImage, setDraggingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function clearFieldError(field: ProductField) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
 
   function readImageFile(file?: File) {
     if (!file) return;
@@ -107,15 +131,17 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
   }
 
   function startEditingProduct(product: AdminProduct) {
+    const firstVariant = product.variants?.[0];
+    const weight = product.weight ?? firstVariant?.weight ?? product.unit ?? '150g';
     setEditingProduct(product);
     setDraft({
       name: product.name,
-      category: product.category === 'Gia vị Tây Bắc' ? 'Gia vị' : 'Khô bò thực vật',
-      price: String(product.price),
+      category: categoryDraftValue(product.category, product.categoryId),
+      price: numericString(product.price) || numericString(firstVariant?.price),
       originalPrice: product.originalPrice == null ? '' : String(product.originalPrice),
-      weight: product.unit ?? '150g',
+      weight: String(weight),
       protein: product.protein ?? '',
-      stock: String(product.stock),
+      stock: numericString(product.stock) || numericString(firstVariant?.inventory) || '100',
       imageUrl: product.image,
       description: product.description,
       ingredients: product.ingredients ?? '',
@@ -133,6 +159,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       nutritionFacts: product.nutritionFacts ?? defaultNutritionFacts(product.category !== 'Gia vị Tây Bắc', product.protein ?? ''),
     });
     setFormError('');
+    setFieldErrors({});
     setNotice('');
     setShowImageUrl(false);
     setOnlineImageUrl('');
@@ -141,8 +168,31 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
     setFormError('');
+
+    const errors: ProductFieldErrors = {};
+    if (!draft.name.trim()) errors.name = 'Vui lòng nhập trường này';
+    if (!draft.category) errors.category = 'Vui lòng nhập trường này';
+    const price = Number(draft.price);
+    if (!draft.price.trim()) errors.price = 'Vui lòng nhập trường này';
+    else if (!Number.isSafeInteger(price) || price <= 0) errors.price = 'Vui lòng nhập giá hợp lệ';
+    if (!draft.weight.trim()) errors.weight = 'Vui lòng nhập trường này';
+    else if (!/^\d+\s*(?:g|gram)?$/i.test(draft.weight.trim()) || Number.parseInt(draft.weight, 10) <= 0) errors.weight = 'Vui lòng nhập khối lượng hợp lệ, ví dụ 150g';
+    const stock = Number(draft.stock);
+    if (!draft.stock.trim()) errors.stock = 'Vui lòng nhập trường này';
+    else if (!Number.isSafeInteger(stock) || stock < 0 || stock > 1_000_000) errors.stock = 'Vui lòng nhập tồn kho hợp lệ';
+    if (!draft.description.trim()) errors.description = 'Vui lòng nhập trường này';
+    if (draft.category !== 'Gia vị' && !draft.protein.trim()) errors.protein = 'Vui lòng nhập trường này';
+
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
+      const firstInvalidField = Object.keys(errors)[0];
+      formRef.current?.querySelector<HTMLElement>(`[data-field="${firstInvalidField}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setFieldErrors({});
+    if (!formRef.current?.reportValidity()) return;
+    setSaving(true);
 
     try {
       const response = await fetch(editingProduct ? `/api/admin/products/${encodeURIComponent(editingProduct.id)}` : '/api/admin/products', {
@@ -188,6 +238,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       }
       setDraft(emptyDraft);
       setEditingProduct(null);
+      setFieldErrors({});
       setOnlineImageUrl('');
       setShowImageUrl(false);
       setOpen(false);
@@ -278,17 +329,18 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
               <button type="button" className="admin-return-icon-button" aria-label="Đóng form" onClick={() => setOpen(false)} disabled={saving}><X size={18} /></button>
             </header>
 
-            <form className="admin-new-product-form" onSubmit={saveProduct}>
-              <label className="field admin-product-full-width">Tên sản phẩm<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} maxLength={160} required /></label>
-              <label className="field">Danh mục<select value={draft.category} onChange={(event) => {
+            <form ref={formRef} className="admin-new-product-form" onSubmit={saveProduct} noValidate>
+              <label className="field admin-product-full-width">Tên sản phẩm<input data-field="name" aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? 'product-name-error' : undefined} className={fieldErrors.name ? 'border-red-500 ring-1 ring-red-500' : undefined} value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); clearFieldError('name'); }} maxLength={160} required />{fieldErrors.name && <small id="product-name-error" className="admin-product-field-error">{fieldErrors.name}</small>}</label>
+              <label className="field">Danh mục<select data-field="category" aria-invalid={Boolean(fieldErrors.category)} aria-describedby={fieldErrors.category ? 'product-category-error' : undefined} className={fieldErrors.category ? 'border-red-500 ring-1 ring-red-500' : undefined} value={draft.category} onChange={(event) => {
                 const category = event.target.value as ProductDraft['category'];
                 setDraft((current) => ({ ...current, category, nutritionFacts: { ...current.nutritionFacts, enabled: category !== 'Gia vị' } }));
-              }}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select></label>
-              <label className="field">Giá niêm yết (VNĐ)<input type="number" min={0} step="any" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} required /></label>
+                clearFieldError('category');
+              }}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select>{fieldErrors.category && <small id="product-category-error" className="admin-product-field-error">{fieldErrors.category}</small>}</label>
+              <label className="field">Giá niêm yết (VNĐ)<input data-field="price" aria-invalid={Boolean(fieldErrors.price)} aria-describedby={fieldErrors.price ? 'product-price-error' : undefined} className={fieldErrors.price ? 'border-red-500 ring-1 ring-red-500' : undefined} type="number" min={0} step="any" value={draft.price} onChange={(event) => { setDraft({ ...draft, price: event.target.value }); clearFieldError('price'); }} required />{fieldErrors.price && <small id="product-price-error" className="admin-product-field-error">{fieldErrors.price}</small>}</label>
               <label className="field">Giá gốc (không bắt buộc)<input type="number" min={0} step="any" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
-              <label className="field">Trọng lượng<input placeholder="150g" value={draft.weight} onChange={(event) => setDraft({ ...draft, weight: event.target.value })} required /></label>
-              <label className="field">Hàm lượng Protein<input placeholder="22g/100g" value={draft.protein} onChange={(event) => setDraft({ ...draft, protein: event.target.value })} maxLength={80} required={draft.category !== 'Gia vị'} /></label>
-              <label className="field">Tồn kho ban đầu<input type="number" min={0} max={1000000} value={draft.stock} onChange={(event) => setDraft({ ...draft, stock: event.target.value })} required /></label>
+              <label className="field">Trọng lượng<input data-field="weight" aria-invalid={Boolean(fieldErrors.weight)} aria-describedby={fieldErrors.weight ? 'product-weight-error' : undefined} className={fieldErrors.weight ? 'border-red-500 ring-1 ring-red-500' : undefined} placeholder="150g" value={draft.weight} onChange={(event) => { setDraft({ ...draft, weight: event.target.value }); clearFieldError('weight'); }} required />{fieldErrors.weight && <small id="product-weight-error" className="admin-product-field-error">{fieldErrors.weight}</small>}</label>
+              <label className="field">Hàm lượng Protein<input data-field="protein" aria-invalid={Boolean(fieldErrors.protein)} aria-describedby={fieldErrors.protein ? 'product-protein-error' : undefined} className={fieldErrors.protein ? 'border-red-500 ring-1 ring-red-500' : undefined} placeholder="22g/100g" value={draft.protein} onChange={(event) => { setDraft({ ...draft, protein: event.target.value }); clearFieldError('protein'); }} maxLength={80} required={draft.category !== 'Gia vị'} />{fieldErrors.protein && <small id="product-protein-error" className="admin-product-field-error">{fieldErrors.protein}</small>}</label>
+              <label className="field">Tồn kho ban đầu<input data-field="stock" aria-invalid={Boolean(fieldErrors.stock)} aria-describedby={fieldErrors.stock ? 'product-stock-error' : undefined} className={fieldErrors.stock ? 'border-red-500 ring-1 ring-red-500' : undefined} type="number" min={0} max={1000000} value={draft.stock} onChange={(event) => { setDraft({ ...draft, stock: event.target.value }); clearFieldError('stock'); }} required />{fieldErrors.stock && <small id="product-stock-error" className="admin-product-field-error">{fieldErrors.stock}</small>}</label>
               <fieldset className="admin-product-variants admin-product-full-width">
                 <legend>Phân loại hàng / Quy cách (Variants)</legend>
                 {draft.variants.length > 0 && <div className="admin-product-variant-table-wrap">
@@ -371,7 +423,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 </div>
               </fieldset>
               <label className="field admin-product-full-width">Thành phần &amp; nguồn gốc nguyên liệu<textarea rows={4} maxLength={5000} value={draft.ingredients} onChange={(event) => setDraft({ ...draft, ingredients: event.target.value })} placeholder="Ví dụ: 100% hạt mắc khén rừng Tây Bắc thu hoạch tự nhiên, phơi sấy tiêu chuẩn..." /></label>
-              <label className="field admin-product-full-width">Mô tả ngắn<textarea rows={3} maxLength={2000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></label>
+              <label className="field admin-product-full-width">Mô tả ngắn<textarea data-field="description" aria-invalid={Boolean(fieldErrors.description)} aria-describedby={fieldErrors.description ? 'product-description-error' : undefined} className={fieldErrors.description ? 'border-red-500 ring-1 ring-red-500' : undefined} rows={3} maxLength={2000} value={draft.description} onChange={(event) => { setDraft({ ...draft, description: event.target.value }); clearFieldError('description'); }} />{fieldErrors.description && <small id="product-description-error" className="admin-product-field-error">{fieldErrors.description}</small>}</label>
               {formError && <p className="admin-return-alert admin-product-full-width" role="alert">{formError}</p>}
               <footer className="admin-product-modal-actions admin-product-full-width">
                 <button className="secondary-action" type="button" onClick={() => setOpen(false)} disabled={saving}>Hủy</button>
