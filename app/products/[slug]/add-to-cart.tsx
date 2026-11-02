@@ -6,6 +6,7 @@ import { Minus, Plus } from 'lucide-react';
 import gsap from 'gsap';
 import { toast } from 'sonner';
 
+import { recordCroEvent } from '@/components/CroEventTracker';
 import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
@@ -159,6 +160,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         else setMessage(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
         return;
       }
+      recordCroEvent('ADD_TO_CART', productId);
       if (buyNow) router.push('/checkout?mode=buy_now');
       else {
         window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));

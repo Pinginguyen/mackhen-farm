@@ -172,6 +172,17 @@ model CartItem {
   @@index([productId])
 }
 
+model FunnelEvent {
+  id        String   @id @default(cuid())
+  eventType String   @db.VarChar(24)
+  sessionId String   @db.VarChar(36)
+  productId String?
+  createdAt DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([sessionId, eventType, createdAt])
+}
+
 model Customer {
   id        String   @id @default(cuid())
   name      String

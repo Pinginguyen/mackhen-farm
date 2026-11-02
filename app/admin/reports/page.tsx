@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/store-data';
+import CroFunnelWidget from './cro-funnel-widget';
 
 export default async function AdminReportsPage() {
   const now = new Date();
@@ -47,7 +48,7 @@ export default async function AdminReportsPage() {
         <div className="page-title">
           <div>
             <p className="eyebrow">Báo cáo</p>
-            <h2>Revenue & channel trend</h2>
+            <h2>Báo cáo doanh thu &amp; chuyển đổi</h2>
           </div>
         </div>
 
@@ -65,6 +66,7 @@ export default async function AdminReportsPage() {
             <strong>{report.lowStock}</strong>
           </div>
         </div>
+        <CroFunnelWidget />
       </section>
     </main>
   );

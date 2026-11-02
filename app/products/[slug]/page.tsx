@@ -8,6 +8,7 @@ import ProductRating from '@/components/ProductRating';
 import ProductReviewsSection from '@/components/ProductReviewsSection';
 import ProductHighlights from '@/components/ProductHighlights';
 import LocalizedProductName from './localized-product-name';
+import CroEventTracker from '@/components/CroEventTracker';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -88,6 +89,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   return (
     <main className="page-shell product-detail-page !bg-[#FAF7F2]">
+      <CroEventTracker eventType="PRODUCT_VIEW" productId={product.id} />
       <section className="detail-section !rounded-2xl !border-stone-200/80 !bg-white !p-5 shadow-xs sm:!p-7">
         <div className="detail-grid">
           <ProductImageGallery image={product.image} images={product.images ?? []} name={product.name} />
