@@ -5552,6 +5552,33 @@ textarea {
   font-size: 0.82rem;
 }
 
+.tracking-integrity-seal {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #a8d5b2;
+  border-radius: 6px;
+  background: #effaf1;
+  color: #176b35;
+}
+
+.tracking-integrity-seal > svg {
+  flex: 0 0 auto;
+}
+
+.tracking-integrity-seal strong,
+.tracking-integrity-seal small {
+  display: block;
+}
+
+.tracking-integrity-seal small {
+  margin-top: 3px;
+  color: #3d6848;
+  font-size: 0.75rem;
+}
+
 .tracking-search {
   display: flex;
   align-items: flex-end;

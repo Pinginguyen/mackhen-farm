@@ -6,6 +6,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: { order: { findUnique: orderFindUnique 
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 
 import { POST } from './route';
+import { createOrderChecksum } from '@/lib/crypto-order';
 
 function makeRequest(body: unknown) {
   return new Request('https://mackhen.example/api/tracking', {
@@ -54,13 +55,14 @@ describe('POST /api/tracking', () => {
 
   it('returns invoice details only when both order code and phone match', async () => {
     const response = await POST(makeRequest({ orderCode: ' mkf-123456 ', phone: '0762 793 244' }));
-    const result = await response.json() as { items: Array<{ maskedPhone: string; maskedAddress: string; phone: string; address: string; customerName: string; paymentMethod: string; subtotal: number; items: Array<{ productSlug: string }> }> };
+    const result = await response.json() as { items: Array<{ integrityChecksum: string; maskedPhone: string; maskedAddress: string; phone: string; address: string; customerName: string; paymentMethod: string; subtotal: number; items: Array<{ productSlug: string }> }> };
 
     expect(response.status).toBe(200);
     expect(result.items[0]).toMatchObject({
       maskedPhone: '0762.xxx.244', maskedAddress: 'Binh Lu, Tam Duong, Lai Chau',
       phone: '0762793244', address: 'Lai Chau, Tam Duong, Binh Lu, So 12 duong X',
       customerName: 'Nguyen Van A', paymentMethod: 'COD', subtotal: 169000,
+      integrityChecksum: createOrderChecksum({ orderCode: 'MKF-123456', totalAmount: 169000, createdAt: new Date('2026-10-14T00:00:00Z') }),
       items: [{ productSlug: 'test1' }],
     });
     expect(orderFindUnique).toHaveBeenCalledWith(expect.objectContaining({

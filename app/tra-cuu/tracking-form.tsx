@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Box, Check, FileText, House, PackageCheck, Star, Truck } from 'lucide-react';
+import { Box, Check, FileText, House, PackageCheck, ShieldCheck, Star, Truck } from 'lucide-react';
 import { getErrorMessage } from '@/lib/error-message';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
@@ -14,6 +14,7 @@ type TrackingTimelineItem = { label: string };
 
 type TrackedOrder = {
   orderCode: string;
+  integrityChecksum?: string;
   customerName?: string;
   phone?: string;
   address?: string;
@@ -66,6 +67,7 @@ function normalizeOrder(value: unknown): TrackedOrder | null {
 
   return {
     orderCode: order.orderCode,
+    integrityChecksum: typeof order.integrityChecksum === 'string' ? order.integrityChecksum : undefined,
     customerName: typeof order.customerName === 'string' ? order.customerName : undefined,
     phone: typeof order.phone === 'string' ? order.phone : undefined,
     address: typeof order.address === 'string' ? order.address : undefined,
@@ -282,6 +284,11 @@ export default function TrackingForm() {
             </header>
 
             {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PAID' && <p className="tracking-payment-seal">ĐÃ THANH TOÁN QUA VIETQR - MB BANK</p>}
+
+            {!usingCachedOrder && order.integrityChecksum && <section className="tracking-integrity-seal" aria-label={text('Mã đối chiếu toàn vẹn SHA-256')}>
+              <ShieldCheck size={19} aria-hidden="true" />
+              <div><strong>{text('Chứng từ có mã băm đối chiếu toàn vẹn (SHA-256)')}</strong><small>{text('Mã đối chiếu của dữ liệu hiện tại, không thay thế chữ ký số.')}</small></div>
+            </section>}
 
             <div className="tracking-invoice-meta">
               <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</p>

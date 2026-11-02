@@ -30,6 +30,7 @@ export default function SiteFooter() {
           <h2>{text('HỖ TRỢ & DỊCH VỤ')}</h2>
           <Link href="/tra-cuu">{text('Tra cứu hành trình đơn hàng')}</Link>
           <Link href="/tra-cuu#return-request-form">{text('Chính sách bảo hành vị giác (Đổi mới trong 24h)')}</Link>
+          <Link href="/chinh-sach-bao-mat">{text('Chính sách bảo mật')}</Link>
           <Link href="/products">{text('Danh mục sản phẩm khô bò & gia vị')}</Link>
           <Link className="footer-b2b-link" href="/hop-tac-b2b">{text('Hợp tác B2B (Wholesale)')}</Link>
           <Link className="footer-b2b-link" href="/truy-xuat">{text('Truy xuất nguồn gốc theo Lô')}</Link>

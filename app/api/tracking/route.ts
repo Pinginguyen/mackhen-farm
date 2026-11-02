@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
+import { createOrderChecksum } from '@/lib/crypto-order';
 
 function normalizeVietnamesePhone(value: string): string | null {
   const compact = value.trim().replace(/[\s().-]/g, '');
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       });
       const items = order && normalizeVietnamesePhone(order.phone) === phone ? [{
         orderCode: order.orderCode,
+        integrityChecksum: createOrderChecksum(order),
         customerName: order.customerName,
         phone: order.phone,
         address: order.address,

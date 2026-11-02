@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import { prisma } from '@/lib/prisma';
+import { createOrderChecksum } from '@/lib/crypto-order';
 import PrintButton from '../../print-button';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
   });
   if (!order) notFound();
   const amount = `${order.totalAmount.toLocaleString('vi-VN')}đ`;
+  const checksum = createOrderChecksum(order);
 
   return (
     <main className="page-shell packing-slip-page">
@@ -70,6 +72,10 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         .packing-signature { min-height: 88px; text-align: center; font-size: 10px; }
         .packing-signature strong { display: block; }
         .packing-signature span { display: block; margin-top: 62px; border-top: 1px solid #78716c; padding-top: 5px; }
+        .packing-integrity { margin-top: 16px; padding: 12px; border: 1px solid #8a9b8c; background: #f3f8f3; }
+        .packing-integrity h2 { margin: 0 0 7px; font-size: 11px; }
+        .packing-integrity code { display: block; overflow-wrap: anywhere; font-size: 9px; }
+        .packing-integrity p { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
         @media print {
           body * { visibility: hidden !important; }
           #printable-order, #printable-order * { visibility: visible !important; }
@@ -151,6 +157,12 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
           <div className="packing-signature"><strong>NGƯỜI ĐÓNG GÓI (PACKER)</strong><span>Ký và ghi rõ họ tên</span></div>
           <div className="packing-signature"><strong>BÀN GIAO TÀI XẾ (LAST-MILE CARRIER)</strong><span>Ký và ghi rõ họ tên</span></div>
         </div>
+        <section className="packing-integrity" aria-label="Xác thực toàn vẹn dữ liệu số">
+          <h2>XÁC THỰC TOÀN VẸN DỮ LIỆU SỐ · SHA-256</h2>
+          <p><strong>SHA-256 Digital Checksum:</strong></p>
+          <code>{checksum}</code>
+          <p>Trạng thái: Đã tạo mã đối chiếu theo SHA-256 (NIST FIPS 180-4). Mã băm giúp so sánh dữ liệu, không phải chữ ký số và không tự chứng minh danh tính người phát hành.</p>
+        </section>
       </section>
     </main>
   );
