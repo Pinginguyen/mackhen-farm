@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextResponse } from 'next/server';
 
-const { productFindUnique, productUpdate, variantUpdateMany, productionLotFindUnique, productionLotCreate, productionLotUpdate, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
+const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, orderItemGroupBy, productionLotFindUnique, productionLotCreate, productionLotUpdate, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
   const mocks = {
   productFindUnique: vi.fn(),
+  productFindMany: vi.fn(),
   productUpdate: vi.fn(),
+  orderItemGroupBy: vi.fn(),
   variantUpdateMany: vi.fn(),
   productionLotFindUnique: vi.fn(),
   productionLotCreate: vi.fn(),
@@ -23,14 +25,14 @@ const { productFindUnique, productUpdate, variantUpdateMany, productionLotFindUn
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: (operation: unknown) => typeof operation === 'function' ? operation(transaction) : Promise.all(operation as Promise<unknown>[]),
-    product: { update: productUpdate },
+    product: { findMany: productFindMany, update: productUpdate },
+    orderItem: { groupBy: orderItemGroupBy, findMany: orderItemFindMany },
     productionLot: { findUnique: productionLotFindUnique, create: productionLotCreate, update: productionLotUpdate },
-    orderItem: { findMany: orderItemFindMany },
   },
 }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 
-import { PATCH } from './route';
+import { GET, PATCH } from './route';
 
 describe('PATCH /api/admin/inventory', () => {
   beforeEach(() => {
@@ -122,5 +124,31 @@ describe('PATCH /api/admin/inventory', () => {
     expect(productionLotUpdate).toHaveBeenCalledWith({ where: { lotCode: 'LOT-MKF-2026-001' }, data: { status: 'RECALLED' } });
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { active: false } });
     expect((await response.json()).affectedCustomers).toHaveLength(1);
+  });
+});
+
+describe('GET /api/admin/inventory', () => {
+  beforeEach(() => {
+    requireAdmin.mockReset().mockResolvedValue(null);
+    productFindMany.mockReset().mockResolvedValue([
+      { id: 'plain', name: 'Plain', stock: 25, active: true, variants: [], productionLots: [] },
+      { id: 'variants', name: 'Variants', stock: 99, active: true, variants: [{ inventory: 8 }, { inventory: 7 }], productionLots: [] },
+    ]);
+    orderItemGroupBy.mockReset().mockResolvedValue([{ productId: 'plain', _sum: { quantity: 6 } }, { productId: 'variants', _sum: { quantity: 4 } }]);
+  });
+
+  it('calculates ATP from physical inventory and open order commitments', async () => {
+    const response = await GET(new Request('https://mackhen.example/api/admin/inventory'));
+    const body = await response.json() as { items: { id: string; stock: number; committed: number; available: number }[] };
+
+    expect(response.status).toBe(200);
+    expect(orderItemGroupBy).toHaveBeenCalledWith(expect.objectContaining({
+      where: { order: { orderStatus: { in: ['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'] } } },
+      _sum: { quantity: true },
+    }));
+    expect(body.items).toEqual([
+      expect.objectContaining({ id: 'plain', stock: 25, committed: 6, available: 19 }),
+      expect.objectContaining({ id: 'variants', stock: 15, committed: 4, available: 11 }),
+    ]);
   });
 });

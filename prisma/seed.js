@@ -139,79 +139,86 @@ const products = [
 async function main() {
   const slugs = products.map((product) => product.slug);
 
-  await prisma.$transaction(async (transaction) => {
-    await transaction.product.updateMany({
-      where: { slug: { notIn: slugs } },
-      data: { active: false },
-    });
-
-    for (const product of products) {
-      const savedProduct = await transaction.product.upsert({
-        where: { slug: product.slug },
-        update: {
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          originalPrice: product.originalPrice ?? null,
-          unit: product.unit,
-          weight: product.weight,
-          protein: product.protein,
-          calories: product.calories,
-          images: [product.image],
-          rating: product.rating,
-          description: product.description,
-          ingredients: product.ingredients,
-          image: product.image,
-          highlight: product.highlight,
-          active: true,
-        },
-        create: {
-          slug: product.slug,
-          name: product.name,
-          category: product.category,
-          price: product.price,
-          originalPrice: product.originalPrice ?? null,
-          unit: product.unit,
-          weight: product.weight,
-          protein: product.protein,
-          calories: product.calories,
-          images: [product.image],
-          rating: product.rating,
-          stock: product.stock,
-          description: product.description,
-          ingredients: product.ingredients,
-          image: product.image,
-          highlight: product.highlight,
-          active: true,
-        },
+  // ĐÃ TĂNG TIMEOUT LÊN 60 GIÂY ĐỂ TRUYỀN DỮ LIỆU SANG SINGAPORE KHÔNG BỊ NGẮT
+  await prisma.$transaction(
+    async (transaction) => {
+      await transaction.product.updateMany({
+        where: { slug: { notIn: slugs } },
+        data: { active: false },
       });
 
-      const existingVariant = await transaction.productVariant.findFirst({
-        where: { productId: savedProduct.id },
-      });
-      const variantData = {
-        title: product.title || product.label || 'Túi 150g',
-        price: product.price,
-        weight: `${product.weight}g`,
-        inventory: product.stock,
-      };
-
-      if (existingVariant) {
-        await transaction.productVariant.update({
-          where: { id: existingVariant.id },
-          data: variantData,
-        });
-      } else {
-        await transaction.productVariant.create({
-          data: {
-            ...variantData,
-            title: product.title || product.label || 'Túi 150g',
-            productId: savedProduct.id,
+      for (const product of products) {
+        const savedProduct = await transaction.product.upsert({
+          where: { slug: product.slug },
+          update: {
+            name: product.name,
+            category: product.category,
+            price: product.price,
+            originalPrice: product.originalPrice ?? null,
+            unit: product.unit,
+            weight: product.weight,
+            protein: product.protein,
+            calories: product.calories,
+            images: [product.image],
+            rating: product.rating,
+            description: product.description,
+            ingredients: product.ingredients,
+            image: product.image,
+            highlight: product.highlight,
+            active: true,
+          },
+          create: {
+            slug: product.slug,
+            name: product.name,
+            category: product.category,
+            price: product.price,
+            originalPrice: product.originalPrice ?? null,
+            unit: product.unit,
+            weight: product.weight,
+            protein: product.protein,
+            calories: product.calories,
+            images: [product.image],
+            rating: product.rating,
+            stock: product.stock,
+            description: product.description,
+            ingredients: product.ingredients,
+            image: product.image,
+            highlight: product.highlight,
+            active: true,
           },
         });
+
+        const existingVariant = await transaction.productVariant.findFirst({
+          where: { productId: savedProduct.id },
+        });
+        const variantData = {
+          title: product.title || product.label || 'Túi 150g',
+          price: product.price,
+          weight: `${product.weight}g`,
+          inventory: product.stock,
+        };
+
+        if (existingVariant) {
+          await transaction.productVariant.update({
+            where: { id: existingVariant.id },
+            data: variantData,
+          });
+        } else {
+          await transaction.productVariant.create({
+            data: {
+              ...variantData,
+              title: product.title || product.label || 'Túi 150g',
+              productId: savedProduct.id,
+            },
+          });
+        }
       }
+    },
+    {
+      maxWait: 20000,
+      timeout: 60000, // 60 giây tha hồ nạp sản phẩm
     }
-  });
+  );
 
   const coreVouchers = [
     {

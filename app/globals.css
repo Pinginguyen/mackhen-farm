@@ -7783,6 +7783,25 @@ body {
   font-size: 0.8rem;
 }
 
+.inventory-atp-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #b8d7bd;
+  border-radius: 4px;
+  background: #f0f8f1;
+  color: #245c2a;
+  font-weight: 700;
+}
+
+.inventory-atp-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #8a5700;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 .admin-inventory-manager {
   display: grid;
   gap: 16px;

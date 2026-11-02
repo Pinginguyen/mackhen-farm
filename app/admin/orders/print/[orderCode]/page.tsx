@@ -1,11 +1,22 @@
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 
 import { prisma } from '@/lib/prisma';
 import PrintButton from '../../print-button';
-import QRCode from 'qrcode';
 
 export const dynamic = 'force-dynamic';
+
+function OrderBarcode({ value }: { value: string }) {
+  const data = Array.from(value).map((character) => character.charCodeAt(0).toString(2).padStart(8, '0')).join('0');
+  const modules = `11010010000${data}1100011101011`;
+  const width = modules.length * 2;
+
+  return (
+    <svg className="packing-barcode" viewBox={`0 0 ${width} 48`} role="img" aria-label={`Barcode Code128 mô phỏng cho đơn ${value}`} shapeRendering="crispEdges">
+      <rect width={width} height="48" fill="#fff" />
+      {modules.split('').map((module, index) => module === '1' ? <rect key={index} x={index * 2} y="0" width="2" height="38" fill="#111" /> : null)}
+    </svg>
+  );
+}
 
 export default async function PackingSlipPage({ params }: { params: { orderCode: string } }) {
   const order = await prisma.order.findUnique({
@@ -13,7 +24,6 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
     include: { items: { include: { product: { select: { slug: true } } } } },
   });
   if (!order) notFound();
-  const qrCode = await QRCode.toDataURL(order.trackingCode ?? order.orderCode, { width: 160, margin: 1, errorCorrectionLevel: 'M' });
   const amount = `${order.totalAmount.toLocaleString('vi-VN')}đ`;
 
   return (
@@ -21,19 +31,20 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
       <style>{`
         .packing-slip-page { max-width: 900px; }
         .packing-slip-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-        #printable-order { max-width: 760px; margin: 0 auto; padding: 32px; border: 2px solid #292a26; border-radius: 10px; background: #fff; color: #1c1917; }
+        #printable-order { max-width: 760px; margin: 0 auto; padding: 32px; border: 2px solid #292a26; border-radius: 8px; background: #fff; color: #1c1917; }
         .packing-sheet-brand { display: flex; align-items: center; gap: 10px; color: #1e3f20; }
         .packing-sheet-brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border: 2px solid #1e3f20; border-radius: 50%; font-weight: 800; }
         .packing-sheet-brand small, .packing-sheet-brand strong { display: block; }
         .packing-sheet-brand small { color: #57534e; font-size: 10px; }
         .packing-sheet-brand strong { font-size: 16px; }
         .packing-sheet-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 20px 0; padding: 16px 0; border-top: 2px solid #292a26; border-bottom: 1px solid #a8a29e; }
-        .packing-sheet-heading h1 { margin: 0 0 5px; font-size: 22px; line-height: 1.2; }
+        .packing-sheet-heading h1 { margin: 0 0 5px; font-size: 20px; line-height: 1.2; }
         .packing-sheet-heading p { margin: 0; color: #57534e; font-size: 12px; }
-        .packing-sheet-code { display: flex; align-items: center; gap: 12px; text-align: right; }
+        .packing-sheet-code { display: grid; justify-items: end; gap: 4px; max-width: 270px; text-align: right; }
         .packing-sheet-code strong { display: block; font-size: 17px; overflow-wrap: anywhere; }
         .packing-sheet-code small { color: #57534e; font-size: 10px; }
-        .packing-sheet-code img { width: 76px; height: 76px; object-fit: contain; }
+        .packing-barcode { display: block; width: min(250px, 100%); height: 46px; }
+        .packing-barcode-label { font-size: 9px; color: #57534e; }
         .packing-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
         .packing-party { min-width: 0; padding: 14px; border: 1px solid #a8a29e; border-radius: 6px; }
         .packing-party h2, .packing-picklist h2 { margin: 0 0 9px; font-size: 12px; text-transform: uppercase; }
@@ -46,17 +57,27 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         .packing-picklist table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .packing-picklist th, .packing-picklist td { padding: 9px 8px; border: 1px solid #78716c; font-size: 11px; text-align: left; overflow-wrap: anywhere; }
         .packing-picklist th { background: #f1f0eb; font-weight: 800; }
-        .packing-picklist th:first-child, .packing-picklist td:first-child { width: 42px; text-align: center; }
+        .packing-picklist th:first-child, .packing-picklist td:first-child { width: 38px; text-align: center; }
+        .packing-picklist th:nth-child(3), .packing-picklist td:nth-child(3) { width: 118px; }
+        .packing-picklist th:nth-child(4), .packing-picklist td:nth-child(4) { width: 88px; text-align: center; }
         .packing-picklist th:last-child, .packing-picklist td:last-child { width: 64px; text-align: center; }
+        .packing-picklist td strong, .packing-picklist td small { display: block; }
+        .packing-picklist td small { margin-top: 3px; color: #57534e; font-size: 10px; }
+        .packing-check { width: 16px; height: 16px; accent-color: #1e3f20; }
         .packing-sheet-footer { padding-top: 14px; border-top: 1px dashed #78716c; }
         .packing-sheet-footer p { margin: 5px 0; font-size: 11px; line-height: 1.5; }
+        .packing-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+        .packing-signature { min-height: 88px; text-align: center; font-size: 10px; }
+        .packing-signature strong { display: block; }
+        .packing-signature span { display: block; margin-top: 62px; border-top: 1px solid #78716c; padding-top: 5px; }
         @media print {
           body * { visibility: hidden !important; }
           #printable-order, #printable-order * { visibility: visible !important; }
-          #printable-order { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 20px !important; border: 2px solid #292a26 !important; border-radius: 8px !important; background: white !important; }
+          #printable-order { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 4mm !important; border: 1px solid #292a26 !important; border-radius: 0 !important; background: white !important; }
           nav, aside, header, button, .no-print, .print-hide { display: none !important; }
           .packing-slip-page { max-width: none !important; margin: 0 !important; padding: 0 !important; }
           .packing-parties { grid-template-columns: 1fr 1fr !important; }
+          .packing-signatures { grid-template-columns: repeat(3, 1fr) !important; }
           .packing-cod, .packing-paid, .packing-pending-payment, .packing-party, .packing-picklist tr { break-inside: avoid; }
           @page { size: A4 portrait; margin: 10mm; }
         }
@@ -72,10 +93,11 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         </div>
 
         <div className="packing-sheet-heading">
-          <div><h1>PHIẾU GỬI HÀNG &amp; NHẶT ĐƠN</h1><p>Ngày đặt: {order.createdAt.toLocaleString('vi-VN')}</p></div>
+          <div><h1>PHIẾU ĐÓNG GÓI &amp; GIAO HÀNG (PICK &amp; PACK SLIP)</h1><p>Ngày tạo: {order.createdAt.toLocaleString('vi-VN')}</p></div>
           <div className="packing-sheet-code">
-            <div><small>MÃ ĐƠN / MÃ VẬN ĐƠN</small><strong>{order.orderCode}</strong><small>{order.trackingCode ?? 'Chưa có mã vận đơn'}</small></div>
-            <Image src={qrCode} alt={`QR ${order.trackingCode ?? order.orderCode}`} width={160} height={160} sizes="76px" unoptimized />
+            <div><small>MÃ ĐƠN</small><strong>{order.orderCode}</strong><small>{order.trackingCode ? `Mã vận đơn: ${order.trackingCode}` : 'Chưa có mã vận đơn'}</small></div>
+            <OrderBarcode value={order.orderCode} />
+            <span className="packing-barcode-label">CODE128 · MÃ VẠCH MÔ PHỎNG</span>
           </div>
         </div>
 
@@ -85,7 +107,7 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
             <p><strong>Mắc Khén Farm</strong></p>
             <p>Hotline: 0762.793.244</p>
             <p>Địa chỉ kho: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.</p>
-            <p>Đơn vị vận chuyển: {order.carrier ?? 'Chưa phân công'}</p>
+            <p>Đơn vị vận chuyển (3PL): {order.carrier ?? 'Chưa phân công'}</p>
           </section>
           <section className="packing-party">
             <h2>Người nhận</h2>
@@ -104,11 +126,17 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         )}
 
         <section className="packing-picklist">
-          <h2>Bảng nhặt hàng · {order.items.length} sản phẩm</h2>
+          <h2>Danh sách nhặt hàng · {order.items.length} dòng hàng</h2>
           <table>
-            <thead><tr><th>STT</th><th>Tên sản phẩm</th><th>Phân loại</th><th>Số lượng</th></tr></thead>
+            <thead><tr><th>STT</th><th>Sản phẩm / Quy cách</th><th>Vị trí kho</th><th>Số lượng cần nhặt</th><th>Kiểm định chất lượng</th></tr></thead>
             <tbody>{order.items.map((item, index) => (
-              <tr key={item.id}><td>{index + 1}</td><td>{item.productName}</td><td>{item.variantLabel ?? '-'}</td><td>{item.quantity}</td></tr>
+              <tr key={item.id}>
+                <td>{index + 1}</td>
+                <td><strong>{item.productName}</strong><small>{item.variantLabel ?? 'Quy cách tiêu chuẩn'}</small></td>
+                <td>Chưa cấu hình vị trí</td>
+                <td>{item.quantity}</td>
+                <td><input className="packing-check" type="checkbox" aria-label={`Kiểm định ${item.productName}`} /></td>
+              </tr>
             ))}</tbody>
           </table>
         </section>
@@ -117,6 +145,11 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
           <p><strong>LƯU Ý GIAO HÀNG:</strong> Cho khách xem hàng, đóng hộp carton 3 lớp khử oxy.</p>
           <p><strong>Ghi chú đơn hàng:</strong> {order.note || 'Không có'}</p>
           <p><strong>Mắc Khén Farm cảm ơn Quý khách!</strong></p>
+        </div>
+        <div className="packing-signatures" aria-label="Xác nhận bàn giao">
+          <div className="packing-signature"><strong>NGƯỜI NHẶT HÀNG (PICKER)</strong><span>Ký và ghi rõ họ tên</span></div>
+          <div className="packing-signature"><strong>NGƯỜI ĐÓNG GÓI (PACKER)</strong><span>Ký và ghi rõ họ tên</span></div>
+          <div className="packing-signature"><strong>BÀN GIAO TÀI XẾ (LAST-MILE CARRIER)</strong><span>Ký và ghi rõ họ tên</span></div>
         </div>
       </section>
     </main>

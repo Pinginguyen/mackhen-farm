@@ -16,7 +16,7 @@ type Lot = {
   receivingNote: string | null;
 };
 
-type InventoryItem = { id: string; name: string; stock: number; status: string; active: boolean; productionLots: Lot[] };
+type InventoryItem = { id: string; name: string; stock: number; committed: number; available: number; status: string; active: boolean; productionLots: Lot[] };
 
 const statusLabels: Record<string, string> = { ACTIVE: 'Đang hoạt động', LOW_STOCK: 'Sắp hết', RECALLED: 'Đã tạm dừng', EXPIRED: 'Hết hạn' };
 
@@ -107,11 +107,14 @@ export default function InventoryManager({ initialInventory }: { initialInventor
       </section>}
 
       <section className="table-card mobile-table-scroll" aria-label="Tồn kho và lô sản xuất">
+        <p className="admin-inventory-note inventory-atp-banner" role="note">Cơ chế quản trị tồn kho thời gian thực: ATP = Tồn thực tế - Tồn đã cam kết</p>
         <table>
-          <thead><tr><th>Sản phẩm</th><th>Tồn hệ thống</th><th>Trạng thái</th><th>Lô sản xuất / khả dụng</th></tr></thead>
+          <thead><tr><th>Sản phẩm</th><th>Tồn thực tế</th><th>Đang giữ trong đơn</th><th>Khả dụng bán (ATP)</th><th>Trạng thái</th><th>Lô sản xuất / khả dụng</th></tr></thead>
           <tbody>{initialInventory.map((item) => <tr key={item.id}>
             <td><strong>{item.name}</strong></td>
-            <td><strong className={item.stock < 10 ? 'inventory-critical' : ''}>{item.stock}</strong>{item.stock < 10 && <span className="inventory-warning"><AlertTriangle size={13} /> Dưới 10</span>}</td>
+            <td><strong>{item.stock}</strong></td>
+            <td>{item.committed}</td>
+            <td><strong className={item.available < 0 ? 'inventory-critical' : item.available < 20 ? 'inventory-atp-warning' : ''}>{item.available}</strong>{item.available < 20 && <span className={item.available < 0 ? 'inventory-critical' : 'inventory-atp-warning'}><AlertTriangle size={13} /> {item.available < 0 ? 'Vượt tồn' : 'Cần tái đặt hàng'}</span>}</td>
             <td>{item.active ? 'Đang bán' : 'Đã ẩn'}</td>
             <td><div className="admin-lot-list">{item.productionLots.length ? item.productionLots.map((lot) => <div className="admin-lot-row" key={lot.id}>
               <span><strong>{lot.lotCode}</strong><small>{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN')}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
@@ -119,7 +122,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
               {lot.status !== 'RECALLED' && lot.status !== 'EXPIRED' && <button type="button" className="admin-lot-pause" disabled={busy} onClick={() => void pauseLot(lot.lotCode)} title="Tạm dừng lô và ẩn sản phẩm"><PauseCircle size={15} /> Tạm dừng lô</button>}
             </div>) : <span>Chưa khai báo lô</span>}</div></td>
           </tr>)}
-          {!initialInventory.length && <tr><td colSpan={4}>Chưa có dữ liệu tồn kho.</td></tr>}</tbody>
+          {!initialInventory.length && <tr><td colSpan={6}>Chưa có dữ liệu tồn kho.</td></tr>}</tbody>
         </table>
       </section>
       <p className="admin-inventory-note"><RefreshCw size={15} /> Hàng chờ thanh toán được giữ tối đa 15 phút; cron hoàn kho chạy mỗi 5 phút.</p>

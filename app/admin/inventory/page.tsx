@@ -4,7 +4,7 @@ import InventoryManager from './inventory-manager';
 
 export default async function AdminInventoryPage() {
   const { data: { items: inventory }, unavailable } = await fetchApiWithFallback<{ items: {
-    id: string; name: string; stock: number; status: string; active: boolean;
+    id: string; name: string; stock: number; committed: number; available: number; status: string; active: boolean;
     productionLots: { id: string; lotCode: string; mfgDate: string; expDate: string; receivedQty: number; availableQty: number; status: string; testReportUrl: string | null; receivingNote: string | null }[];
   }[] }>('/api/admin/inventory', { items: [] });
   return (

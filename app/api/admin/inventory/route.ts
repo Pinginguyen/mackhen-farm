@@ -12,21 +12,37 @@ export async function GET(request: Request) {
   const denied = await requireAdmin(request);
   if (denied) return denied;
   return withDatabase(async () => {
-    const items = await prisma.product.findMany({
-      select: {
-        id: true, name: true, category: true, price: true, unit: true, stock: true, active: true, image: true,
-        productionLots: { select: { id: true, lotCode: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
-    return NextResponse.json({ items: items.map((item) => ({
-      ...item,
-      status: item.stock < 10 ? 'LOW_STOCK' : 'ACTIVE',
-      productionLots: item.productionLots.map((lot) => ({
-        ...lot,
-        status: lot.expDate <= new Date() ? 'EXPIRED' : lot.availableQty < 10 && lot.status === 'ACTIVE' ? 'LOW_STOCK' : lot.status,
-      })),
-    })) });
+    const [items, committedRows] = await Promise.all([
+      prisma.product.findMany({
+        select: {
+          id: true, name: true, category: true, price: true, unit: true, stock: true, active: true, image: true,
+          variants: { select: { inventory: true } },
+          productionLots: { select: { id: true, lotCode: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.orderItem.groupBy({
+        by: ['productId'],
+        where: { order: { orderStatus: { in: ['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'] } } },
+        _sum: { quantity: true },
+      }),
+    ]);
+    const committedByProduct = new Map(committedRows.map((row) => [row.productId, row._sum.quantity ?? 0]));
+    return NextResponse.json({ items: items.map((item) => {
+      const stock = item.variants.length ? item.variants.reduce((total, variant) => total + variant.inventory, 0) : item.stock;
+      const committed = committedByProduct.get(item.id) ?? 0;
+      return {
+        ...item,
+        stock,
+        committed,
+        available: stock - committed,
+        status: stock < 10 ? 'LOW_STOCK' : 'ACTIVE',
+        productionLots: item.productionLots.map((lot) => ({
+          ...lot,
+          status: lot.expDate <= new Date() ? 'EXPIRED' : lot.availableQty < 10 && lot.status === 'ACTIVE' ? 'LOW_STOCK' : lot.status,
+        })),
+      };
+    }) });
   });
 }
 
