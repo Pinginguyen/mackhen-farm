@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag, unstable_cache } from 'next/cache';
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
@@ -9,15 +10,21 @@ import { writeAuditLog } from '@/lib/audit-log';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { Prisma } from '@prisma/client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
+
+const getCachedActiveProducts = unstable_cache(
+  () => prisma.product.findMany({
+    where: { active: true },
+    include: { variants: true },
+    orderBy: { createdAt: 'desc' },
+  }),
+  ['active-products'],
+  { revalidate: 60, tags: ['products'] },
+);
 
 export function GET() {
   return withDatabase(async () => {
-    const databaseProducts = await prisma.product.findMany({
-      where: { active: true },
-      include: { variants: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    const databaseProducts = await getCachedActiveProducts();
     const products = databaseProducts.length
       ? databaseProducts
       : DEFAULT_PRODUCTS.map((product) => ({ ...product, variants: [] }));
@@ -233,6 +240,7 @@ export async function POST(request: Request) {
       } satisfies Prisma.ProductCreateInput,
       ...(variants?.length ? { include: { variants: true } } : {}),
     });
+    revalidateTag('products');
     return NextResponse.json({ product }, { status: 201 });
   }, 'Admin product creation failed');
 }
@@ -318,6 +326,7 @@ export async function PATCH(request: Request) {
       oldValue: previous,
       newValue: { price: product.price, stock: product.stock, active: product.active },
     });
+    revalidateTag('products');
     return NextResponse.json({ product });
   }, 'Admin product update failed');
 }
@@ -339,6 +348,7 @@ export async function DELETE(request: Request) {
     if (!result.count) {
       return NextResponse.json({ success: false, message: 'Không tìm thấy sản phẩm cần xóa.' }, { status: 404 });
     }
+    revalidateTag('products');
     return NextResponse.json({ success: true, message: 'Đã xóa sản phẩm thành công.' });
   }, 'Admin product deletion failed');
 }

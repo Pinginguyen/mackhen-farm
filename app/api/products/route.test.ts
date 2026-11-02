@@ -13,6 +13,10 @@ const { productFindMany, productFindUnique, productCreate, productUpdate, produc
 vi.mock('@/lib/prisma', () => ({ prisma: { product: { findMany: productFindMany, findUnique: productFindUnique, create: productCreate, update: productUpdate, updateMany: productUpdateMany }, auditLog: { create: auditLogCreate } } }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
+vi.mock('next/cache', () => ({
+  unstable_cache: (callback: () => unknown) => callback,
+  revalidateTag: vi.fn(),
+}));
 
 import { DELETE, GET, PATCH, POST } from './route';
 

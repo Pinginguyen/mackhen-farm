@@ -38,7 +38,10 @@ if (datasourceUrl) {
 }
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient(
-  datasourceUrl ? { datasourceUrl: datasourceUrl.toString() } : undefined,
+  {
+    ...(datasourceUrl ? { datasourceUrl: datasourceUrl.toString() } : {}),
+    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+  },
 );
 
 globalForPrisma.prisma = prisma;
