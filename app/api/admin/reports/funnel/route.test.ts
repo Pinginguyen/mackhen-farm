@@ -23,22 +23,23 @@ describe('GET /api/admin/reports/funnel', () => {
     requireAdmin.mockReset().mockResolvedValue(null);
   });
 
-  it('returns uncached 30-day funnel metrics and calculated conversion rates', async () => {
+  it('returns real 30-day funnel metrics and calculated conversion rates', async () => {
     const response = await GET(new Request('https://mackhen.example/api/admin/reports/funnel'));
     const result = await response.json();
 
     expect(response.status).toBe(200);
     expect(result).toMatchObject({
       periodDays: 30,
-      productViews: 1000,
-      addToCart: 120,
-      checkoutStarts: 50,
-      paidOrders: 20,
-      addToCartRate: 12,
+      views: 1000,
+      cartAdds: 120,
+      checkouts: 50,
+      completed: 20,
+      cartRate: 12,
       cartToCheckoutRate: 41.67,
-      checkoutCompletionRate: 40,
-      overallConversionRate: 2,
+      checkoutRate: 40,
+      overallRate: 2,
       checkoutDropOffRate: 60,
+      usingFallback: false,
     });
     expect(funnelEventGroupBy).toHaveBeenCalledWith(expect.objectContaining({
       by: ['eventType'],
@@ -48,6 +49,34 @@ describe('GET /api/admin/reports/funnel', () => {
     expect(orderCount).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' } }),
     }));
+  });
+
+  it('returns estimated funnel counts when no traffic events have been recorded', async () => {
+    funnelEventGroupBy.mockResolvedValueOnce([]);
+    orderCount.mockResolvedValueOnce(4);
+
+    const response = await GET(new Request('https://mackhen.example/api/admin/reports/funnel'));
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result).toMatchObject({
+      views: 120,
+      cartAdds: 35,
+      checkouts: 12,
+      completed: 4,
+      usingFallback: true,
+    });
+  });
+
+  it('keeps the report available when the funnel-events table is not migrated yet', async () => {
+    funnelEventGroupBy.mockRejectedValueOnce(new Error('FunnelEvent table does not exist'));
+    orderCount.mockResolvedValueOnce(10);
+
+    const response = await GET(new Request('https://mackhen.example/api/admin/reports/funnel'));
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result).toMatchObject({ views: 250, cartAdds: 60, checkouts: 20, completed: 10, usingFallback: true });
   });
 
   it('returns the admin guard response without querying funnel data', async () => {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Download, FileText, Pencil, Printer, Search, X, Zap } from 'lucide-react';
 import { formatCurrency } from '@/lib/store-data';
+import { getAllowedNextStatuses } from '@/lib/order-workflow';
 
 export type AdminOrder = {
   id: string;
@@ -90,12 +91,6 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const currentPage = Math.min(page, pageCount);
   const pagedOrders = visibleOrders.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
 
-  function canSelectStatus(order: AdminOrder, status: string) {
-    if (['CANCELLED', 'RETURNED'].includes(order.status)) return status === order.status;
-    if (order.status === 'SHIPPING') return status === order.status || ['DELIVERED', 'RETURNED'].includes(status);
-    return true;
-  }
-
   const exportParams = new URLSearchParams({ format: 'csv' });
   if (search.trim()) exportParams.set('q', search.trim());
   if (statusTab !== 'ALL') exportParams.set('status', statusTab);
@@ -150,6 +145,10 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   }
 
   async function quickUpdate(order: AdminOrder, status: string, carrier?: string) {
+    if (!getAllowedNextStatuses(order.status).includes(status)) {
+      setToast(`Không thể chuyển đơn ${order.orderCode} từ ${order.status} sang ${status}.`);
+      return;
+    }
     setPending(order.orderCode);
     setToast('');
     try {
@@ -203,13 +202,14 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
       setToast('Nhập lý do trước khi xác nhận thanh toán thủ công.');
       return;
     }
+    const targetStatus = getAllowedNextStatuses(order.status).includes('PAID') ? 'PAID' : order.status;
     setPending(order.orderCode);
     setToast('');
     try {
       const response = await fetch('/api/admin/orders', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ orderCode: order.orderCode, status: order.status, paymentStatus: 'PAID', paymentReason: reason }),
+        body: JSON.stringify({ orderCode: order.orderCode, status: targetStatus, paymentStatus: 'PAID', paymentReason: reason }),
       });
       const result = await response.json() as { status?: string; paymentStatus?: string; error?: { message?: string } };
       if (!response.ok) {
@@ -324,7 +324,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-toolbar" onSubmit={(event) => save(event, order)}>
               <div className="admin-order-toolbar-controls grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.map(([value, label]) => <option key={value} value={value} disabled={value !== order.status && (!canSelectStatus(order, value) || value === 'PAID' || value === 'CANCELLED')}>{label}</option>)}</select></label>
+                <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.filter(([value]) => value === order.status || getAllowedNextStatuses(order.status).includes(value)).map(([value, label]) => <option key={value} value={value} disabled={value === 'PAID' || value === 'CANCELLED'}>{label}</option>)}</select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID" disabled={order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID'}>Đã thanh toán</option></select></label>
                 <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
                 <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} placeholder="Nhập mã vận đơn..." /></label>
@@ -336,8 +336,9 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 </div>
                 <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">
                   {['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(order.status) && <button type="button" className="admin-order-cancel-button" disabled={pending === order.orderCode} onClick={() => { setCancelReason('Khách đổi ý'); setCancellingOrder(order.orderCode); }}>Hủy đơn</button>}
-                  {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
-                  {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
+                  {order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID' && !['CANCELLED', 'RETURNED', 'DELIVERED', 'COMPLETED'].includes(order.status) && <button type="button" className="admin-order-manual-trigger" onClick={() => setManualPaymentOrder(order.orderCode)} disabled={pending === order.orderCode}>Duyệt thanh toán</button>}
+                  {order.status === 'PENDING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'CONFIRMED')}>Xác nhận đơn</button>}
+                  {['CONFIRMED', 'PAID'].includes(order.status) && (order.paymentMethod === 'COD' || order.paymentStatus === 'PAID') && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'PROCESSING')}>Duyệt đóng gói</button>}
                   {order.status === 'PROCESSING' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'HANDED_OFF', 'SPX')}>Bàn giao 3PL</button>}
                   {order.status === 'HANDED_OFF' && <button type="button" className="admin-order-quick-button" disabled={pending === order.orderCode} onClick={() => void quickUpdate(order, 'IN_TRANSIT')}>Đang giao</button>}
                   <button className="admin-order-save-button bg-[#9B2424] hover:bg-[#801b1b] text-white px-4 py-1.5 rounded-lg text-sm font-semibold" type="submit" disabled={pending === order.orderCode}>{pending === order.orderCode ? 'Đang lưu...' : 'Cập nhật đơn'}</button>

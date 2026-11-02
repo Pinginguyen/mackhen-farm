@@ -7,24 +7,12 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import type { Prisma } from '@prisma/client';
+import { allowedTransitions, orderStatuses } from '@/lib/order-workflow';
 
 export const dynamic = 'force-dynamic';
 
-const statuses = ['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'DELIVERED', 'COMPLETED', 'RETURNED', 'CANCELLED'] as const;
+const statuses = orderStatuses;
 const carriers = ['GHTK', 'SPX', 'VIETTEL_POST'] as const;
-const allowedTransitions = {
-  PENDING: ['CONFIRMED', 'PAID', 'CANCELLED'],
-  CONFIRMED: ['PAID', 'PROCESSING', 'CANCELLED'],
-  PAID: ['PROCESSING', 'CANCELLED'],
-  PROCESSING: ['HANDED_OFF', 'CANCELLED'],
-  HANDED_OFF: ['IN_TRANSIT', 'SHIPPING', 'RETURNED'],
-  IN_TRANSIT: ['SHIPPING', 'DELIVERED', 'RETURNED'],
-  SHIPPING: ['DELIVERED', 'RETURNED'],
-  DELIVERED: ['COMPLETED'],
-  COMPLETED: [],
-  RETURNED: [],
-  CANCELLED: [],
-} as const satisfies Record<(typeof statuses)[number], readonly (typeof statuses)[number][]>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
