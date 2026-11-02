@@ -8,7 +8,10 @@ export default async function Header() {
   let user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null = null;
   if (session) {
     try {
-      user = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, role: true } });
+      const authenticatedUser = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, role: true } });
+      if (authenticatedUser && (authenticatedUser.role === 'CUSTOMER' || authenticatedUser.role === 'ADMIN')) {
+        user = { name: authenticatedUser.name, role: authenticatedUser.role };
+      }
     } catch {
       user = null;
     }

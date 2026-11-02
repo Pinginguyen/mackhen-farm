@@ -1,8 +1,10 @@
 {
-    "chat.editor.preferCopilotHarness": false,
-    "chat.defaultToCopilotHarness": false,
-    "chat.agent.maxRequests": 9999,
-    "files.exclude": {
-        "**/node_modules": true
-    }
+  "chat.editor.preferCopilotHarness": false,
+  "chat.defaultToCopilotHarness": false,
+  "chat.agent.maxRequests": 9999,
+  "files.exclude": {
+    "**/node_modules": true
+  },
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.vendorPrefix": "ignore"
 }

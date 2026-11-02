@@ -37,6 +37,7 @@ enum VoucherDiscountType {
 enum UserRole {
   CUSTOMER
   ADMIN
+  AFFILIATE
 }
 
 enum CheckoutPaymentMethod {
@@ -60,6 +61,7 @@ model User {
   address   String?
   role      UserRole @default(CUSTOMER)
   orders    Order[]
+  affiliate Affiliate?
   reviewReplies ReviewReply[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -194,6 +196,46 @@ model Customer {
   updatedAt DateTime @updatedAt
 }
 
+model Affiliate {
+  id             String           @id @default(cuid())
+  userId         String           @unique
+  affiliateCode  String           @unique
+  commissionRate Int              @default(10)
+  bankAccount    String
+  active         Boolean          @default(true)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks         AffiliateClick[]
+  payouts        AffiliatePayout[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([active, createdAt])
+}
+
+model AffiliateClick {
+  id          String    @id @default(cuid())
+  affiliateId String
+  createdAt   DateTime  @default(now())
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  @@index([affiliateId, createdAt])
+}
+
+model AffiliatePayout {
+  id                  String    @id @default(cuid())
+  affiliateId         String
+  amount              Int
+  orderCount          Int
+  bankAccountSnapshot String
+  paymentReference    String?
+  paidBy              String
+  paidAt              DateTime  @default(now())
+  affiliate           Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Restrict)
+  orders              Order[]
+
+  @@index([affiliateId, paidAt])
+}
+
 enum ReturnRequestStatus {
   PENDING
   REPLACEMENT_APPROVED
@@ -223,6 +265,9 @@ model Order {
   discountAmount Float               @default(0)
   voucherCode   String?
   affiliateCode String?
+  affiliateCommissionRate Int?
+  affiliateCommissionPaidAt DateTime?
+  affiliatePayoutId String?
   totalAmount   Int                  @map("total")
   idempotencyKey String?              @unique
   lotCode       String?
@@ -243,6 +288,7 @@ model Order {
   refundOperations RefundOperation[]
   compensationVouchers CompensationVoucher[]
   reviews       Review[]
+  affiliatePayout AffiliatePayout? @relation(fields: [affiliatePayoutId], references: [id], onDelete: SetNull)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 

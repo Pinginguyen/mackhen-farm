@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardList, LayoutDashboard, Package, RotateCcw, Settings, Tag, Users, Wallet } from 'lucide-react';
+import { BarChart3, ClipboardList, Handshake, LayoutDashboard, Package, RotateCcw, Settings, Tag, Users, Wallet } from 'lucide-react';
 
 const groups = [
   { label: 'KINH DOANH', items: [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/orders', label: 'Đơn hàng', icon: ClipboardList },
+    { href: '/admin/affiliates', label: 'Đối tác KOC / Affiliate', icon: Handshake },
     { href: '/admin/returns', label: 'Đổi trả', icon: RotateCcw },
     { href: '/admin/reconciliation', label: 'Đối soát', icon: Wallet },
   ] },

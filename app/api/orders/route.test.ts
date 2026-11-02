@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
@@ -8,6 +8,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
     productionLotUpdateMany: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
     voucherFindUnique: vi.fn(), voucherUpdateMany: vi.fn(),
+    affiliateFindUnique: vi.fn(),
   };
   const tx = {
     cart: { findUnique: mocks.cartFindUnique },
@@ -19,6 +20,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
     productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
+    affiliate: { findUnique: mocks.affiliateFindUnique },
   };
   return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
@@ -58,6 +60,7 @@ describe('POST /api/orders checkout', () => {
         ? { id: 'voucher-freeship', code, discountType: 'FIXED', value: 35000, maxDiscount: null, minSpend: 250000, expiresAt: null, isActive: true, freeShipping: true, firstOrderOnly: false }
         : null));
     voucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    affiliateFindUnique.mockReset().mockResolvedValue(null);
     userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
     orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
@@ -83,6 +86,7 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('accepts the flat checkout contract and validates submitted line prices against the cart', async () => {
+    affiliateFindUnique.mockResolvedValueOnce({ affiliateCode: 'KOC_TAYBAC', commissionRate: 12, active: true });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
@@ -94,7 +98,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000, affiliateCode: 'KOC_TAYBAC' }),
+      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000, affiliateCode: 'KOC_TAYBAC', affiliateCommissionRate: 12 }),
     }));
   });
 

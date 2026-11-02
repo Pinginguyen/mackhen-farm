@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { normalizeAffiliateCode, storeAffiliateCode } from '@/lib/affiliate-attribution';
 
@@ -9,6 +9,7 @@ export default function AffiliateTracker() {
   const searchParams = useSearchParams();
   const ref = searchParams.get('ref');
   const [notice, setNotice] = useState('');
+  const trackedCode = useRef<string | null>(null);
 
   useEffect(() => {
     if (pathname.startsWith('/admin') || !ref) {
@@ -19,6 +20,16 @@ export default function AffiliateTracker() {
     if (!code || !storeAffiliateCode(code)) {
       setNotice('');
       return;
+    }
+
+    if (trackedCode.current !== code) {
+      trackedCode.current = code;
+      void fetch('/api/affiliate/click', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ affiliateCode: code }),
+        keepalive: true,
+      }).catch(() => undefined);
     }
 
     setNotice(code);

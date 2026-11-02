@@ -307,6 +307,10 @@ export async function POST(request: Request) {
         const customer = email
           ? await transaction.customer.upsert({ where: { email }, create: { name, email, phone, address }, update: { name, phone, address } })
           : await transaction.customer.create({ data: { name, phone, address } });
+        const affiliate = affiliateCode
+          ? await transaction.affiliate.findUnique({ where: { affiliateCode }, select: { affiliateCode: true, commissionRate: true, active: true } })
+          : null;
+        const attributedAffiliate = affiliate?.active ? affiliate : null;
         const numericCode = randomInt(100000, 1000000);
         const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
 
@@ -326,7 +330,8 @@ export async function POST(request: Request) {
             shippingFee: shipping,
             discountAmount: discount,
             voucherCode: voucherCode || null,
-            affiliateCode,
+            affiliateCode: attributedAffiliate?.affiliateCode ?? null,
+            affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
             grossAmount: subtotal,

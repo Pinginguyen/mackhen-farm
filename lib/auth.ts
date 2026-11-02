@@ -8,7 +8,7 @@ export type SessionPayload = {
   userId: string;
   name: string;
   email: string;
-  role: 'CUSTOMER' | 'ADMIN';
+  role: 'CUSTOMER' | 'ADMIN' | 'AFFILIATE';
   expiresAt: number;
 };
 
@@ -43,7 +43,7 @@ export function verifySessionToken(token?: string): SessionPayload | null {
 
   try {
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString()) as SessionPayload;
-    if (!session.userId || !session.email || !['CUSTOMER', 'ADMIN'].includes(session.role) || session.expiresAt <= Math.floor(Date.now() / 1000)) return null;
+    if (!session.userId || !session.email || !['CUSTOMER', 'ADMIN', 'AFFILIATE'].includes(session.role) || session.expiresAt <= Math.floor(Date.now() / 1000)) return null;
     return session;
   } catch {
     return null;
