@@ -78,7 +78,7 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: 'desc' },
     });
-    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, subtotal: order.subtotal, shippingFee: order.shippingFee, discountAmount: order.discountAmount, note: order.note, trackingCode: order.trackingCode, carrier: order.carrier, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ ...item, sku: item.product.slug })) }));
+    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, subtotal: order.subtotal, shippingFee: order.shippingFee, discountAmount: order.discountAmount, affiliateCode: order.affiliateCode, note: order.note, trackingCode: order.trackingCode, carrier: order.carrier, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ ...item, sku: item.product.slug })) }));
     if (params.get('format') === 'csv') {
       const escape = (value: string | number) => {
         const text = String(value);

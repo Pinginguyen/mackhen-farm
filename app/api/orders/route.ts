@@ -7,6 +7,7 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
 import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
+import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 
 type CheckoutItemSnapshot = {
   id?: string;
@@ -27,6 +28,7 @@ type CheckoutBody = {
   paymentMethod?: string;
   note?: string;
   voucherCode?: string;
+  affiliateCode?: unknown;
   buyNow?: boolean;
   items?: unknown;
   price?: unknown;
@@ -106,6 +108,12 @@ export async function POST(request: Request) {
   }
   if (!isRecord(payload)) return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
   const body = payload as CheckoutBody;
+  const affiliateCode = body.affiliateCode === undefined || body.affiliateCode === null || body.affiliateCode === ''
+    ? null
+    : normalizeAffiliateCode(body.affiliateCode);
+  if (body.affiliateCode !== undefined && body.affiliateCode !== null && body.affiliateCode !== '' && !affiliateCode) {
+    return NextResponse.json({ error: { code: 'INVALID_AFFILIATE_CODE', message: 'Mã giới thiệu không hợp lệ.' } }, { status: 400 });
+  }
   if (body.items === null || (Array.isArray(body.items) && body.items.length === 0)) {
     return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Đơn hàng không có sản phẩm.' } }, { status: 400 });
   }
@@ -318,6 +326,7 @@ export async function POST(request: Request) {
             shippingFee: shipping,
             discountAmount: discount,
             voucherCode: voucherCode || null,
+            affiliateCode,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
             grossAmount: subtotal,

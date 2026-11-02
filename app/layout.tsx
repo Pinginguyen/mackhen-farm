@@ -9,6 +9,8 @@ import ExitIntentPopup from '@/components/ExitIntentPopup';
 import { LocaleCurrencyProvider } from '@/lib/i18n-context';
 import { Toaster } from 'sonner';
 import { Be_Vietnam_Pro } from 'next/font/google';
+import { Suspense } from 'react';
+import AffiliateTracker from '@/components/marketing/AffiliateTracker';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -48,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Khôi phục đầy đủ Header, Footer và Bộ đổi tiền */}
         <LocaleCurrencyProvider>
           <div className="app-viewport overflow-x-clip">
+            <Suspense fallback={null}><AffiliateTracker /></Suspense>
             <SiteHeaderVisibility>
               <Header />
             </SiteHeaderVisibility>

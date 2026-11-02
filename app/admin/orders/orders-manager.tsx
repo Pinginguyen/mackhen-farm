@@ -16,6 +16,7 @@ export type AdminOrder = {
   paymentStatus: string;
   total: number;
   subtotal: number;
+  affiliateCode: string | null;
   shippingFee: number;
   discountAmount: number;
   note: string | null;
@@ -76,7 +77,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const visibleOrders = orderList.filter((order) => {
     const matchesTab = orderMatchesTab(order, statusTab);
     const query = search.trim().toLocaleLowerCase('vi');
-    const matchesSearch = !query || `${order.orderCode} ${order.customer} ${order.phone}`.toLocaleLowerCase('vi').includes(query);
+    const matchesSearch = !query || `${order.orderCode} ${order.customer} ${order.phone} ${order.affiliateCode ?? ''}`.toLocaleLowerCase('vi').includes(query);
     const orderDate = order.createdAt.slice(0, 10);
     return matchesTab
       && matchesSearch
@@ -282,7 +283,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 </div>
                 <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN')}</time>
               </div>
-              <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small></div>
+              <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small>{order.affiliateCode && <span className="affiliate-commission-badge">🤝 KOC: {order.affiliateCode} · Hoa hồng (10%): {formatCurrency(order.subtotal * 0.1)}</span>}</div>
             </header>
             {order.note?.trim() && <p className="admin-order-customer-note">Ghi chú của khách: {order.note}</p>}
             {order.paymentMethod === 'COD' && order.total >= 200000 && <p className="cod-risk-badge">Cần xác nhận qua điện thoại</p>}

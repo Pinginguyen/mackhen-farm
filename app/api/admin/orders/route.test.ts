@@ -33,6 +33,21 @@ describe('/api/admin/orders', () => {
     requireAdmin.mockReset().mockResolvedValue(null);
   });
 
+  it('returns affiliate attribution with the order for KOC commission reconciliation', async () => {
+    orderFindMany.mockResolvedValueOnce([{
+      id: 'order-1', orderCode: 'MKF-100001', customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau',
+      orderStatus: 'PENDING', paymentMethod: 'COD', paymentStatus: 'PENDING', totalAmount: 169000, subtotal: 169000,
+      shippingFee: 0, discountAmount: 0, affiliateCode: 'KOC_TAYBAC', note: null, trackingCode: null, carrier: null,
+      createdAt: new Date('2026-11-03T00:00:00.000Z'), warrantyRequest: null, returnRequests: [], items: [],
+    }]);
+
+    const response = await GET(new Request('https://mackhen.example/api/admin/orders'));
+    const result = await response.json() as { items: Array<{ affiliateCode: string; subtotal: number }> };
+
+    expect(response.status).toBe(200);
+    expect(result.items[0]).toMatchObject({ affiliateCode: 'KOC_TAYBAC', subtotal: 169000 });
+  });
+
   it('filters by order/customer/phone, pending state, payment, and date range', async () => {
     const response = await GET(new Request('https://mackhen.example/api/admin/orders?q=linh&status=PENDING&paymentMethod=COD&from=2026-10-01&to=2026-10-02'));
 

@@ -25,6 +25,7 @@ export default function PrivacyPolicyPage() {
           <p>Để tiếp nhận và giao đơn hàng, chúng tôi sử dụng họ tên người nhận, số điện thoại và địa chỉ giao hàng nhằm xác nhận đơn, liên hệ giao nhận và đối soát với đơn vị vận chuyển (3PL). Dữ liệu chỉ được dùng cho các mục đích cần thiết này và hỗ trợ sau bán hàng liên quan đến đơn.</p>
           <p>Nếu khách đăng ký tài khoản, hệ thống cần email và mật khẩu để xác thực; mật khẩu được lưu dưới dạng mã băm, không lưu dưới dạng văn bản gốc. Dữ liệu giao dịch có thể được lưu trong phạm vi cần thiết để xử lý thanh toán, kế toán, giải quyết khiếu nại và tuân thủ nghĩa vụ pháp lý.</p>
           <p>Để tổng hợp hiệu quả mua sắm, hệ thống ghi nhận sự kiện lượt xem sản phẩm, thêm giỏ và bắt đầu checkout cùng một mã phiên ngẫu nhiên lưu trong sessionStorage của tab hiện tại. Các sự kiện này không gửi họ tên, số điện thoại hoặc địa chỉ đến API thống kê.</p>
+          <p>Khi khách truy cập liên kết có mã giới thiệu, mã affiliate được lưu trong localStorage tối đa 30 ngày và gắn với đơn hàng phát sinh để ghi nhận nguồn giới thiệu, đối soát hoa hồng; mã này không chứa thông tin liên hệ của khách.</p>
         </section>
 
         <section aria-labelledby="privacy-security">

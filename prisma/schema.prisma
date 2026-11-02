@@ -222,6 +222,7 @@ model Order {
   shippingFee   Float                @map("shipping")
   discountAmount Float               @default(0)
   voucherCode   String?
+  affiliateCode String?
   totalAmount   Int                  @map("total")
   idempotencyKey String?              @unique
   lotCode       String?
@@ -249,6 +250,7 @@ model Order {
   @@index([customerId, createdAt])
   @@index([userId, createdAt])
   @@index([phone, createdAt])
+  @@index([affiliateCode, createdAt])
 }
 
 model OrderItem {

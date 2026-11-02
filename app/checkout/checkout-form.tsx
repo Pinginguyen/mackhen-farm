@@ -13,6 +13,7 @@ import VietnamAddressFields from './vietnam-address-fields';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { formatApproxVnd } from '@/lib/translations';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
+import { getStoredAffiliateCode } from '@/lib/affiliate-attribution';
 
 type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number };
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
@@ -237,6 +238,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         paymentMethod,
         note: form.get('notes'),
         voucherCode: appliedVoucher,
+        affiliateCode: getStoredAffiliateCode(),
         items: checkoutItems.map((item) => ({
           id: item.id,
           productId: item.productId,

@@ -87,15 +87,27 @@ describe('POST /api/orders checkout', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
       body: JSON.stringify({
-        customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', paymentMethod: 'COD', discountCode: '',
+        customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', paymentMethod: 'COD', discountCode: '', affiliateCode: 'koc_taybac',
         items: [{ id: 'cart-item-1', productId: 'spice-1', productSlug: 'hat-doi-rung-nep-thuong-hang', variantId: null, quantity: 1, price: 169000 }],
       }),
     }));
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000 }),
+      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000, affiliateCode: 'KOC_TAYBAC' }),
     }));
+  });
+
+  it('rejects malformed affiliate codes before creating an order', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', paymentMethod: 'COD', affiliateCode: '<script>' }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_AFFILIATE_CODE');
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('applies GIAM10 to the merchandise subtotal for a new authenticated member', async () => {
