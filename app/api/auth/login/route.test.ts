@@ -108,6 +108,23 @@ describe('POST /api/auth/login', () => {
     expect(verifySessionToken(sessionToken)?.role).toBe('CUSTOMER');
   });
 
+  it('keeps the AFFILIATE role in the login response and session', async () => {
+    findUnique.mockResolvedValue({
+      id: 'affiliate-user-1',
+      name: 'KOC Partner',
+      email: 'koc@example.com',
+      role: 'AFFILIATE',
+      password: 'stored-hash',
+    });
+
+    const response = await POST(login('koc@example.com', 'KocPass123'));
+    const sessionToken = response.headers.get('set-cookie')?.match(/mkf_session=([^;]+)/)?.[1];
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ user: { role: 'AFFILIATE' } });
+    expect(verifySessionToken(sessionToken)?.role).toBe('AFFILIATE');
+  });
+
   it('accepts NEXTAUTH_SECRET when AUTH_SECRET is not set', async () => {
     delete process.env.AUTH_SECRET;
     process.env.NEXTAUTH_SECRET = secret;
