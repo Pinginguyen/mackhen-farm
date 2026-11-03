@@ -71,6 +71,14 @@ export default function VietQrPaymentDetails({
             paymentMethod="VIETQR"
             isLocalOnly={isLocalOnly}
           />
+          <button
+            type="button"
+            data-testid="print-receipt"
+            onClick={() => window.print()}
+            className="w-full flex items-center justify-center gap-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 py-2.5 px-4 rounded-xl text-sm font-semibold transition mt-3"
+          >
+            <span>In hóa đơn / Lưu PDF</span>
+          </button>
         </div>
       </PaymentStatusPoller>
     </>
