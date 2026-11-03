@@ -211,6 +211,22 @@ describe('/api/returns', () => {
     }
   });
 
+  it('returns an empty list when the return listing query fails', async () => {
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    returnFindMany.mockRejectedValueOnce(new Error('Database connection unavailable'));
+
+    try {
+      const response = await GET(makeRequest('GET'));
+      const result = await response.json() as { items: unknown[] };
+
+      expect(response.status).toBe(200);
+      expect(result.items).toEqual([]);
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('return list query failed'), expect.any(Error));
+    } finally {
+      logError.mockRestore();
+    }
+  });
+
   it('falls back to the request list and logs a missing issued-voucher column', async () => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestItem = { id: 'return-1', riskTag: null, createdAt: new Date(), order: { orderCode: 'MKF-123456', customerName: 'Nguyễn An', totalAmount: 169000 } };

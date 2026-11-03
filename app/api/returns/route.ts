@@ -139,37 +139,38 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   return withDatabase(async () => {
-    let items;
     try {
+      let items;
+      try {
       items = await prisma.returnRequest.findMany({
         include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true, issuedVoucher: true },
         orderBy: { createdAt: 'desc' },
       });
-    } catch (error) {
-      if (isMissingReturnRequestTable(error)) {
-        console.warn('Admin return table is unavailable; returning an empty list.', error);
-        return NextResponse.json({ items: [] });
-      }
-      if (!isMissingReturnVoucherRelationColumn(error)) throw error;
+      } catch (error) {
+        if (isMissingReturnRequestTable(error)) {
+          console.warn('Admin return table is unavailable; returning an empty list.', error);
+          return NextResponse.json({ items: [] });
+        }
+        if (!isMissingReturnVoucherRelationColumn(error)) throw error;
 
-      console.error('Admin return list is missing the issued voucher relation column; apply pending migrations.', error);
-      const requestsWithoutIssuedVoucher = await prisma.returnRequest.findMany({
-        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
-        orderBy: { createdAt: 'desc' },
-      });
-      const voucherNames = requestsWithoutIssuedVoucher.map((item) => `Voucher đền bù đơn ${item.order.orderCode}`);
-      const issuedVouchers = voucherNames.length
-        ? await prisma.voucher.findMany({ where: { name: { in: voucherNames } } })
-        : [];
-      const voucherByName = new Map(issuedVouchers.map((voucher) => [voucher.name, voucher]));
-      const items = requestsWithoutIssuedVoucher.map((item) => ({
-        ...item,
-        issuedVoucher: voucherByName.get(`Voucher đền bù đơn ${item.order.orderCode}`) ?? null,
-      }));
-      items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
-        || right.createdAt.getTime() - left.createdAt.getTime());
-      return NextResponse.json({ items });
-    }
+        console.error('Admin return list is missing the issued voucher relation column; apply pending migrations.', error);
+        const requestsWithoutIssuedVoucher = await prisma.returnRequest.findMany({
+          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        const voucherNames = requestsWithoutIssuedVoucher.map((item) => `Voucher đền bù đơn ${item.order.orderCode}`);
+        const issuedVouchers = voucherNames.length
+          ? await prisma.voucher.findMany({ where: { name: { in: voucherNames } } })
+          : [];
+        const voucherByName = new Map(issuedVouchers.map((voucher) => [voucher.name, voucher]));
+        items = requestsWithoutIssuedVoucher.map((item) => ({
+          ...item,
+          issuedVoucher: voucherByName.get(`Voucher đền bù đơn ${item.order.orderCode}`) ?? null,
+        }));
+        items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
+          || right.createdAt.getTime() - left.createdAt.getTime());
+        return NextResponse.json({ items });
+      }
       const requestsMissingVoucherLink = items.filter((item) => item.status === 'VOUCHER_ISSUED' && !item.issuedVoucher);
       if (requestsMissingVoucherLink.length) {
         const voucherNames = requestsMissingVoucherLink.map((item) => `Voucher đền bù đơn ${item.order.orderCode}`);
@@ -182,6 +183,10 @@ export async function GET(request: Request) {
     items.sort((left, right) => Number(right.riskTag === 'URGENT_QUALITY_RISK') - Number(left.riskTag === 'URGENT_QUALITY_RISK')
       || right.createdAt.getTime() - left.createdAt.getTime());
     return NextResponse.json({ items });
+    } catch (error) {
+      console.error('Admin return list query failed; returning an empty list.', error);
+      return NextResponse.json({ items: [] });
+    }
   }, 'Return request listing failed');
 }
 

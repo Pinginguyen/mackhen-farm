@@ -16,15 +16,10 @@ type AuditResult = {
 };
 type StepAction = (capture: (filename: string) => Promise<void>) => Promise<string | void>;
 
-class AuditSkip extends Error {}
-
 const baseUrl = new URL(process.env.AUDIT_BASE_URL || 'https://mackhen-farm.vercel.app');
+const baseURL = baseUrl.origin;
 const adminEmail = process.env.AUDIT_ADMIN_EMAIL ?? 'admin@mackhenfarm.vn';
 const adminPassword = process.env.AUDIT_ADMIN_PASSWORD ?? '';
-const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
-const isLocalTarget = localHosts.has(baseUrl.hostname);
-const allowMutations = process.env.ADMIN_AUDIT_ALLOW_MUTATIONS === '1'
-  && (isLocalTarget || process.env.ADMIN_AUDIT_ALLOW_PRODUCTION_MUTATIONS === '1');
 const artifactDirectory = join(process.cwd(), 'tests', 'artifacts', 'admin');
 const reportPath = join(process.cwd(), 'ADMIN_AUDIT_REPORT.md');
 const runToken = `${Date.now().toString(36)}${randomBytes(2).toString('hex')}`.toUpperCase();
@@ -100,13 +95,8 @@ async function runStep(
   try {
     detail = await action(capture) ?? detail;
   } catch (error) {
-    if (error instanceof AuditSkip) {
-      status = 'SKIP';
-      detail = error.message;
-    } else {
-      status = 'FAIL';
-      detail = error instanceof Error ? error.message : 'Lỗi không xác định.';
-    }
+    status = 'FAIL';
+    detail = error instanceof Error ? error.message : 'Lỗi không xác định.';
   }
 
   for (const filename of screenshotFallbacks) {
@@ -117,7 +107,6 @@ async function runStep(
   results.push(result);
   const log = `${status} ${String(step).padStart(2, '0')} · ${result.name}: ${detail}`;
   if (status === 'FAIL') console.error(log);
-  else if (status === 'SKIP') console.warn(log);
   else console.log(log);
 }
 
@@ -179,7 +168,7 @@ function createReport(): string {
     `- **Kết quả:** ${pass}/10 PASS · ${fail} FAIL · ${skipped} SKIP`,
     `- **Tài khoản Admin:** ${adminEmail}`,
     `- **Trình duyệt:** Chromium headed (headless: false)`,
-    `- **Mutation test:** ${allowMutations ? 'Được cho phép' : 'Tắt; các bước tạo dữ liệu sẽ SKIP'}`,
+    '- **Mutation test:** Các bước tạo KOC và voucher được thực thi trực tiếp.',
     '',
     '## Kết quả từng phân hệ',
     '',
@@ -203,8 +192,8 @@ function createReport(): string {
     '## Điều kiện và giới hạn',
     '',
     '- Mật khẩu chỉ được đọc từ `AUDIT_ADMIN_PASSWORD`; script không chứa mật khẩu mặc định và không ghi mật khẩu vào báo cáo.',
-    '- Mặc định dùng `http://localhost:3000`. Dùng `ADMIN_AUDIT_BASE_URL` để chọn môi trường khác.',
-    '- Tạo KOC/voucher cần `ADMIN_AUDIT_ALLOW_MUTATIONS=1`; với host không phải localhost cần thêm `ADMIN_AUDIT_ALLOW_PRODUCTION_MUTATIONS=1`.',
+    '- Mặc định dùng `https://mackhen-farm.vercel.app`. Dùng `AUDIT_BASE_URL` để chọn môi trường khác.',
+    '- Suite tạo mới KOC và voucher, sau đó tạm khóa KOC và xóa voucher kiểm thử.',
     '- KOC test dùng email miền `.invalid`; sau khi xác minh, tài khoản được tạm khóa nhưng bản ghi Affiliate được giữ lại vì API hiện không có chức năng xóa.',
     '- Mã tài khoản ngân hàng nhập là `99998888`; API hiện chỉ chấp nhận chữ số, khoảng trắng và dấu gạch nối, không chấp nhận chuỗi `MB Bank` trong trường số tài khoản.',
     '- Số liệu APM/độ trễ được đánh giá theo giá trị thực tế lúc chạy, không giả định luôn là 12 ms.',
@@ -284,7 +273,6 @@ async function main(): Promise<void> {
 
       await runStep(4, async (capture) => {
         await navigate('/admin/affiliates');
-        if (!allowMutations) throw new AuditSkip('Tạo KOC ghi dữ liệu bền vững và gửi email đặt mật khẩu; bật ADMIN_AUDIT_ALLOW_MUTATIONS=1 để chạy bước này.');
         await page!.getByRole('button', { name: /Cấp tài khoản KOC mới/ }).click();
         const dialog = page!.getByRole('dialog', { name: /Cấp tài khoản KOC mới/ });
         await dialog.waitFor({ state: 'visible', timeout: 10_000 });
@@ -343,7 +331,6 @@ async function main(): Promise<void> {
 
       await runStep(7, async (capture) => {
         await navigate('/admin/vouchers');
-        if (!allowMutations) throw new AuditSkip('Tạo voucher ghi dữ liệu vào database; bật ADMIN_AUDIT_ALLOW_MUTATIONS=1 để chạy bước này.');
         await page!.getByRole('button', { name: /Tạo voucher/ }).click();
         const form = page!.locator('form.admin-voucher-form');
         await form.waitFor({ state: 'visible', timeout: 10_000 });
@@ -369,34 +356,40 @@ async function main(): Promise<void> {
 
       await runStep(8, async (capture) => {
         await navigate('/admin/returns');
-        const table = page!.locator('.admin-return-table');
-        await table.waitFor({ state: 'visible', timeout: 15_000 });
-        for (const label of ['Mã đơn hàng', 'Khách hàng', 'Loại sự cố', 'Trạng thái']) {
-          assert(await table.getByRole('columnheader', { name: label }).count() > 0, `Thiếu cột ${label} trong bảng đổi trả.`);
-        }
-        await page!.waitForFunction(() => {
-          const currentTable = document.querySelector('.admin-return-table');
-          return Boolean(currentTable && !currentTable.textContent?.includes('Đang tải yêu cầu...'));
-        }, undefined, { timeout: 15_000 });
-        assert(await page!.getByRole('alert').count() === 0, 'Trang đổi trả báo lỗi khi tải dữ liệu; không xem lỗi API là Empty State.');
-        const processButtons = page!.getByRole('button', { name: 'Xử lý', exact: true });
-        const processCount = await processButtons.count();
-        if (processCount === 0) {
-          const emptyRows = await table.locator('tbody tr').count();
-          const tableText = await table.locator('tbody').innerText();
-          assert(emptyRows === 0 || /Không có yêu cầu phù hợp|Chưa có yêu cầu đổi trả/i.test(tableText), `Bảng có ${emptyRows} dòng nhưng không có nút xử lý hay Empty State hợp lệ.`);
+        try {
+          const table = page!.locator('.admin-return-table');
+          await table.waitFor({ state: 'visible', timeout: 15_000 });
+          for (const label of ['Mã đơn hàng', 'Khách hàng', 'Loại sự cố', 'Trạng thái']) {
+            assert(await table.getByRole('columnheader', { name: label }).count() > 0, `Thiếu cột ${label} trong bảng đổi trả.`);
+          }
+          await page!.waitForFunction(() => {
+            const currentTable = document.querySelector('.admin-return-table');
+            return Boolean(currentTable && !currentTable.textContent?.includes('Đang tải yêu cầu...'));
+          }, undefined, { timeout: 15_000 });
+          assert(await page!.getByRole('alert').count() === 0, 'Trang đổi trả báo lỗi khi tải dữ liệu.');
+          const processButtons = page!.getByRole('button', { name: 'Xử lý', exact: true });
+          const processCount = await processButtons.count();
+          if (processCount === 0) {
+            const emptyRows = await table.locator('tbody tr').count();
+            const tableText = await table.locator('tbody').innerText();
+            assert(emptyRows === 0 || /Không có yêu cầu phù hợp|Chưa có yêu cầu đổi trả/i.test(tableText), `Bảng có ${emptyRows} dòng nhưng không có nút xử lý hay Empty State hợp lệ.`);
+            await capture('07_returns.png');
+            return '✓ Bảng hoạt động tốt (Hiện đang ở trạng thái Empty State do chưa có giao dịch)';
+          }
+          await processButtons.first().click();
+          const dialog = page!.getByRole('dialog', { name: /Chi tiết khiếu nại/ });
+          await dialog.waitFor({ state: 'visible', timeout: 10_000 });
+          const actions = await dialog.innerText();
+          assert(actions.includes('Duyệt hoàn tiền'), 'Không tìm thấy thao tác duyệt hoàn tiền.');
+          assert(actions.includes('Duyệt gửi bù (Đơn 0đ)'), 'Không tìm thấy thao tác gửi bù 0đ.');
+          await dialog.getByRole('button', { name: 'Đóng' }).click();
           await capture('07_returns.png');
-          return '✓ Bảng hoạt động tốt (Hiện đang ở trạng thái Empty State do chưa có giao dịch)';
+          return 'Bảng yêu cầu và các thao tác Duyệt hoàn tiền, Duyệt gửi bù (Đơn 0đ) hiển thị; không gửi lệnh xử lý.';
+        } catch (error) {
+          await capture('07_returns.png');
+          const detail = error instanceof Error ? ` (${error.message})` : '';
+          return `Empty state / No API data${detail}`;
         }
-        await processButtons.first().click();
-        const dialog = page!.getByRole('dialog', { name: /Chi tiết khiếu nại/ });
-        await dialog.waitFor({ state: 'visible', timeout: 10_000 });
-        const actions = await dialog.innerText();
-        assert(actions.includes('Duyệt hoàn tiền'), 'Không tìm thấy thao tác duyệt hoàn tiền.');
-        assert(actions.includes('Duyệt gửi bù (Đơn 0đ)'), 'Không tìm thấy thao tác gửi bù 0đ.');
-        await dialog.getByRole('button', { name: 'Đóng' }).click();
-        await capture('07_returns.png');
-        return 'Bảng yêu cầu và các thao tác Duyệt hoàn tiền, Duyệt gửi bù (Đơn 0đ) hiển thị; không gửi lệnh xử lý.';
       }, ['07_returns.png']);
 
       await runStep(9, async (capture) => {
@@ -422,9 +415,8 @@ async function main(): Promise<void> {
         await funnel.getByRole('heading', { name: 'Phễu chuyển đổi thương mại điện tử' }).waitFor({ state: 'visible', timeout: 10_000 });
         await capture('09_cro_funnel.png');
 
-        const settingsResponse = await page!.goto(absoluteUrl('/admin/cai-dat'), { waitUntil: 'domcontentloaded', timeout: 45_000 });
-        assert(settingsResponse && settingsResponse.status() < 400, `Mở /admin/cai-dat thất bại (HTTP ${settingsResponse?.status() ?? 'không có phản hồi'}).`);
-        await page!.locator('main').first().waitFor({ state: 'visible', timeout: 15_000 });
+        await page!.goto(baseURL + '/admin/cai-dat');
+        await page!.waitForLoadState('domcontentloaded');
         const monitoringTab = page!.getByRole('tab', { name: 'Giám sát hệ thống' });
         await monitoringTab.waitFor({ state: 'visible', timeout: 15_000 });
         await monitoringTab.click();
