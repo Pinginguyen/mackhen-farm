@@ -20,7 +20,7 @@ type AffiliateSummary = {
   commissionDueOrders: number;
 };
 
-const emptyDraft = { name: '', email: '', affiliateCode: '', commissionRate: '10', bankAccount: '' };
+const emptyDraft = { name: '', email: '', password: '', affiliateCode: '', commissionRate: '10', bankAccount: '' };
 
 export default function AffiliateManager() {
   const [affiliates, setAffiliates] = useState<AffiliateSummary[]>([]);
@@ -61,13 +61,11 @@ export default function AffiliateManager() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ ...draft, affiliateCode: draft.affiliateCode.toUpperCase().trim(), commissionRate: Number(draft.commissionRate) }),
       });
-      const result = await response.json() as { emailSent?: boolean; error?: { message?: string } };
+      const result = await response.json() as { error?: { message?: string } };
       if (!response.ok) throw new Error(result.error?.message ?? 'Không thể cấp tài khoản KOC.');
       setShowCreate(false);
       setDraft(emptyDraft);
-      setMessage(result.emailSent
-        ? 'Đã cấp tài khoản và gửi email đặt mật khẩu ban đầu cho KOC.'
-        : 'Đã cấp tài khoản nhưng email chưa gửi được. Kiểm tra cấu hình SMTP; KOC có thể thử chức năng Quên mật khẩu sau khi email hoạt động.');
+      setMessage('Đã cấp tài khoản KOC. Hãy gửi mật khẩu cho KOC qua kênh an toàn.');
       await loadAffiliates();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Không thể cấp tài khoản KOC.');
@@ -154,6 +152,7 @@ export default function AffiliateManager() {
           <form className="affiliate-form" onSubmit={createAffiliate}>
             <label>Tên KOC<input required maxLength={100} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
             <label>Email đăng nhập<input required type="email" autoComplete="email" value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} /></label>
+            <label>Mật khẩu đăng nhập<input required type="password" autoComplete="new-password" minLength={6} maxLength={128} value={draft.password} onChange={(event) => setDraft((current) => ({ ...current, password: event.target.value }))} /></label>
             <label>Mã định danh<input required maxLength={64} pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="TUTRINH_FOOD" value={draft.affiliateCode} onChange={(event) => setDraft((current) => ({ ...current, affiliateCode: event.target.value.toUpperCase() }))} /></label>
             <label>Tỷ lệ hoa hồng<select value={draft.commissionRate} onChange={(event) => setDraft((current) => ({ ...current, commissionRate: event.target.value }))}>{[10, 11, 12, 13, 14, 15].map((rate) => <option key={rate} value={rate}>{rate}%</option>)}</select></label>
             <label className="affiliate-form-wide">Số tài khoản ngân hàng<input required inputMode="numeric" maxLength={34} value={draft.bankAccount} onChange={(event) => setDraft((current) => ({ ...current, bankAccount: event.target.value }))} /></label>

@@ -278,6 +278,7 @@ async function main(): Promise<void> {
         await dialog.waitFor({ state: 'visible', timeout: 10_000 });
         await dialog.getByLabel('Tên KOC').fill('Tú Trinh Review Tây Bắc');
         await dialog.getByLabel('Email đăng nhập').fill(affiliateEmail);
+        await dialog.getByLabel('Mật khẩu đăng nhập').fill('AdminKocTest-2026');
         await dialog.getByLabel('Mã định danh').fill(affiliateCode);
         await dialog.getByLabel('Tỷ lệ hoa hồng').selectOption('10');
         await dialog.getByLabel('Số tài khoản ngân hàng').fill('99998888');
