@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Handshake, Plus, Wallet, X } from 'lucide-react';
+import { Check, Handshake, Plus, Trash2, Wallet, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/store-data';
 
 type AffiliateSummary = {
@@ -30,6 +30,7 @@ export default function AffiliateManager() {
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [draft, setDraft] = useState(emptyDraft);
+  const [deletingAffiliateId, setDeletingAffiliateId] = useState<string | null>(null);
   const [payingAffiliate, setPayingAffiliate] = useState<AffiliateSummary | null>(null);
   const [paymentReference, setPaymentReference] = useState('');
 
@@ -91,6 +92,24 @@ export default function AffiliateManager() {
     }
   }
 
+  async function deleteAffiliate(affiliate: AffiliateSummary) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa vĩnh viễn KOC này không? Hành động này không thể hoàn tác.')) return;
+    setDeletingAffiliateId(affiliate.id);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(`/api/admin/affiliates/${encodeURIComponent(affiliate.id)}`, { method: 'DELETE' });
+      const result = await response.json() as { message?: string; error?: { message?: string } };
+      if (!response.ok) throw new Error(result.message ?? result.error?.message ?? 'Không thể xóa tài khoản KOC.');
+      setMessage(result.message ?? `Đã xóa KOC ${affiliate.affiliateCode} thành công.`);
+      await loadAffiliates();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không thể xóa tài khoản KOC.');
+    } finally {
+      setDeletingAffiliateId(null);
+    }
+  }
+
   async function settleCommission(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!payingAffiliate) return;
@@ -137,7 +156,10 @@ export default function AffiliateManager() {
               <td><span className={`affiliate-status ${affiliate.active ? 'is-active' : 'is-suspended'}`}>{affiliate.active ? 'Đang hoạt động' : 'Tạm khóa'}</span></td>
               <td><div className="affiliate-row-actions">
                 <button className="affiliate-settle-button" type="button" disabled={!affiliate.commissionDue} onClick={() => setPayingAffiliate(affiliate)}><Wallet size={15} /> Đối soát &amp; Thanh toán</button>
-                <button className="affiliate-toggle-button" type="button" onClick={() => void toggleAffiliate(affiliate)}>{affiliate.active ? 'Tạm khóa' : 'Kích hoạt'}</button>
+                <div className="affiliate-admin-actions">
+                  <button className="affiliate-toggle-button" type="button" disabled={deletingAffiliateId === affiliate.id} onClick={() => void toggleAffiliate(affiliate)}>{affiliate.active ? 'Tạm khóa' : 'Kích hoạt'}</button>
+                  <button className="affiliate-delete-button" type="button" disabled={deletingAffiliateId === affiliate.id} onClick={() => void deleteAffiliate(affiliate)} aria-label={`Xóa KOC ${affiliate.affiliateCode}`}><Trash2 size={15} />{deletingAffiliateId === affiliate.id ? 'Đang xóa...' : 'Xóa'}</button>
+                </div>
               </div></td>
             </tr>)}
             {!loading && !affiliates.length && <tr><td className="affiliate-empty-cell" colSpan={8}>Chưa có đối tác KOC.</td></tr>}

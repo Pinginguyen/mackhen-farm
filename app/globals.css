@@ -1518,6 +1518,10 @@ textarea {
 .affiliate-settle-button,.affiliate-toggle-button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #8c3d12; font-size: 0.74rem; font-weight: 750; cursor: pointer; }
 .affiliate-settle-button:disabled { color: #a8a29e; cursor: not-allowed; }
 .affiliate-toggle-button { color: #6b6258; }
+.affiliate-admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.affiliate-delete-button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: #dc2626; font-size: 0.74rem; font-weight: 750; cursor: pointer; }
+.affiliate-delete-button:hover { color: #991b1b; }
+.affiliate-delete-button:disabled,.affiliate-toggle-button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .affiliate-modal-backdrop { position: fixed; z-index: 1500; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(31, 25, 20, 0.48); }
 .affiliate-modal { width: min(620px, 100%); max-height: min(88vh, 780px); overflow: auto; padding: 22px; border: 1px solid #e8e2d9; border-radius: 8px; background: #fdfbf7; box-shadow: 0 24px 80px rgba(34, 24, 18, 0.22); }
