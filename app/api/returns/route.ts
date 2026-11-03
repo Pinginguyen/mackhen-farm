@@ -39,6 +39,14 @@ function isMissingReturnVoucherRelationColumn(error: unknown): boolean {
     && error.meta.column.includes('returnRequestId');
 }
 
+function isMissingReturnRequestTable(error: unknown): boolean {
+  return isRecord(error)
+    && error.code === 'P2021'
+    && isRecord(error.meta)
+    && typeof error.meta.table === 'string'
+    && /return.?request|refund/i.test(error.meta.table);
+}
+
 function normalizePhone(value: string): string {
   const digits = value.replace(/\D/g, '');
   if (digits.startsWith('0084')) return `0${digits.slice(4)}`;
@@ -138,6 +146,10 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' },
       });
     } catch (error) {
+      if (isMissingReturnRequestTable(error)) {
+        console.warn('Admin return table is unavailable; returning an empty list.', error);
+        return NextResponse.json({ items: [] });
+      }
       if (!isMissingReturnVoucherRelationColumn(error)) throw error;
 
       console.error('Admin return list is missing the issued voucher relation column; apply pending migrations.', error);

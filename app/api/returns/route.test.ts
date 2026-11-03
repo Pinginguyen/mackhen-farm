@@ -195,6 +195,22 @@ describe('/api/returns', () => {
     });
   });
 
+  it('returns an empty list when the return-request table is missing', async () => {
+    const logWarning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    returnFindMany.mockRejectedValueOnce({ code: 'P2021', meta: { table: 'public.ReturnRequest' } });
+
+    try {
+      const response = await GET(makeRequest('GET'));
+      const result = await response.json() as { items: unknown[] };
+
+      expect(response.status).toBe(200);
+      expect(result.items).toEqual([]);
+      expect(logWarning).toHaveBeenCalledWith(expect.stringContaining('return table is unavailable'), expect.objectContaining({ code: 'P2021' }));
+    } finally {
+      logWarning.mockRestore();
+    }
+  });
+
   it('falls back to the request list and logs a missing issued-voucher column', async () => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const requestItem = { id: 'return-1', riskTag: null, createdAt: new Date(), order: { orderCode: 'MKF-123456', customerName: 'Nguyễn An', totalAmount: 169000 } };
