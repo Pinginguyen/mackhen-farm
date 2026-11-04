@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 import { exportDocuments } from '@/lib/b2b-export-documents';
+import ContainerFreightCalculator from '@/components/b2b/ContainerFreightCalculator';
 
 const successNotice = 'Yêu cầu đã được ghi nhận. Quản lý phát triển thị trường sẽ liên hệ với bạn qua Email trong 24h.';
 const emailNotice = 'Yêu cầu đã được lưu, nhưng email thông báo quản trị chưa gửi được. Vui lòng thử lại sau.';
@@ -79,6 +80,8 @@ export default function B2BPartnershipPage() {
           ))}
         </div>
       </section>
+
+      <div className="b2b-shell b2b-freight-section"><ContainerFreightCalculator /></div>
 
       <section className="b2b-inquiry-band" id="partner-inquiry">
         <div className="b2b-shell b2b-inquiry-grid">

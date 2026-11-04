@@ -6,6 +6,7 @@ import LogoutButton from '@/app/logout-button';
 import LiveProductSearch from './LiveProductSearch';
 import CartLink from './CartLink';
 import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
+import HearthModeToggle from './HearthModeToggle';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
@@ -34,6 +35,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
         <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
         <CartLink />
         <LocaleCurrencySwitcher />
+        <HearthModeToggle />
         {!user ? (
           <>
             <Link className="mobile-account-trigger" href="/dang-nhap" aria-label={t('login')}><UserRound size={19} /></Link>

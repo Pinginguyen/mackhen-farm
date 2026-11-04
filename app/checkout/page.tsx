@@ -9,6 +9,7 @@ import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import CheckoutOrderSummary from './checkout-order-summary';
 import CroEventTracker from '@/components/CroEventTracker';
+import TasteGuarantee from '@/components/checkout/TasteGuarantee';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
@@ -45,6 +46,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
             <CheckoutHeading />
           </div>
         </div>
+
+        <TasteGuarantee />
 
         {buyNow && <BuyNowCartRecovery items={cartItems} />}
         <div className={`checkout-layout${cartUnavailable || cartItems.length === 0 ? ' is-empty' : ''}`}>

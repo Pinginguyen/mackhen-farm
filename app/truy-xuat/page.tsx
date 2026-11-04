@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CheckCircle2, Cog, Flame, Leaf, LoaderCircle, Search, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Cog, Flame, FlaskConical, Leaf, LoaderCircle, MapPin, Search, ShieldCheck } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
 
@@ -103,7 +103,7 @@ export default function TraceabilityPage() {
         <div className="traceability-shell">
           <div className="traceability-journey-heading">
             <div><p className="traceability-kicker">SUPPLIER → BATCH → FINISHED GOODS</p><h2 id="traceability-journey-title">{text('Hành trình chuỗi cung ứng')}</h2></div>
-            {batch && <div className="traceability-compliance"><CheckCircle2 size={17} aria-hidden="true" /><span>{text('Đã kiểm định ATTP & Lưu hành hợp pháp')}</span></div>}
+            {batch && <div className="traceability-compliance"><CheckCircle2 size={17} aria-hidden="true" /><span>{text('Hộ chiếu số · Hồ sơ lô hàng')}</span></div>}
           </div>
           {batch ? <>
             <section className="traceability-product" aria-label={text('Thông tin sản phẩm')}>
@@ -114,6 +114,23 @@ export default function TraceabilityPage() {
                 {batch.packaging && <div><dt>{text('Quy cách')}</dt><dd>{text(batch.packaging)}</dd></div>}
                 {batch.ingredients && <div><dt>{text('Thành phần')}</dt><dd>{text(batch.ingredients)}</dd></div>}
               </dl>
+            </section>
+            <section className="dpp-passport" aria-labelledby="dpp-passport-title">
+              <header className="dpp-passport-heading"><div><p className="traceability-kicker">DIGITAL PRODUCT PASSPORT</p><h3 id="dpp-passport-title">{isEN ? 'Upcycled food supply passport' : 'Hộ chiếu số chuỗi cung ứng Upcycled Food'}</h3></div><span>{batch.batchCode}</span></header>
+              <p className="dpp-disclosure" role="note">{isEN ? 'Supplier-provided profile information. Coordinates and lab indicators below are not independently verified or linked to an uploaded certificate for this batch.' : 'Thông tin hồ sơ do đơn vị cung cấp. Tọa độ và chỉ tiêu kiểm nghiệm dưới đây chưa được xác minh độc lập hoặc liên kết với chứng thư tải lên cho mã lô này.'}</p>
+              <div className="dpp-section-title"><MapPin size={17} aria-hidden="true" /><h4>{isEN ? 'Geo-supply nodes' : 'Các nút chuỗi cung ứng'}</h4></div>
+              <ol className="dpp-supply-nodes">
+                <li><span>01</span><div><strong>{isEN ? 'Fresh soy pulp collection' : 'Thu gom bã đậu nành tươi'}</strong><p>{isEN ? 'Soy milk facility, Tien Son Industrial Park, Bac Ninh (ISO 22000 status is supplier-reported).' : 'Nhà máy sữa đậu nành, KCN Tiên Sơn, Bắc Ninh (thông tin ISO 22000 do đơn vị cung cấp).'}</p><small>21.012°N, 106.015°E</small></div></li>
+                <li><span>02</span><div><strong>{isEN ? 'Native mac khen and doi seed region' : 'Vùng nguyên liệu Mắc Khén & Hạt Dổi bản địa'}</strong><p>{isEN ? 'Hua Tat village, Van Ho, Son La.' : 'Bản Hua Tạt, Vân Hồ, Sơn La.'}</p><small>20.738°N, 104.912°E</small></div></li>
+                <li><span>03</span><div><strong>{isEN ? 'Low-temperature drying' : 'Sấy thăng hoa nhiệt độ thấp'}</strong><p>{isEN ? 'Reported process: 60°C; moisture target reduced from 80% to below 7.5%. Verify against the batch process record.' : 'Quy trình được cung cấp: 60°C; độ ẩm mục tiêu giảm từ 80% xuống dưới 7,5%. Cần đối chiếu hồ sơ sản xuất của lô.'}</p></div></li>
+              </ol>
+              <div className="dpp-section-title"><FlaskConical size={17} aria-hidden="true" /><h4>{isEN ? 'Food safety indicators' : 'Chỉ số an toàn thực phẩm'}</h4></div>
+              <p className="dpp-lab-disclosure">{isEN ? 'Reported test results; the NIFTT laboratory report and batch-specific certificate are not attached.' : 'Kết quả được cung cấp; chưa đính kèm phiếu thử nghiệm NIFTT và chứng thư gắn mã lô.'}</p>
+              <div className="dpp-lab-table-wrap"><table className="dpp-lab-table"><thead><tr><th>{isEN ? 'Indicator' : 'Chỉ tiêu'}</th><th>{isEN ? 'Reported result' : 'Kết quả được cung cấp'}</th><th>{isEN ? 'Reference' : 'Tham chiếu'}</th></tr></thead><tbody>
+                <tr><th>Salmonella</th><td>{isEN ? 'Negative' : 'Âm tính'}</td><td>{isEN ? 'Certificate not attached' : 'Chưa đính kèm chứng thư'}</td></tr>
+                <tr><th>E. coli</th><td>&lt; 10 CFU/g</td><td>QCVN 8-2:2011/BYT</td></tr>
+                <tr><th>{isEN ? 'Aflatoxin / mould' : 'Aflatoxin / Nấm mốc'}</th><td>{isEN ? 'Not detected' : 'Không phát hiện'}</td><td>{isEN ? 'Certificate not attached' : 'Chưa đính kèm chứng thư'}</td></tr>
+              </tbody></table></div>
             </section>
             <div className="traceability-timeline-wrap">
               <span className="traceability-timeline-line animate-in fade-in duration-500 fill-mode-both" aria-hidden="true" />

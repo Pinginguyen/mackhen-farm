@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
+import SoundEffect from '@/components/common/SoundEffect';
 
 export default function SiteFooter() {
   const pathname = usePathname();
@@ -42,6 +43,7 @@ export default function SiteFooter() {
         </section>
       </div>
       <div className="site-footer-bottom">{text('© 2026 Mắc Khén Farm. Dự án bài tập lớn Thương mại điện tử - ĐH Giao thông Vận tải (UTH).')}</div>
+      <div className="site-footer-sound-control"><SoundEffect /></div>
     </footer>
   );
 }

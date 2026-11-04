@@ -10,6 +10,7 @@ import { recordCroEvent } from '@/components/CroEventTracker';
 import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import StickyQuickBuyBar from '@/components/product/StickyQuickBuyBar';
+import { playClickSound } from '@/components/common/SoundEffect';
 
 function animateFlyToCart(image: string, origin: DOMRect) {
   const cart = document.querySelector<HTMLElement>('.header-cart');
@@ -99,6 +100,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
 
   async function addItem(buyNow = false, origin?: DOMRect) {
     if (saving) return;
+    playClickSound();
     setMessage('');
     setSaving(true);
     const selectedVariant = variants.find((variant) => variant.id === variantId);

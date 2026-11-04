@@ -11,6 +11,7 @@ import LocalizedProductName from './localized-product-name';
 import CroEventTracker from '@/components/CroEventTracker';
 import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
+import NutriGradeBadge from '@/components/product/NutriGradeBadge';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -144,6 +145,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
                 </table>
                 </div>
               </section>}
+              <NutriGradeBadge />
               {product.ingredients?.trim() && <section className="product-info-block !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Thành phần &amp; nguồn gốc nguyên liệu</h2>
                 <p className="whitespace-pre-line">{product.ingredients.trim()}</p>
