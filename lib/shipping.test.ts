@@ -8,7 +8,7 @@ describe('calculateShipping', () => {
   });
 
   it('waives shipping at the free-shipping threshold', () => {
-    expect(calculateShipping(169000, ['mac-khen-xe-soi-cay-nong'])).toBe(0);
+    expect(calculateShipping(250000, ['mac-khen-xe-soi-cay-nong'])).toBe(0);
   });
 
   it('waives shipping for the combo regardless of subtotal', () => {

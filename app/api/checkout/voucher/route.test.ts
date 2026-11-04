@@ -58,7 +58,7 @@ describe('POST /api/checkout/voucher', () => {
     const response = await POST(request('GIAM10', memberCookie()));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ code: 'GIAM10', discount: 16900, subtotal: 169000, shipping: 0 });
+    expect(await response.json()).toMatchObject({ code: 'GIAM10', discount: 16900, subtotal: 169000, shipping: 35000 });
     expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member', orderStatus: { not: 'CANCELLED' } } });
   });
 

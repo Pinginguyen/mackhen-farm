@@ -11,7 +11,7 @@ const jerkyProfile: SensoryProfile = {
   metrics: [
     { icon: '🌶️', labelVi: 'Độ cay', labelEn: 'Spiciness', value: 3 },
     { icon: '🥩', labelVi: 'Độ dai giòn', labelEn: 'Texture', value: 4 },
-    { icon: '🌿', labelVi: 'Hương Mắc Khén', labelEn: 'Aroma', value: 4 },
+    { icon: '🌿', labelVi: 'Hương Mắc Khén', labelEn: 'Aroma', value: 5 },
   ],
 };
 

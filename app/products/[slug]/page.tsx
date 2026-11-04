@@ -10,6 +10,7 @@ import ProductHighlights from '@/components/ProductHighlights';
 import LocalizedProductName from './localized-product-name';
 import CroEventTracker from '@/components/CroEventTracker';
 import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
+import TasteGuarantee from '@/components/checkout/TasteGuarantee';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import NutriGradeBadge from '@/components/product/NutriGradeBadge';
 
@@ -182,6 +183,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             </div>
 
             <ProductHighlights highlights={product.highlights} />
+            <TasteGuarantee />
             <FlavorPairingGuide products={pairingProducts} />
           </div>
         </div>

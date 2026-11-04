@@ -7,6 +7,7 @@ import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
 type CartVariant = { id: string; label: string; price: number; weight: string; stock: number };
+type UpsellProduct = { id: string; slug: string; name: string; image: string; price: number; stock: number };
 type CartItem = {
   id: string;
   productId: string;
@@ -24,10 +25,12 @@ type CartItem = {
 type CartSnapshot = { items: CartItem[]; subtotal: number; shipping: number; total: number };
 
 const emptyCart: CartSnapshot = { items: [], subtotal: 0, shipping: 0, total: 0 };
+const UPSELL_SLUG = 'muoi-cham-cheo-hat-doi-rang-kho';
 
 export default function CartDrawer() {
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartSnapshot>(emptyCart);
+  const [upsellProduct, setUpsellProduct] = useState<UpsellProduct | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingItem, setPendingItem] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -51,6 +54,17 @@ export default function CartDrawer() {
     }
   }
 
+  async function loadUpsellProduct() {
+    try {
+      const response = await fetch(`/api/products/${UPSELL_SLUG}`, { cache: 'no-store' });
+      if (!response.ok) return setUpsellProduct(null);
+      const result = await response.json() as { product?: UpsellProduct };
+      setUpsellProduct(result.product ?? null);
+    } catch {
+      setUpsellProduct(null);
+    }
+  }
+
   useEffect(() => {
     const openDrawer = () => setOpen(true);
     window.addEventListener('mackhen:cart-drawer-open', openDrawer);
@@ -64,6 +78,7 @@ export default function CartDrawer() {
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', closeOnEscape);
     void loadCart();
+    void loadUpsellProduct();
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', closeOnEscape);
@@ -88,6 +103,30 @@ export default function CartDrawer() {
       setPendingItem(null);
     }
   }
+
+  async function addUpsell() {
+    if (!upsellProduct || pendingItem) return;
+    setPendingItem('upsell');
+    setMessage('');
+    try {
+      const response = await fetch('/api/cart/items', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId: upsellProduct.slug, quantity: 1 }),
+      });
+      const result = await response.json() as { error?: { message?: string }; cartCount?: number };
+      if (!response.ok) throw new Error(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
+      await loadCart();
+      window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
+      setMessage(isEN ? 'Chẳm chéo added to your cart.' : 'Đã thêm Muối Chẳm Chéo vào giỏ hàng.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : (isEN ? 'Cart update failed.' : 'Không thể thêm sản phẩm vào giỏ.'));
+    } finally {
+      setPendingItem(null);
+    }
+  }
+
+  const hasChamCheo = cart.items.some((item) => /cham.?cheo/i.test(`${item.productSlug} ${item.name}`));
 
   if (!open) return null;
 
@@ -118,11 +157,16 @@ export default function CartDrawer() {
               </div>
             </article>;
           }) : <div className="cart-drawer-empty"><ShoppingBag size={28} /><p>{isEN ? 'Your cart is empty.' : 'Giỏ hàng đang trống.'}</p><Link href="/products" onClick={() => setOpen(false)}>{isEN ? 'Explore products' : 'Khám phá sản phẩm'}</Link></div>}
+          {!hasChamCheo && upsellProduct && upsellProduct.stock > 0 && <section className="cart-drawer-upsell">
+            <div className="cart-drawer-upsell-image"><img src={upsellProduct.image} alt="" width={56} height={56} /></div>
+            <div className="cart-drawer-upsell-copy"><p>{isEN ? 'A Northwest favorite' : 'MÓN NHẮM GỢI Ý'}</p><strong>{isEN ? 'Plant jerky loves chẳm chéo.' : 'Ăn khô bò phải chấm chẳm chéo!'}</strong><span>{translateProductName(upsellProduct.name)} · {formatCurrency(upsellProduct.price)}</span></div>
+            <button type="button" onClick={() => void addUpsell()} disabled={pendingItem !== null} aria-label={isEN ? 'Add chẳm chéo to cart' : 'Thêm Muối Chẳm Chéo vào giỏ'}>{pendingItem === 'upsell' ? '…' : '+ Thêm'}</button>
+          </section>}
         </div>
         {message && <p className="cart-drawer-message" role="status">{message}</p>}
         {cart.items.length > 0 && <footer className="cart-drawer-footer">
           <div className="cart-drawer-subtotal"><span>{isEN ? 'Subtotal' : 'Tạm tính'}</span><strong>{formatCurrency(cart.subtotal)}</strong></div>
-          <Link className="cart-drawer-checkout" href="/checkout" onClick={() => setOpen(false)}>{isEN ? 'Proceed to Checkout' : 'Tiến hành Thanh toán'}</Link>
+          <Link className="cart-drawer-checkout" href="/checkout" onClick={() => setOpen(false)}>{isEN ? 'Proceed to Checkout' : 'Thanh toán'}</Link>
           <Link className="cart-drawer-full-cart" href="/cart" onClick={() => setOpen(false)}>{isEN ? 'View full cart' : 'Xem giỏ hàng đầy đủ'}</Link>
         </footer>}
       </aside>

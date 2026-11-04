@@ -9,10 +9,10 @@ function MarqueeContent({ messages, duplicate = false }: { messages: MarqueeMess
   return (
     <span className="marquee-content" aria-hidden={duplicate}>
       {messages.map((message) => (
-        <span className="marquee-item text-[#FDFBF7] text-xs md:text-sm font-medium tracking-widest" key={message.text}>
-          <span className="marquee-separator text-amber-300 text-xs mx-4" aria-hidden="true">✦</span>
+        <span className="marquee-item text-[#FAF7F2] text-xs md:text-sm font-medium tracking-widest" key={message.text}>
+          <span className="marquee-separator text-[#D4A373] text-xs mx-4" aria-hidden="true">✦</span>
           {message.href
-            ? <Link className="transition-colors hover:text-amber-200 hover:underline" href={message.href} tabIndex={duplicate ? -1 : undefined}>{message.text}</Link>
+            ? <Link className="transition-colors hover:text-[#D4A373] hover:underline" href={message.href} tabIndex={duplicate ? -1 : undefined}>{message.text}</Link>
             : <span>{message.text}</span>}
         </span>
       ))}
@@ -41,7 +41,7 @@ export default function MarqueeBanner() {
 
   return (
     <div
-      className="home-marquee w-full overflow-hidden bg-gradient-to-r from-[#7A1C1C] via-[#9B2424] to-[#7A1C1C] !py-2.5 shadow-md"
+      className="home-marquee w-full overflow-hidden bg-gradient-to-r from-[#142820] via-[#841E1E] to-[#142820] !py-2.5 shadow-md"
       style={{
         maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
         WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',

@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
 
-import ProductRating from '@/components/ProductRating';
-import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
+import ProductCard from '@/components/ProductCard';
 import type { NutritionFacts } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
@@ -37,7 +34,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_50' | '50_100' | 'OVER_150'>('ALL');
   const [proteinOnly, setProteinOnly] = useState(false);
   const [query, setQuery] = useState(initialQuery);
-  const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
+  const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
   useEffect(() => setQuery(initialQuery), [initialQuery]);
   const plantProducts = products.filter((product) => product.category !== 'Gia vị Tây Bắc');
@@ -74,45 +71,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
         </div>
       </>}
       <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
-        {visibleProducts.map((product, index) => (
-          <article key={product.id} className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-[0_12px_32px_rgba(155,36,36,0.08)] transition-all duration-300 hover:!shadow-[0_20px_40px_rgba(155,36,36,0.14)] hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
-            <div className="image-box group !overflow-hidden !rounded-xl">
-              <img className="transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={translateProductName(product.name)} />
-              <div className="product-badges">
-                {product.stock === 0 && <span className="product-badge out-of-stock-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text('Tạm hết hàng')}</span>}
-                {product.protein != null && <span className="product-badge nutrition-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.protein)} Protein</span>}
-                {product.badge?.trim() && <span className="product-highlight-badge !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.badge)}</span>}
-                <span className="product-badge !min-h-0 !px-2.5 !py-0.5 !rounded-full !border !border-stone-200/70 !text-[11px] !font-semibold !tracking-wide">{text(product.highlight)}</span>
-              </div>
-            </div>
-            <div className="card-body">
-              <div className="product-card-header">
-                <div className="meta-row"><span>{text(product.category)} • {text(product.unit ?? 'Khối lượng chưa cập nhật')}</span></div>
-                <ProductRating rating={product.rating} showValue={false} size="sm" />
-              </div>
-              <h4 className="product-name"><Link href={`/products/${product.slug}`}>{translateProductName(product.name)}</Link></h4>
-              <div className="product-artisan-chips" aria-label={locale === 'en' ? 'Product qualities' : 'Đặc tính sản phẩm'}>
-                {product.category !== 'Gia vị Tây Bắc' && <span>🌿 {locale === 'en' ? 'Upcycled Soy' : 'Đậu nành upcycled'}</span>}
-                {Number(product.protein?.match(/\d+(?:\.\d+)?/)?.[0] ?? 0) >= 20 && <span>💪 {locale === 'en' ? 'High-Protein' : 'Giàu đạm'}</span>}
-                {product.category !== 'Gia vị Tây Bắc' && <span>🍃 0% Cholesterol</span>}
-              </div>
-              <TasteSensoryMeter name={product.name} slug={product.slug} compact />
-              <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{text(product.description)}</p>
-              <div className="product-card-pricing">
-                <div className="product-prices"><strong className="!text-[#9B2424]">{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div>
-              </div>
-              <Link
-                href={`/products/${product.slug}`}
-                aria-disabled={product.stock === 0}
-                tabIndex={product.stock === 0 ? -1 : undefined}
-                onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
-                className={`product-card-action !rounded-xl !bg-[#9B2424] !text-white !shadow-xs transition-all duration-300 hover:!bg-[#831D1D] hover:!shadow-sm${product.stock === 0 ? ' is-out-of-stock' : ''}`}
-              >
-                {product.stock === 0 ? text('Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
-              </Link>
-            </div>
-          </article>
-        ))}
+        {visibleProducts.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}
         {!visibleProducts.length && <p className="empty-state">{text('Danh mục hiện chưa có sản phẩm.')}</p>}
       </div>
     </>

@@ -98,7 +98,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 0, grossAmount: 169000, netAmount: 169000, affiliateCode: 'KOC_TAYBAC', affiliateCommissionRate: 12 }),
+      data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 35000, grossAmount: 169000, netAmount: 204000, affiliateCode: 'KOC_TAYBAC', affiliateCommissionRate: 12 }),
     }));
   });
 
@@ -128,7 +128,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ subtotal: 169000, discountAmount: 16900, totalAmount: 152100 }),
+      data: expect.objectContaining({ subtotal: 169000, shippingFee: 35000, discountAmount: 16900, totalAmount: 187100 }),
     }));
     expect(orderCount).toHaveBeenCalledWith({ where: { userId: 'new-member', orderStatus: { not: 'CANCELLED' } } });
   });
@@ -146,7 +146,7 @@ describe('POST /api/orders checkout', () => {
     }));
 
     expect(response.status).toBe(201);
-    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ voucherCode: 'BANMOI', discountAmount: 25000, totalAmount: 144000 }) }));
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ voucherCode: 'BANMOI', discountAmount: 25000, totalAmount: 179000 }) }));
     expect(voucherUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'voucher-ban-moi', isActive: true }), data: { usedCount: { increment: 1 } } }));
   });
 
@@ -235,7 +235,7 @@ describe('POST /api/orders checkout', () => {
       where: { id: 'voucher-1', customerPhone: '0762793244', redeemedAt: null, expiresAt: { gt: expect.any(Date) } },
     }));
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ discountAmount: 84500, totalAmount: 84500 }),
+      data: expect.objectContaining({ discountAmount: 84500, totalAmount: 119500 }),
     }));
   });
 
@@ -299,7 +299,7 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        idempotencyKey: 'checkout-attempt-001', grossAmount: 169000, netAmount: 169000, reconciled: false,
+        idempotencyKey: 'checkout-attempt-001', grossAmount: 169000, netAmount: 204000, reconciled: false,
         holdExpiresAt: expect.any(Date),
       }),
     }));
@@ -454,7 +454,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ subtotal: 169000, totalAmount: 169000, items: { create: [expect.objectContaining({ price: 169000, lineTotal: 169000, productName: 'Hạt Dổi' })] } }),
+      data: expect.objectContaining({ subtotal: 169000, shippingFee: 35000, totalAmount: 204000, items: { create: [expect.objectContaining({ price: 169000, lineTotal: 169000, productName: 'Hạt Dổi' })] } }),
     }));
   });
 

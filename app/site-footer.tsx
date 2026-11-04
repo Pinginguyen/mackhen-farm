@@ -44,9 +44,23 @@ export default function SiteFooter() {
           <p>Hotline: <a href="tel:+84762793244">0762.793.244</a> · Email: <a href="mailto:contact@mackhenfarm.vn">contact@mackhenfarm.vn</a></p>
           <p>{text('Công khai thông tin người bán theo Nghị định 52/2013/NĐ-CP và Nghị định 85/2021/NĐ-CP.')}</p>
           <p>{text('Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
-          <a className="moit-notice-badge" href="https://online.gov.vn/" target="_blank" rel="noopener noreferrer" aria-label="Đã thông báo Bộ Công Thương, tra cứu trên cổng online.gov.vn">
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16 2.5 27 7v8.1c0 7.1-4.6 12.1-11 14.4C9.6 27.2 5 22.2 5 15.1V7l11-4.5Z" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m10.5 15.8 3.6 3.5 7.4-7.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"/></svg>
-            <span><strong>ĐÃ THÔNG BÁO</strong><small>BỘ CÔNG THƯƠNG</small></span>
+          <a
+            href="http://online.gov.vn"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-2.5 bg-white border border-blue-200 px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all group"
+            title="Website đã thông báo với Bộ Công Thương"
+          >
+            <div className="w-7 h-7 flex-shrink-0 bg-blue-50 text-[#005BA6] rounded-lg flex items-center justify-center border border-blue-100">
+              <svg className="w-4 h-4 text-[#005BA6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#005BA6] leading-tight">ĐÃ THÔNG BÁO</span>
+              <span className="text-[9px] uppercase tracking-tight font-bold text-red-600 leading-tight">BỘ CÔNG THƯƠNG</span>
+            </div>
           </a>
         </section>
       </div>

@@ -14,7 +14,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
-    <header className="topbar site-header fixed top-0 left-0 right-0 w-full z-50 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-gray-200/60 shadow-sm transition-all duration-300 !py-2">
+    <header className="topbar site-header fixed top-0 left-0 right-0 w-full z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm transition-all duration-300 !py-2">
       <Link className="brand-wrap" href="/">
         <span className="brand-badge">M</span>
         <span>
@@ -44,7 +44,7 @@ export default function HeaderContent({ user }: { user: { name: string; role: 'C
           </>
         ) : (
           <>
-            {user.role === 'ADMIN' && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#9B2424] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#831D1D]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
+            {user.role === 'ADMIN' && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#841E1E] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#6F1717]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
             <details className="account-menu">
               <summary className="!h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white" aria-label={`${locale === 'en' ? 'Account' : 'Tài khoản'} ${user.name}`} title={user.name}>
                 <span className="account-avatar !h-9 !w-9 !rounded-lg !text-stone-700" aria-hidden="true">{initials || 'MK'}</span>

@@ -3,8 +3,8 @@ import { getSensoryProfile } from './sensory-profile';
 
 describe('getSensoryProfile', () => {
   it('assigns the jerky profile by product name or slug', () => {
-    expect(getSensoryProfile('Mắc Khén Xé Sợi Cay Nồng')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 4]);
-    expect(getSensoryProfile('Khác', 'mac-khen-chay-toi-gion-cay')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 4]);
+    expect(getSensoryProfile('Mắc Khén Xé Sợi Cay Nồng')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 5]);
+    expect(getSensoryProfile('Khác', 'mac-khen-chay-toi-gion-cay')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 5]);
   });
 
   it('assigns forest seed and cham cheo salt profiles', () => {
