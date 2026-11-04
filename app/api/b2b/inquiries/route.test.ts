@@ -59,7 +59,7 @@ describe('POST /api/b2b/inquiries', () => {
     sendB2bInquiryEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
 
     const response = await POST(request(inquiryPayload));
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, id: 'inquiry-1', emailSent: false });
     expect(createInquiry).toHaveBeenCalledOnce();
   });

@@ -101,14 +101,18 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   async function save(event: React.FormEvent<HTMLFormElement>, order: AdminOrder) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const selectedStatus = String(form.get('status') ?? order.status);
+    const selectedPaymentStatus = String(form.get('paymentStatus') ?? order.paymentStatus);
+    const selectedCarrier = String(form.get('carrier') ?? '');
+    const trackingInput = String(form.get('trackingCode') ?? '');
     setPending(order.orderCode);
     setToast('');
     try {
-      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: form.get('status'), paymentStatus: form.get('paymentStatus'), carrier: form.get('carrier'), trackingCode: form.get('trackingCode') }) });
+      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: selectedStatus, paymentStatus: selectedPaymentStatus, carrier: selectedCarrier, trackingCode: trackingInput }) });
       const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
       else {
-        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? String(form.get('status')), paymentStatus: result.paymentStatus ?? String(form.get('paymentStatus')), carrier: result.carrier ?? (String(form.get('carrier') || '') || null), trackingCode: result.trackingCode ?? (String(form.get('trackingCode') || '') || null) } : item));
+        setOrderList((current) => current.map((item) => item.orderCode === order.orderCode ? { ...item, status: result.status ?? selectedStatus, paymentStatus: result.paymentStatus ?? selectedPaymentStatus, carrier: result.carrier ?? (selectedCarrier || null), trackingCode: result.trackingCode ?? (trackingInput || null) } : item));
         setToast(`Đã cập nhật đơn ${order.orderCode}.`);
       }
     } catch {

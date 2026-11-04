@@ -13,6 +13,16 @@ export const dynamic = 'force-dynamic';
 
 const statuses = orderStatuses;
 const carriers = ['GHTK', 'SPX', 'VIETTEL_POST'] as const;
+const statusLabels: Record<string, (typeof statuses)[number]> = {
+  'Đã xác nhận': 'CONFIRMED',
+  'Đã thanh toán': 'PAID',
+  'Đang đóng gói phòng sạch': 'PROCESSING',
+  'Đang giao hàng': 'SHIPPING',
+  'Giao thành công': 'DELIVERED',
+  'Hoàn tất': 'COMPLETED',
+  'Đã hủy': 'CANCELLED',
+  'Hoàn hàng': 'RETURNED',
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -89,14 +99,18 @@ export async function PATCH(request: Request) {
     const body = payload as { orderCode?: unknown; status?: unknown; paymentStatus?: unknown; carrier?: unknown; trackingCode?: unknown; phone?: unknown; address?: unknown; paymentReason?: unknown; cancelReason?: unknown };
     const orderCode = typeof body.orderCode === 'string' ? body.orderCode.trim().toUpperCase() : '';
     const hasStatus = body.status !== undefined;
+    const statusValue = typeof body.status === 'string' ? body.status.trim() : '';
+    const normalizedStatus = statusLabels[statusValue] ?? statusValue;
+    const carrierValue = typeof body.carrier === 'string' ? body.carrier.trim() : body.carrier;
+    const normalizedCarrier = typeof carrierValue === 'string' && carrierValue.toUpperCase() === 'SPX EXPRESS' ? 'SPX' : carrierValue;
     const normalizedPhone = typeof body.phone === 'string' ? body.phone.replace(/\D/g, '') : '';
     const address = typeof body.address === 'string' ? body.address.trim() : '';
     const paymentReason = typeof body.paymentReason === 'string' ? body.paymentReason.trim() : '';
     const cancelReason = typeof body.cancelReason === 'string' ? body.cancelReason.trim() : '';
-    if (!/^MKF-\d{6}$/.test(orderCode) || (hasStatus && (typeof body.status !== 'string' || !statuses.includes(body.status as (typeof statuses)[number])))
-      || (!hasStatus && body.paymentStatus === undefined && body.phone === undefined && body.address === undefined)
+    if (!/^MKF-\d{6}$/.test(orderCode) || (hasStatus && !statuses.includes(normalizedStatus as (typeof statuses)[number]))
+      || (!hasStatus && body.paymentStatus === undefined && body.phone === undefined && body.address === undefined && body.carrier === undefined && body.trackingCode === undefined)
       || (body.paymentStatus !== undefined && body.paymentStatus !== 'PENDING' && body.paymentStatus !== 'PAID')
-      || (body.carrier !== undefined && body.carrier !== null && typeof body.carrier !== 'string')
+      || (normalizedCarrier !== undefined && normalizedCarrier !== null && typeof normalizedCarrier !== 'string')
       || (body.trackingCode !== undefined && typeof body.trackingCode !== 'string')
       || (typeof body.trackingCode === 'string' && body.trackingCode.length > 160)
       || (body.phone !== undefined && !/^0[35789]\d{8}$/.test(normalizedPhone))
@@ -107,12 +121,12 @@ export async function PATCH(request: Request) {
     if (body.cancelReason !== undefined && (typeof body.cancelReason !== 'string' || cancelReason.length > 500)) {
       return NextResponse.json({ error: { message: 'Chọn lý do hủy đơn hợp lệ.' } }, { status: 400 });
     }
-    const requestedStatus = hasStatus ? body.status as (typeof statuses)[number] : undefined;
-    if (body.carrier && !carriers.includes(body.carrier as (typeof carriers)[number])) {
+    const requestedStatus = hasStatus ? normalizedStatus as (typeof statuses)[number] : undefined;
+    if (normalizedCarrier && !carriers.includes(normalizedCarrier as (typeof carriers)[number])) {
       return NextResponse.json({ error: { message: 'Đơn vị vận chuyển không hợp lệ.' } }, { status: 400 });
     }
     let trackingCode = body.trackingCode?.trim() || '';
-    if (requestedStatus === 'HANDED_OFF' && body.carrier === 'SPX' && !trackingCode) {
+    if (requestedStatus === 'HANDED_OFF' && normalizedCarrier === 'SPX' && !trackingCode) {
       trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
@@ -123,7 +137,7 @@ export async function PATCH(request: Request) {
       if (requestedStatus && requestedStatus !== currentOrder.orderStatus && !nextStatuses.includes(requestedStatus)) {
         return NextResponse.json({ error: { message: 'Chuyển trạng thái không hợp lệ.' } }, { status: 409 });
       }
-      if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (!(body.carrier || currentOrder.carrier) || !(trackingCode || currentOrder.trackingCode))) {
+      if (targetStatus !== currentOrder.orderStatus && ['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (!(normalizedCarrier || currentOrder.carrier) || !(trackingCode || currentOrder.trackingCode))) {
         return NextResponse.json({ error: { message: 'Nhập hãng vận chuyển và mã vận đơn trước khi bàn giao.' } }, { status: 400 });
       }
       const updatesRecipient = body.phone !== undefined || body.address !== undefined;
@@ -137,21 +151,21 @@ export async function PATCH(request: Request) {
       if (['CANCELLED', 'RETURNED'].includes(currentOrder.orderStatus) && targetStatus !== currentOrder.orderStatus) {
         return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc chuyển hoàn là trạng thái cuối, không thể tiếp tục xử lý.' } }, { status: 409 });
       }
-      if (targetStatus === 'CANCELLED' && !['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(currentOrder.orderStatus)) {
+      if (targetStatus === 'CANCELLED' && targetStatus !== currentOrder.orderStatus && !['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'].includes(currentOrder.orderStatus)) {
         return NextResponse.json({ error: { message: 'Không thể hủy đơn sau khi đã bàn giao vận chuyển.' } }, { status: 409 });
       }
-      if (targetStatus === 'CANCELLED' && !cancelReason) {
+      if (targetStatus === 'CANCELLED' && targetStatus !== currentOrder.orderStatus && !cancelReason) {
         return NextResponse.json({ error: { message: 'Chọn lý do hủy đơn hợp lệ.' } }, { status: 400 });
       }
       if (currentOrder.orderStatus === 'SHIPPING' && targetStatus !== currentOrder.orderStatus && !['DELIVERED', 'RETURNED'].includes(targetStatus)) {
         return NextResponse.json({ error: { message: 'Đơn đang giao chỉ có thể cập nhật thành đã giao hoặc chuyển hoàn.' } }, { status: 409 });
       }
-      if (['DELIVERED', 'COMPLETED'].includes(targetStatus) && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID') {
+      if (targetStatus !== currentOrder.orderStatus && ['DELIVERED', 'COMPLETED'].includes(targetStatus) && currentOrder.paymentMethod !== 'COD' && currentOrder.paymentStatus !== 'PAID') {
         return NextResponse.json({ error: { message: 'Chưa xác nhận thanh toán VietQR. Hãy cập nhật thanh toán thành Đã thanh toán trước khi hoàn tất đơn.' } }, { status: 409 });
       }
       const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
       const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
-      const order = ['RETURNED', 'CANCELLED'].includes(targetStatus)
+      const order = ['RETURNED', 'CANCELLED'].includes(targetStatus) && targetStatus !== currentOrder.orderStatus
         ? await prisma.$transaction(async (transaction) => {
           if (currentOrder.orderStatus !== targetStatus) {
             const claimed = await transaction.order.updateMany({
@@ -180,8 +194,8 @@ export async function PATCH(request: Request) {
             ...(body.phone !== undefined ? { phone: normalizedPhone } : {}),
             ...(body.address !== undefined ? { address } : {}),
             ...(manualPayment ? { note: [currentOrder.note?.trim(), `[Thanh toán thủ công bởi ${getRequestSession(request)?.email ?? 'unknown-admin'}]: ${paymentReason}`].filter(Boolean).join('\n') } : {}),
-            carrier: body.carrier ? body.carrier as (typeof carriers)[number] : requestedStatus ? null : currentOrder.carrier,
-            trackingCode: trackingCode || (body.trackingCode !== undefined ? null : requestedStatus ? null : currentOrder.trackingCode),
+            carrier: normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : requestedStatus && requestedStatus !== currentOrder.orderStatus ? null : currentOrder.carrier,
+            trackingCode: trackingCode || (body.trackingCode !== undefined ? null : requestedStatus && requestedStatus !== currentOrder.orderStatus ? null : currentOrder.trackingCode),
             deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
           },
         });

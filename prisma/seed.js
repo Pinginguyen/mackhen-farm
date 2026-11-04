@@ -264,20 +264,18 @@ async function main() {
     throw new Error('ADMIN_INITIAL_PASSWORD is required and must contain at least 10 characters.');
   }
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@mackhenfarm.vn' },
-    create: {
-      email: 'admin@mackhenfarm.vn',
-      name: 'Quản Trị Viên Mắc Khén Farm',
-      password: await hash(adminPassword, 12),
-      role: 'ADMIN',
-    },
-    update: {
-      name: 'Quản Trị Viên Mắc Khén Farm',
-      password: await hash(adminPassword, 12),
-      role: 'ADMIN',
-    },
-    select: { email: true, role: true },
-  });
+  where: { email: 'admin@mackhenfarm.vn' },
+  create: {
+    email: 'admin@mackhenfarm.vn',
+    name: 'Quản Trị Viên Mắc Khén Farm',
+    password: await hash(adminPassword, 12),
+    role: 'ADMIN',
+  },
+  update: {
+    password: await hash(adminPassword, 12),
+    role: 'ADMIN',
+  }
+});
 
   const count = await prisma.product.count({ where: { active: true } });
   console.log(`Seeded ${count} active products and ${coreVouchers.length} core vouchers into database.`);

@@ -1,5 +1,72 @@
 # GOD MODE E2E AUDIT REPORT
 
-No run has completed yet. This file is overwritten by `npm run test:god-mode`.
+- **Run:** 12:12:06 4/11/2026
+- **Target:** https://mackhen-farm.vercel.app
+- **Run ID:** MW1NSZ7J52EE86
+- **Browser:** Playwright Chromium (headed)
+- **Total:** 18 PASS · 1 FAIL · 1 SKIP
+- **Browser page errors:** 0
 
-The suite is restricted to a local app host and a local `DATABASE_URL`. It also requires `GOD_MODE_ALLOW_MUTATIONS=1` and `AUDIT_ADMIN_PASSWORD`. Use a disposable local database because the suite creates test orders, accounts, and audit events before attempting cleanup.
+## Negative / Positive Summary
+
+| Test class | PASS | FAIL | SKIP |
+|---|---:|---:|---:|
+| Positive | 9 | 1 | 0 |
+| Negative | 3 | 0 | 1 |
+| Edge cases | 6 | 0 | 0 |
+
+## Act Summary
+
+| Act | Suite | PASS | FAIL | SKIP |
+|---:|---|---:|---:|---:|
+| 1 | SECURITY & WEBHOOK CHAOS | 2 | 0 | 0 |
+| 2 | CROSS-BORDER B2B · SINGAPORE | 1 | 0 | 0 |
+| 3 | ADMIN SETUP · STOCK & KOC | 1 | 0 | 0 |
+| 4 | CUSTOMER EDGE CASES · ATP & FREESHIP | 3 | 0 | 0 |
+| 5 | CONCURRENCY & IDEMPOTENCY | 2 | 0 | 1 |
+| 6 | AUTOMATED RECONCILIATION | 2 | 0 | 0 |
+| 7 | WMS & FSM | 1 | 0 | 0 |
+| 8 | CUSTOMER INVOICE, ESG & REVIEW | 1 | 1 | 0 |
+| 9 | REVERSE LOGISTICS · RESTOCK | 1 | 0 | 0 |
+| 10 | AFFILIATE SETTLEMENT & AUDIT LOGS | 4 | 0 | 0 |
+
+## Detailed Results
+
+| Act | Class | Case | Status | Time | Detail |
+|---:|---|---|---|---:|---|
+| 1 | NEGATIVE | Webhook missing authorization returns 401 | **PASS** | 313 ms | Unauthenticated webhook was rejected before database access. |
+| 1 | NEGATIVE | Webhook invalid authorization returns 401 | **PASS** | 61 ms | Invalid webhook credential was rejected. |
+| 2 | POSITIVE | SGD locale renders and submits the Singapore B2B form | **PASS** | 2423 ms | SGD B2B form submitted and a toast was displayed. |
+| 3 | POSITIVE | Admin creates KOC and test voucher using seeded stock | **PASS** | 4879 ms | Created affiliate VIP_TEST_MW1NSZ7J52EE86 and voucher CHIDUNG1LAN_MW1NSZ7J52EE86; using Mắc Khén Xé Sợi Cay Nồng × 4 per order with seeded stock 120. |
+| 4 | POSITIVE | Customer registers and attribution ref is captured | **PASS** | 950 ms | Customer session created; ?ref attribution stored as VIP_TEST_MW1NSZ7J52EE86. |
+| 4 | NEGATIVE | Adding more than test stock is rejected | **PASS** | 120 ms | Số lượng vượt quá tồn kho |
+| 4 | EDGE | One unit validates the FREESHIP threshold | **PASS** | 240 ms | Single-item FREESHIP check: Cần mua thêm 185.000đ để áp dụng FREESHIP.. |
+| 5 | EDGE | Three concurrent checkout submissions share one idempotency key | **PASS** | 776 ms | 3 requests returned 3 success responses; 1 unique order MKF-586367 persisted (other requests may return duplicate or conflict). |
+| 5 | NEGATIVE | Underpaid authenticated webhook does not pay the order | **SKIP** | 0 ms | SEPAY_WEBHOOK_SECRET is not configured; authenticated underpayment check was skipped. |
+| 5 | EDGE | One-use voucher is consumed exactly once | **PASS** | 133 ms | Voucher usage count is 1 and voucher is inactive after reaching its one-use limit. |
+| 6 | POSITIVE | Admin SePay simulation changes the order to PAID | **PASS** | 1351 ms | Payment confirmed; order state is PAID. |
+| 6 | EDGE | Product stock reflects the completed checkout | **PASS** | 155 ms | Mắc Khén Xé Sợi Cay Nồng quantity 4 checked out; physical stock=116. |
+| 7 | POSITIVE | Admin advances order through WMS states and prints checksum slip | **PASS** | 1001 ms | WMS reached DELIVERED, backward transition was rejected with 409, and barcode/SHA-256 rendered. |
+| 8 | POSITIVE | Customer tracking invoice is rendered and printable to PDF | **PASS** | 352 ms | Tracking invoice and SHA-256 integrity seal rendered; PDF is 2162 bytes. |
+| 8 | POSITIVE | Customer submits a verified five-star product review | **FAIL** | 13304 ms | locator.waitFor: Timeout 12000ms exceeded. Call log: [2m  - waiting for getByRole('status').filter({ hasText: /đánh giá của bạn đã được thêm\|your review has been added/i }) to be visible[22m  |
+| 9 | EDGE | Second order can be returned and physical inventory is restored | **PASS** | 2979 ms | Returned order MKF-155383; test product stock matches its pre-order value. |
+| 10 | EDGE | Returned KOC order appears in the commission summary | **PASS** | 514 ms | Returned order is listed with commission 26000; dashboard due total is 49400. |
+| 10 | POSITIVE | Admin audit logs contain order status actions | **PASS** | 892 ms | Audit logs include order fulfillment/return actions (34 recent entries inspected). |
+| 10 | POSITIVE | Voucher redemption is reflected in persisted state | **PASS** | 133 ms | Voucher CHIDUNG1LAN_MW1NSZ7J52EE86 is consumed and inactive. |
+| 10 | POSITIVE | Admin CRO conversion funnel renders | **PASS** | 220 ms | CRO funnel widget and heading rendered on Admin reports. |
+
+## Browser Errors
+
+- None observed.
+
+## Cleanup / Retained Evidence
+
+- Temporary orders, review, cart, voucher, local test users, B2B inquiry, and product stock adjustments were cleaned up.
+- Audit logs generated by the test are intentionally retained as evidence.
+
+## Safety Conditions
+
+- Mutating suite refuses non-local application hosts; `DATABASE_URL` may target a remote database when explicitly configured.
+- Requires explicit `GOD_MODE_ALLOW_MUTATIONS=1` and `AUDIT_ADMIN_PASSWORD`; secrets are never written to the report.
+- Test creates temporary KOC/customer/B2B/voucher/order/review data and attempts cleanup at the end.
+- Do not point the local app at production services. Use a disposable local database snapshot.

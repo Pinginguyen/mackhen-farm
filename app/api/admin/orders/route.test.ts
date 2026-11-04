@@ -186,6 +186,63 @@ describe('/api/admin/orders', () => {
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'SHIPPING', trackingCode: 'SPX-NEW' }) }));
   });
 
+  it('maps Vietnamese status labels to Prisma enum values', async () => {
+    const statusLabels = [
+      ['Đã xác nhận', 'CONFIRMED'],
+      ['Đã thanh toán', 'PAID'],
+      ['Đang đóng gói phòng sạch', 'PROCESSING'],
+      ['Đang giao hàng', 'SHIPPING'],
+      ['Giao thành công', 'DELIVERED'],
+      ['Hoàn tất', 'COMPLETED'],
+      ['Đã hủy', 'CANCELLED'],
+      ['Hoàn hàng', 'RETURNED'],
+    ] as const;
+
+    for (const [label, status] of statusLabels) {
+      orderFindUnique.mockResolvedValueOnce({ orderStatus: status, paymentStatus: 'PAID', paymentMethod: 'COD', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null, items: [] });
+      const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ orderCode: 'MKF-100001', status: label }),
+      }));
+
+      expect(response.status).toBe(200);
+      expect(orderUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: status }) }));
+    }
+  });
+
+  it('allows carrier and tracking updates without a status change', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'PROCESSING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', carrier: 'SPX Express', trackingCode: 'SPX12345' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'PROCESSING', carrier: 'SPX', trackingCode: 'SPX12345' }) }));
+  });
+
+  it('allows a cancelled order to save same-state metadata without a cancellation reason', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'CANCELLED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'CANCELLED', carrier: 'SPX Express', trackingCode: 'SPX12345' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'CANCELLED', carrier: 'SPX', trackingCode: 'SPX12345' }) }));
+  });
+
+  it('allows a confirmed COD order to move directly to processing', async () => {
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'CONFIRMED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'PROCESSING' }) }));
+  });
+
   it('does not allow a returned order to resume shipping', async () => {
     orderFindUnique.mockResolvedValueOnce({ orderStatus: 'RETURNED', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {

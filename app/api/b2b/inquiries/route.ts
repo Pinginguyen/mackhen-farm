@@ -63,6 +63,6 @@ export async function POST(request: Request) {
       console.error('B2B inquiry email delivery failed.');
     }
 
-    return NextResponse.json({ success: true, id: inquiry.id, emailSent }, { status: 201 });
+    return NextResponse.json({ success: true, id: inquiry.id, emailSent }, { status: emailSent ? 201 : 200 });
   }, 'B2B inquiry persistence failed.');
 }
