@@ -9,6 +9,8 @@ import ProductReviewsSection from '@/components/ProductReviewsSection';
 import ProductHighlights from '@/components/ProductHighlights';
 import LocalizedProductName from './localized-product-name';
 import CroEventTracker from '@/components/CroEventTracker';
+import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
+import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -85,6 +87,17 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
     };
   }
 
+  let pairingProducts: { id: string; slug: string; name: string; image: string; price: number; stock: number }[] = DEFAULT_PRODUCTS;
+  try {
+    const livePairingProducts = await prisma.product.findMany({
+      where: { active: true, slug: { in: ['mac-khen-chay-toi-gion-cay', 'mac-khen-xe-soi-cay-nong', 'combo-bo-ba-nhau-xanh', 'cham-cheo-uot-chuan-vi-dien-bien', 'hat-mac-khen-rung-sao-kho-son-la'] } },
+      select: { id: true, slug: true, name: true, image: true, price: true, stock: true },
+    });
+    if (livePairingProducts.length) pairingProducts = livePairingProducts;
+  } catch {
+    pairingProducts = DEFAULT_PRODUCTS;
+  }
+
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   return (
@@ -110,6 +123,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
               <ProductRating rating={product.rating} size="sm" />
             </div>
+            <TasteSensoryMeter name={product.name} slug={product.slug} />
             <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
@@ -144,6 +158,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             </div>
 
             <ProductHighlights highlights={product.highlights} />
+            <FlavorPairingGuide products={pairingProducts} />
           </div>
         </div>
       </section>

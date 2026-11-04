@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
@@ -41,9 +40,9 @@ export default function CartLink() {
   }, []);
 
   return (
-    <Link className="header-cart !h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white !text-stone-700 shadow-xs transition-all duration-300 hover:!bg-stone-50" href="/cart" aria-label={`${t('cart')}${count ? `, ${count} ${locale === 'en' ? 'items' : 'sản phẩm'}` : ''}`}>
+    <button type="button" className="header-cart !h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white !text-stone-700 shadow-xs transition-all duration-300 hover:!bg-stone-50" onClick={() => window.dispatchEvent(new Event('mackhen:cart-drawer-open'))} aria-label={`${t('cart')}${count ? `, ${count} ${locale === 'en' ? 'items' : 'sản phẩm'}` : ''}`}>
       <ShoppingBag size={19} />
       {count > 0 && <span className="header-cart-count animate-pulse duration-700 transition-transform hover:scale-125" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
-    </Link>
+    </button>
   );
 }

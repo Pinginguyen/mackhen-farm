@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Minus, Plus } from 'lucide-react';
 import gsap from 'gsap';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { recordCroEvent } from '@/components/CroEventTracker';
 import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import StickyQuickBuyBar from '@/components/product/StickyQuickBuyBar';
 
 function animateFlyToCart(image: string, origin: DOMRect) {
   const cart = document.querySelector<HTMLElement>('.header-cart');
@@ -82,31 +83,11 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [productUnavailable, setProductUnavailable] = useState(false);
-  const [showStickyBuyBar, setShowStickyBuyBar] = useState(false);
-  const { locale, formatCurrency, t, translateProductName } = useLocaleCurrency();
-  const localizedName = translateProductName(name);
+  const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const primaryActionsRef = useRef<HTMLDivElement>(null);
   const selectedVariant = variants.find((variant) => variant.id === variantId);
   const selectedPrice = selectedVariant?.price ?? price;
   const selectedOriginalPrice = selectedVariant?.originalPrice ?? originalPrice;
-
-  useEffect(() => {
-    const target = primaryActionsRef.current;
-    if (!target) return;
-
-    const updateStickyBar = () => {
-      const passedPurchaseActions = target.getBoundingClientRect().bottom < 0;
-      const isMobile = window.matchMedia('(max-width: 767px)').matches;
-      setShowStickyBuyBar((current) => current === (passedPurchaseActions && isMobile) ? current : passedPurchaseActions && isMobile);
-    };
-    updateStickyBar();
-    window.addEventListener('scroll', updateStickyBar, { passive: true });
-    window.addEventListener('resize', updateStickyBar, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', updateStickyBar);
-      window.removeEventListener('resize', updateStickyBar);
-    };
-  }, []);
 
   function clearBuyNowSnapshot() {
     try {
@@ -164,6 +145,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
       if (buyNow) router.push('/checkout?mode=buy_now');
       else {
         window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
+        window.dispatchEvent(new Event('mackhen:cart-drawer-open'));
         toast.success('🎉 Đã thêm sản phẩm vào giỏ hàng!', { duration: 2500 });
         setIsAdded(true);
         window.setTimeout(() => setIsAdded(false), 1500);
@@ -204,11 +186,14 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <button className={`primary-action micro-tactile transition-all duration-200 active:scale-90 hover:scale-[1.02] hover:shadow-lg ${isAdded ? 'bg-emerald-600 text-white animate-bounce' : 'bg-[#9B2424] text-white'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
         <button className="secondary-action micro-tactile" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
-      {showStickyBuyBar && <div className="mobile-sticky-buy-bar">
-        <img src={image} alt="" />
-        <span><strong>{localizedName}</strong><b>{formatCurrency(selectedPrice)}</b></span>
-        <button type="button" className="primary-action micro-tactile" onClick={() => void addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
-      </div>}
+      <StickyQuickBuyBar
+        product={{ name, image, price: selectedPrice }}
+        currency={currency}
+        anchorRef={primaryActionsRef}
+        onAddToCart={() => void addItem(false)}
+        disabled={productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}
+        loading={saving}
+      />
       {message && <p role="status">{message}</p>}
     </div>
   );

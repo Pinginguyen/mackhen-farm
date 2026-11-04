@@ -7,6 +7,7 @@ import type { MouseEvent } from 'react';
 import { ArrowRight, Eye } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
+import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import ProductQuickView from '@/components/ProductQuickView';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import { useLocaleCurrency } from '@/lib/i18n-context';
@@ -46,7 +47,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   }
 
   return (
-    <article className={`product-card holographic-card cursor-pointer${product.stock === 0 ? ' is-out-of-stock' : ''}`} onMouseMove={handleTilt} onMouseLeave={resetTilt} style={{ animationDelay: `${index * 35}ms` }}>
+    <article className={`product-card holographic-card cursor-pointer shadow-[0_12px_32px_rgba(155,36,36,0.08)] hover:shadow-[0_20px_40px_rgba(155,36,36,0.14)]${product.stock === 0 ? ' is-out-of-stock' : ''}`} onMouseMove={handleTilt} onMouseLeave={resetTilt} style={{ animationDelay: `${index * 35}ms` }}>
       <div className={`image-box product-card-media group !overflow-hidden !rounded-xl${secondImage ? ' has-secondary' : ''}`}>
         <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
           <Image className="product-card-image is-primary transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
@@ -66,6 +67,12 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
         <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
+        <div className="product-artisan-chips" aria-label={locale === 'en' ? 'Product qualities' : 'Đặc tính sản phẩm'}>
+          {product.category !== 'Gia vị Tây Bắc' && <span>🌿 {locale === 'en' ? 'Upcycled Soy' : 'Đậu nành upcycled'}</span>}
+          {Number(product.protein?.match(/\d+(?:\.\d+)?/)?.[0] ?? 0) >= 20 && <span>💪 {locale === 'en' ? 'High-Protein' : 'Giàu đạm'}</span>}
+          {product.category !== 'Gia vị Tây Bắc' && <span>🍃 {locale === 'en' ? '0% Cholesterol' : '0% Cholesterol'}</span>}
+        </div>
+        <TasteSensoryMeter name={product.name} slug={product.slug} compact />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
         <div className="product-card-pricing"><div className="product-prices"><strong className="!text-[#9B2424]">{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div></div>
         <Link

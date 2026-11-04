@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
 import ProductRating from '@/components/ProductRating';
+import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import type { NutritionFacts } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
@@ -74,7 +75,7 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
       </>}
       <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
         {visibleProducts.map((product, index) => (
-          <article key={product.id} className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-xs transition-all duration-300 hover:!shadow-md hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
+          <article key={product.id} className={`product-card !rounded-2xl !border !border-stone-200/60 !bg-white !shadow-[0_12px_32px_rgba(155,36,36,0.08)] transition-all duration-300 hover:!shadow-[0_20px_40px_rgba(155,36,36,0.14)] hover:!-translate-y-1${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
             <div className="image-box group !overflow-hidden !rounded-xl">
               <img className="transition-transform duration-500 group-hover:!scale-105" src={product.image} alt={translateProductName(product.name)} />
               <div className="product-badges">
@@ -90,6 +91,12 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
                 <ProductRating rating={product.rating} showValue={false} size="sm" />
               </div>
               <h4 className="product-name"><Link href={`/products/${product.slug}`}>{translateProductName(product.name)}</Link></h4>
+              <div className="product-artisan-chips" aria-label={locale === 'en' ? 'Product qualities' : 'Đặc tính sản phẩm'}>
+                {product.category !== 'Gia vị Tây Bắc' && <span>🌿 {locale === 'en' ? 'Upcycled Soy' : 'Đậu nành upcycled'}</span>}
+                {Number(product.protein?.match(/\d+(?:\.\d+)?/)?.[0] ?? 0) >= 20 && <span>💪 {locale === 'en' ? 'High-Protein' : 'Giàu đạm'}</span>}
+                {product.category !== 'Gia vị Tây Bắc' && <span>🍃 0% Cholesterol</span>}
+              </div>
+              <TasteSensoryMeter name={product.name} slug={product.slug} compact />
               <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{text(product.description)}</p>
               <div className="product-card-pricing">
                 <div className="product-prices"><strong className="!text-[#9B2424]">{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div>

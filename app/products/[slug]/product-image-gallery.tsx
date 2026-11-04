@@ -7,6 +7,15 @@ export default function ProductImageGallery({ image, images, name }: { image: st
   const galleryImages = [image, ...images.filter((item) => item !== image)];
   const [activeImage, setActiveImage] = useState(image);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [lens, setLens] = useState<{ x: number; y: number; xPercent: number; yPercent: number } | null>(null);
+
+  function moveLens(event: React.MouseEvent<HTMLButtonElement>) {
+    if (!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+    setLens({ x, y, xPercent: x / bounds.width * 100, yPercent: y / bounds.height * 100 });
+  }
 
   useEffect(() => {
     if (!zoomOpen) return;
@@ -24,8 +33,9 @@ export default function ProductImageGallery({ image, images, name }: { image: st
 
   return (
     <div className="detail-gallery">
-      <button className="detail-media" type="button" onClick={() => setZoomOpen(true)} aria-label={`Phóng to ảnh ${name}`}>
+      <button className="detail-media" type="button" onClick={() => setZoomOpen(true)} onMouseMove={moveLens} onMouseLeave={() => setLens(null)} aria-label={`Phóng to ảnh ${name}`}>
         <img src={activeImage} alt={name} />
+        <span className={`product-optical-lens${lens ? ' is-visible' : ''}`} aria-hidden="true" style={lens ? { left: lens.x, top: lens.y, backgroundImage: `url("${activeImage}")`, backgroundPosition: `${lens.xPercent}% ${lens.yPercent}%` } : undefined} />
         <span className="detail-zoom-button" aria-hidden="true"><Maximize2 size={18} /></span>
       </button>
       {galleryImages.length > 1 && galleryImages.map((galleryImage, index) => (

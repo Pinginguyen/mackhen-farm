@@ -11,6 +11,8 @@ import { Toaster } from 'sonner';
 import { Be_Vietnam_Pro } from 'next/font/google';
 import { Suspense } from 'react';
 import AffiliateTracker from '@/components/marketing/AffiliateTracker';
+import CartDrawer from '@/components/cart/CartDrawer';
+import MobileBottomDock from '@/components/layout/MobileBottomDock';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -49,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* Khôi phục đầy đủ Header, Footer và Bộ đổi tiền */}
         <LocaleCurrencyProvider>
+          <div className="texture-overlay" aria-hidden="true" />
           <div className="app-viewport overflow-x-clip">
             <Suspense fallback={null}><AffiliateTracker /></Suspense>
             <SiteHeaderVisibility>
@@ -58,6 +61,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SiteFooter />
             <FloatingContact />
             <ExitIntentPopup />
+            <CartDrawer />
+            <MobileBottomDock />
           </div>
         </LocaleCurrencyProvider>
       </body>
