@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Search, Tag, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { SystemSettings } from '@/lib/system-settings';
 
 export type AuditEntry = {
   id: string;
@@ -82,10 +83,12 @@ function AuditTarget({ entry }: { entry: AuditEntry }) {
   return <span className="audit-target-chip" title={entry.targetId}>{entry.targetEntity} · {entry.targetId.slice(0, 12)}</span>;
 }
 
-export default function SettingsTabs({ defaultTab, appUrl, bank, auditEntries, auditUnavailable, monitoring, monitoringUnavailable }: {
+export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings, settingsUnavailable, auditEntries, auditUnavailable, monitoring, monitoringUnavailable }: {
   defaultTab: 'general' | 'audit' | 'monitoring';
   appUrl: string;
   bank: string;
+  systemSettings: SystemSettings;
+  settingsUnavailable: boolean;
   auditEntries: AuditEntry[];
   auditUnavailable: boolean;
   monitoring: MonitoringData;
@@ -93,6 +96,10 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, auditEntries, a
 }) {
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [selectedAudit, setSelectedAudit] = useState<AuditEntry | null>(null);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(String(systemSettings.freeShippingThreshold));
+  const [tasteGuaranteeText, setTasteGuaranteeText] = useState(systemSettings.tasteGuaranteeText);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsFeedback, setSettingsFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -109,6 +116,33 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, auditEntries, a
     };
   }, [selectedAudit]);
 
+  async function saveSalesSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const threshold = Number(freeShippingThreshold);
+    if (!Number.isSafeInteger(threshold) || threshold < 0 || threshold > 100_000_000 || !tasteGuaranteeText.trim()) {
+      setSettingsFeedback({ type: 'error', text: 'Vui lòng nhập ngưỡng freeship hợp lệ và nội dung bảo hiểm vị giác.' });
+      return;
+    }
+    setSavingSettings(true);
+    setSettingsFeedback(null);
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ freeShippingThreshold: threshold, tasteGuaranteeText: tasteGuaranteeText.trim() }),
+      });
+      const result = await response.json() as { settings?: SystemSettings; error?: string };
+      if (!response.ok || !result.settings) throw new Error(result.error ?? 'Không thể lưu cài đặt.');
+      setFreeShippingThreshold(String(result.settings.freeShippingThreshold));
+      setTasteGuaranteeText(result.settings.tasteGuaranteeText);
+      setSettingsFeedback({ type: 'success', text: 'Đã lưu chính sách bán hàng và chuyển đổi.' });
+    } catch (error) {
+      setSettingsFeedback({ type: 'error', text: error instanceof Error ? error.message : 'Không thể lưu cài đặt.' });
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   return <div className="admin-settings-tabs">
     <div className="admin-settings-tab-list" role="tablist" aria-label="Các phần cài đặt">
       {tabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} className={activeTab === tab.id ? 'is-active' : ''} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
@@ -116,6 +150,14 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, auditEntries, a
     {activeTab === 'general' && <section id="settings-panel-general" className="admin-settings-tab-panel" role="tabpanel">
       <div className="settings-list"><div><span>Thanh toán VietQR / SePay</span><strong>Đang dùng QR chuyển khoản trực tiếp · SePay tự động xác nhận</strong></div><div><span>Ngân hàng VietQR</span><strong>{bank}</strong></div><div><span>URL ứng dụng</span><strong>{appUrl}</strong></div></div>
       <p className="settings-note">Thông tin nhạy cảm được quản lý qua biến môi trường và không hiển thị trong portal.</p>
+      <form className="settings-cro-form" onSubmit={saveSalesSettings}>
+        <div><p className="eyebrow">CRO · STOREFRONT</p><h2>CHÍNH SÁCH BÁN HÀNG &amp; CHUYỂN ĐỔI</h2></div>
+        {settingsUnavailable && <p className="empty-state" role="status">Không thể tải cài đặt từ cơ sở dữ liệu.</p>}
+        <label className="field">Ngưỡng Miễn Phí Vận Chuyển (VNĐ)<input type="number" min={0} max={100000000} step={1000} value={freeShippingThreshold} onChange={(event) => setFreeShippingThreshold(event.target.value)} required /></label>
+        <label className="field">Nội dung Cam Kết Bảo hiểm Vị giác<textarea rows={3} maxLength={2000} value={tasteGuaranteeText} onChange={(event) => setTasteGuaranteeText(event.target.value)} required /></label>
+        {settingsFeedback && <p className={settingsFeedback.type === 'success' ? 'settings-cro-success' : 'settings-cro-error'} role={settingsFeedback.type === 'success' ? 'status' : 'alert'}>{settingsFeedback.text}</p>}
+        <button className="primary-action" type="submit" disabled={savingSettings || settingsUnavailable}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt chính sách'}</button>
+      </form>
     </section>}
     {activeTab === 'audit' && <section id="settings-panel-audit" className="admin-settings-tab-panel" role="tabpanel">
       {auditUnavailable && <p className="empty-state" role="status">Không thể tải audit log khi cơ sở dữ liệu chưa kết nối.</p>}

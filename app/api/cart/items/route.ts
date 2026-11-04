@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { calculateShipping } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
 
 export async function POST(request: Request) {
   let body: { productId?: string; variantId?: string; quantity?: number; buyNow?: boolean };
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   const quantity = body.quantity;
 
   return withDatabase(async () => {
+  const settings = await getSystemSettings();
   const product = await prisma.product.findFirst({
     where: { active: true, OR: [{ id: body.productId }, { slug: body.productId }] },
     include: { variants: true },
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
   const item = outcome.item;
   const cartItems = await prisma.cartItem.findMany({ where: { cartId: id }, include: { product: { select: { slug: true } } } });
   const total = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity * cartItem.unitPrice, 0);
-  const shipping = calculateShipping(total, cartItems.map((cartItem) => cartItem.product.slug));
+  const shipping = calculateShipping(total, cartItems.map((cartItem) => cartItem.product.slug), settings.freeShippingThreshold);
   const cartCount = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
   const response = NextResponse.json({
     item: { id: item.id, productId: item.productId, variantId: item.productVariantId, quantity: item.quantity },
@@ -90,6 +92,7 @@ export async function PATCH(request: Request) {
   const decodedCartId = decodeURIComponent(cartId);
 
   return withDatabase(async () => {
+    const settings = await getSystemSettings();
     const result = await prisma.$transaction(async (transaction) => {
       const current = await transaction.cartItem.findFirst({
         where: { id: body.itemId, cartId: decodedCartId },
@@ -140,7 +143,7 @@ export async function PATCH(request: Request) {
 
     const cartItems = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
     const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    const shipping = calculateShipping(subtotal, cartItems.map((item) => item.product.slug));
+    const shipping = calculateShipping(subtotal, cartItems.map((item) => item.product.slug), settings.freeShippingThreshold);
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     return NextResponse.json({ item: result.item, totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
   });
@@ -161,12 +164,13 @@ export async function DELETE(request: Request) {
   const decodedCartId = decodeURIComponent(cartId);
 
   return withDatabase(async () => {
+    const settings = await getSystemSettings();
     const deleted = await prisma.cartItem.deleteMany({ where: { id: body.itemId, cartId: decodedCartId } });
     if (!deleted.count) return NextResponse.json({ error: { code: 'CART_ITEM_NOT_FOUND', message: 'Không tìm thấy sản phẩm trong giỏ hàng' } }, { status: 404 });
 
     const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
     const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    const shipping = calculateShipping(subtotal, items.map((item) => item.product.slug));
+    const shipping = calculateShipping(subtotal, items.map((item) => item.product.slug), settings.freeShippingThreshold);
     const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
     return NextResponse.json({ totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
   });

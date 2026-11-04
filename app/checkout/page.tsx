@@ -6,10 +6,10 @@ import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { readCartSnapshot } from '@/lib/cart-server';
 import CheckoutForm, { BuyNowCartRecovery, CheckoutHeading } from './checkout-form';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
-import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import CheckoutOrderSummary from './checkout-order-summary';
 import CroEventTracker from '@/components/CroEventTracker';
 import TasteGuarantee from '@/components/checkout/TasteGuarantee';
+import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
@@ -29,7 +29,8 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
     }
   }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
-  const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const freeShippingApplied = cart.freeShippingThreshold > 0 && subtotal >= cart.freeShippingThreshold;
+  const upsellProduct = cartItems.map((item) => item.upsellProduct).find((product): product is CartUpsellProduct => Boolean(product && product.stock > 0 && !cartItems.some((item) => item.productId === product.id)));
   const orderSummary = <CheckoutOrderSummary
     items={cartItems.map((item) => ({ id: `${item.productId}-${item.variantId ?? 'single'}`, name: item.name ?? 'Sản phẩm', quantity: item.quantity ?? 1, total: item.total ?? 0 }))}
     shipping={shipping}
@@ -47,7 +48,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
           </div>
         </div>
 
-        <TasteGuarantee />
+        <TasteGuarantee text={cart.tasteGuaranteeText} />
 
         {buyNow && <BuyNowCartRecovery items={cartItems} />}
         <div className={`checkout-layout${cartUnavailable || cartItems.length === 0 ? ' is-empty' : ''}`}>
@@ -55,7 +56,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
             {cartUnavailable || cartItems.length === 0 ? (
               <CheckoutEmptyState unavailable={cartUnavailable} buyNow={buyNow} />
             ) : (
-              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
+              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} freeShippingThreshold={cart.freeShippingThreshold} upsellProduct={upsellProduct} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
             )}
           </div>
 

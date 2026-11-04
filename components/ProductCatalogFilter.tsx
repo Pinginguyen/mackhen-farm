@@ -25,6 +25,11 @@ export type CatalogProduct = {
   images?: string[];
   highlight: string;
   badge?: string | null;
+  badgeText?: string | null;
+  spiciness?: number;
+  chewiness?: number;
+  aroma?: number;
+  upsellProductId?: string | null;
   isFeatured?: boolean;
   nutritionFacts?: NutritionFacts | null;
 };

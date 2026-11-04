@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { getSensoryProfile } from './sensory-profile';
+import { normalizeSensoryScores } from './sensory-profile';
 
-describe('getSensoryProfile', () => {
-  it('assigns the jerky profile by product name or slug', () => {
-    expect(getSensoryProfile('Mắc Khén Xé Sợi Cay Nồng')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 5]);
-    expect(getSensoryProfile('Khác', 'mac-khen-chay-toi-gion-cay')?.metrics.map((metric) => metric.value)).toEqual([3, 4, 5]);
+describe('normalizeSensoryScores', () => {
+  it('keeps the scores saved for the product', () => {
+    expect(normalizeSensoryScores({ spiciness: 2, chewiness: 4, aroma: 5 })).toEqual({ spiciness: 2, chewiness: 4, aroma: 5 });
   });
 
-  it('assigns forest seed and cham cheo salt profiles', () => {
-    expect(getSensoryProfile('Hạt Dổi Rừng Nếp Thượng Hạng')?.metrics.map((metric) => metric.value)).toEqual([2, 5, 5]);
-    expect(getSensoryProfile('Muối Chẳm Chéo Hạt Dổi Rang Khô')?.metrics.map((metric) => metric.value)).toEqual([4, 4, 5]);
+  it('accepts the inclusive one-to-five range', () => {
+    expect(normalizeSensoryScores({ spiciness: 1, chewiness: 5, aroma: 1 })).toEqual({ spiciness: 1, chewiness: 5, aroma: 1 });
   });
 
-  it('leaves unrelated products without a guessed profile', () => {
-    expect(getSensoryProfile('Chẳm Chéo Ướt Chuẩn Vị Điện Biên')).toBeNull();
+  it('hides the meter data when any score is missing or out of range', () => {
+    expect(normalizeSensoryScores({ spiciness: 3, chewiness: 4 })).toBeNull();
+    expect(normalizeSensoryScores({ spiciness: 6, chewiness: 4, aroma: 5 })).toBeNull();
   });
 });

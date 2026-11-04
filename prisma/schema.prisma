@@ -91,12 +91,19 @@ model Product {
   calories      Int?
   images        String[]         @default([])
   rating        Float            @default(0)
+  spiciness     Int              @default(3)
+  chewiness     Int              @default(4)
+  aroma         Int              @default(5)
   stock         Int              @default(0)
   description   String
   ingredients   String?          @db.Text
   image         String
   highlight     String
   badge         String?
+  badgeText     String?          @default("Upcycled Soy")
+  upsellProductId String?
+  upsellProduct Product?         @relation("ProductUpsell", fields: [upsellProductId], references: [id], onDelete: SetNull)
+  upsellSources Product[]        @relation("ProductUpsell")
   highlights    String[]         @default([])
   nutritionFacts Json?
   active        Boolean          @default(true)
@@ -111,6 +118,14 @@ model Product {
 
   @@index([active, category])
   @@index([active, isFeatured])
+  @@index([upsellProductId])
+}
+
+model SystemSetting {
+  id                    String   @id @default("default")
+  freeShippingThreshold Int      @default(250000)
+  tasteGuaranteeText    String   @default("Bảo hiểm vị giác 100%: Ăn thử gói đầu tiên không hợp khẩu vị Tây Bắc, hoàn tiền hoặc đổi vị mới trong 24h.")
+  updatedAt             DateTime @updatedAt
 }
 
 model ProductVariant {

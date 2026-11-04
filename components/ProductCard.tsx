@@ -61,7 +61,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
         <div className="artisan-stamp-row" aria-label={locale === 'en' ? 'Product provenance and qualities' : 'Nguồn gốc và đặc tính sản phẩm'}>
-          {product.category !== 'Gia vị Tây Bắc' && <span>♻ Upcycled</span>}
+          {product.badgeText?.trim() && <span>{product.badgeText}</span>}
           {proteinGrams >= 20 && <span>💪 High-Protein</span>}
           <span>⛰ Sơn La</span>
         </div>
@@ -79,7 +79,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
         <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
-        <TasteSensoryMeter name={product.name} slug={product.slug} compact />
+        <TasteSensoryMeter compact spiciness={product.spiciness} chewiness={product.chewiness} aroma={product.aroma} />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
         <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div></div>
         <Link

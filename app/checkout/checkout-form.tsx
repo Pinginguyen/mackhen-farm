@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LoaderCircle, Ticket, X } from 'lucide-react';
-import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import { getErrorMessage } from '@/lib/error-message';
 import { createAbortSignal } from '@/lib/request-timeout';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
@@ -14,6 +13,8 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 import { formatApproxVnd } from '@/lib/translations';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { getStoredAffiliateCode } from '@/lib/affiliate-attribution';
+import CartUpsell from '@/components/cart/CartUpsell';
+import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
 
 type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number };
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
@@ -107,7 +108,7 @@ function rememberUserOrder(orderCode: string) {
   }
 }
 
-export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
+export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, freeShippingThreshold, upsellProduct, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; freeShippingThreshold: number; upsellProduct?: CartUpsellProduct; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
   const items = Array.isArray(receivedItems) ? receivedItems : [];
   const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
@@ -133,7 +134,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
   const normalizedVoucher = voucher.trim().toUpperCase();
-  const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
+  const freeShippingApplied = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
   const discount = appliedVoucher ? voucherDiscount : 0;
   const checkoutTotal = Math.max(0, subtotal + shipping - discount);
 
@@ -324,6 +325,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
   return (
     <form ref={formRef} className="form-list" onSubmit={submitOrder}>
       <div className="field checkout-country-field"><label htmlFor="shipping-country">{isEN ? 'Shipping country' : 'Quốc gia giao hàng'}</label><select id="shipping-country" value={shippingCountry} onChange={(event) => setShippingCountry(event.target.value)}><option value="VN">{isEN ? 'Vietnam' : 'Việt Nam'}</option><option value="SG">Singapore</option><option value="MY">Malaysia</option></select></div>
+      {!buyNow && upsellProduct && <CartUpsell product={upsellProduct} onAdded={() => router.refresh()} />}
       {shippingCountry !== 'VN' && <p className="checkout-cross-border-notice" role="status">{isEN ? 'Cross-border shipping partner integration is in progress. Shipping fees will be automatically converted to SGD/MYR.' : 'Hệ thống vận chuyển xuyên biên giới (Cross-border Shipping) đang trong giai đoạn tích hợp đối tác. Phí vận chuyển sẽ được tự động quy đổi sang SGD/MYR.'}</p>}
       <div className="field"><label htmlFor="name">{isEN ? 'Full name' : 'Họ tên'}</label><input id="name" name="name" autoComplete="name" defaultValue={initialCustomer?.name} required /></div>
       <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" defaultValue={initialCustomer?.email} /></div>

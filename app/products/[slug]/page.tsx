@@ -13,6 +13,7 @@ import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import TasteGuarantee from '@/components/checkout/TasteGuarantee';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import NutriGradeBadge from '@/components/product/NutriGradeBadge';
+import { getSystemSettings } from '@/lib/system-settings';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -22,6 +23,7 @@ function normalizeProductLookup(value: string): string {
 }
 
 export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
+  const systemSettings = await getSystemSettings();
   let product: Product | null = null;
   let inactiveInDatabase = false;
   let reviews: ProductReview[] = [];
@@ -147,7 +149,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
               <ProductRating rating={product.rating} size="sm" />
             </div>
-            <TasteSensoryMeter name={product.name} slug={product.slug} />
+            <TasteSensoryMeter spiciness={product.spiciness} chewiness={product.chewiness} aroma={product.aroma} />
             <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
@@ -183,7 +185,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             </div>
 
             <ProductHighlights highlights={product.highlights} />
-            <TasteGuarantee />
+            <TasteGuarantee text={systemSettings.tasteGuaranteeText} />
             <FlavorPairingGuide products={pairingProducts} />
           </div>
         </div>

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { getRequestSession } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
 import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
   if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
   return withDatabase(async () => {
+    const settings = await getSystemSettings();
     const voucher = isCompensationVoucher ? null : await prisma.voucher.findUnique({ where: { code } });
     const compensationVoucher = isCompensationVoucher ? await prisma.compensationVoucher.findUnique({ where: { code } }) : null;
     if (!voucher && (!compensationVoucher || compensationVoucher.customerPhone !== enteredPhone || compensationVoucher.redeemedAt || compensationVoucher.expiresAt <= new Date())) {
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
     if (!cart?.items.length) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
     const subtotal = cart.items.reduce((sum, item) => sum + item.quantity * (item.variant?.price ?? item.product.price), 0);
-    const shipping = calculateShipping(subtotal, cart.items.map((item) => item.product.slug));
+    const shipping = calculateShipping(subtotal, cart.items.map((item) => item.product.slug), settings.freeShippingThreshold);
     if (voucher) {
       const validationError = getManagedVoucherValidationError(voucher, subtotal);
       if (validationError) return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: validationError } }, { status: 400 });

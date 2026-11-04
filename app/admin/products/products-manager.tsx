@@ -26,6 +26,11 @@ type ProductDraft = {
   description: string;
   ingredients: string;
   badge: string;
+  badgeText: string;
+  spiciness: string;
+  chewiness: string;
+  aroma: string;
+  upsellProductId: string;
   isFeatured: boolean;
   variants: VariantDraft[];
   nutritionFacts: NutritionFacts;
@@ -57,6 +62,11 @@ const emptyDraft: ProductDraft = {
   description: '',
   ingredients: '',
   badge: '',
+  badgeText: 'Upcycled Soy',
+  spiciness: '3',
+  chewiness: '4',
+  aroma: '5',
+  upsellProductId: '',
   isFeatured: false,
   variants: [],
   nutritionFacts: defaultNutritionFacts(true),
@@ -146,6 +156,11 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       description: product.description,
       ingredients: product.ingredients ?? '',
       badge: product.badge ?? '',
+      badgeText: product.badgeText ?? '',
+      spiciness: String(product.spiciness ?? 3),
+      chewiness: String(product.chewiness ?? 4),
+      aroma: String(product.aroma ?? 5),
+      upsellProductId: product.upsellProductId ?? '',
       isFeatured: product.isFeatured ?? false,
       variants: (product.variants ?? []).map((variant) => ({
         id: variant.id,
@@ -209,6 +224,11 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           description: String(draft.description).trim(),
           ingredients: String(draft.ingredients).trim(),
           badge: draft.badge.trim() || null,
+          badgeText: draft.badgeText.trim() || null,
+          spiciness: Number(draft.spiciness),
+          chewiness: Number(draft.chewiness),
+          aroma: Number(draft.aroma),
+          upsellProductId: draft.upsellProductId || null,
           isFeatured: draft.isFeatured,
           variants: draft.variants.map((variant) => ({
             ...(variant.id ? { id: variant.id } : {}),
@@ -407,6 +427,18 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 )}
               </div>
               <label className="field admin-product-full-width">Nhãn nổi bật (Badge tag) - Tùy chọn<input value={draft.badge} onChange={(event) => setDraft({ ...draft, badge: event.target.value })} maxLength={60} placeholder="Ví dụ: Sản phẩm mới, Bán chạy, Giảm 15%..." /><small>Để trống nếu không muốn hiển thị nhãn đỏ trên ảnh sản phẩm.</small></label>
+              <fieldset className="admin-product-variants admin-product-full-width">
+                <legend>THIẾT LẬP VỊ GIÁC &amp; HIỂN THỊ TRỰC QUAN</legend>
+                <div className="admin-nutrition-grid">
+                  {([
+                    ['spiciness', 'Độ cay'],
+                    ['chewiness', 'Độ dai giòn'],
+                    ['aroma', 'Hương Mắc Khén'],
+                  ] as const).map(([field, label]) => <label className="field" key={field}>{label}<select value={draft[field]} onChange={(event) => setDraft((current) => ({ ...current, [field]: event.target.value }))}>{[1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score} / 5</option>)}</select></label>)}
+                </div>
+                <label className="field admin-product-full-width">Chữ trên tem huy hiệu<input value={draft.badgeText} onChange={(event) => setDraft((current) => ({ ...current, badgeText: event.target.value }))} maxLength={80} placeholder="Ví dụ: OCOP 4 Sao, High-Protein, Bản Hua Tạt..." /></label>
+                <label className="field admin-product-full-width">Sản phẩm gợi ý bán kèm (Upsell)<select value={draft.upsellProductId} onChange={(event) => setDraft((current) => ({ ...current, upsellProductId: event.target.value }))}><option value="">Không gợi ý sản phẩm bán kèm</option>{products.filter((item) => item.active && item.id !== editingProduct?.id).map((item) => <option value={item.id} key={item.id}>{item.name} · {item.price.toLocaleString('vi-VN')}đ</option>)}</select></label>
+              </fieldset>
               <label className="admin-nutrition-toggle admin-product-full-width"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => setDraft((current) => ({ ...current, isFeatured: event.target.checked }))} /> Hiển thị trong mục Sản phẩm bán chạy trên trang chủ</label>
               <fieldset className="admin-nutrition-fields admin-product-full-width">
                 <legend>Bảng giá trị dinh dưỡng (Nutrition Facts)</legend>

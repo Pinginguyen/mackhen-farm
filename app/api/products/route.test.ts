@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindMany, productFindUnique, productCreate, productUpdate, productUpdateMany, auditLogCreate, requireAdmin } = vi.hoisted(() => ({
+const { productFindMany, productFindUnique, productFindFirst, productCreate, productUpdate, productUpdateMany, auditLogCreate, requireAdmin } = vi.hoisted(() => ({
   productFindMany: vi.fn(),
   productFindUnique: vi.fn(),
+  productFindFirst: vi.fn(),
   productCreate: vi.fn(),
   productUpdate: vi.fn(),
   productUpdateMany: vi.fn(),
@@ -10,7 +11,7 @@ const { productFindMany, productFindUnique, productCreate, productUpdate, produc
   requireAdmin: vi.fn(),
 }));
 
-vi.mock('@/lib/prisma', () => ({ prisma: { product: { findMany: productFindMany, findUnique: productFindUnique, create: productCreate, update: productUpdate, updateMany: productUpdateMany }, auditLog: { create: auditLogCreate } } }));
+vi.mock('@/lib/prisma', () => ({ prisma: { product: { findMany: productFindMany, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, update: productUpdate, updateMany: productUpdateMany }, auditLog: { create: auditLogCreate } } }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('next/cache', () => ({
@@ -40,6 +41,11 @@ const validProduct = {
   imageUrl: '/products/xe-soi.jpg',
   stock: 15,
   badge: 'Bán chạy',
+  badgeText: 'OCOP 4 Sao',
+  spiciness: 2,
+  chewiness: 4,
+  aroma: 5,
+  upsellProductId: 'upsell-1',
   isFeatured: true,
   nutritionFacts: { enabled: true, servingSize: 'Trên 100g', calories: '320 kcal', protein: '22g', fat: '2.5g', cholesterol: '0 mg', fiber: '4g', carbohydrates: '15g', sodium: '420 mg' },
 };
@@ -48,6 +54,7 @@ describe('/api/products', () => {
   beforeEach(() => {
     productFindMany.mockReset().mockResolvedValue([]);
     productFindUnique.mockReset().mockResolvedValue({ id: 'product-1', price: 89000, stock: 10, active: true, variants: [] });
+    productFindFirst.mockReset().mockResolvedValue({ id: 'upsell-1' });
     productCreate.mockReset().mockResolvedValue({ id: 'product-1', ...validProduct });
     productUpdate.mockReset().mockResolvedValue({ id: 'product-1', ...validProduct });
     productUpdateMany.mockReset();
@@ -161,6 +168,11 @@ describe('/api/products', () => {
         image: validProduct.imageUrl,
         images: [validProduct.imageUrl],
         badge: validProduct.badge,
+        badgeText: validProduct.badgeText,
+        spiciness: validProduct.spiciness,
+        chewiness: validProduct.chewiness,
+        aroma: validProduct.aroma,
+        upsellProduct: { connect: { id: 'upsell-1' } },
         isFeatured: true,
         nutritionFacts: validProduct.nutritionFacts,
         active: true,
@@ -273,6 +285,7 @@ describe('/api/products', () => {
     const invalidNutrition = await POST(makeRequest('POST', { ...validProduct, nutritionFacts: { enabled: true, calories: { raw: '320' } } }));
     const invalidIngredients = await POST(makeRequest('POST', { ...validProduct, ingredients: 'x'.repeat(5001) }));
     const invalidIngredientsType = await PATCH(makeRequest('PATCH', { id: 'product-1', ...validProduct, ingredients: { value: 'not text' } }));
+    const invalidTasteScore = await POST(makeRequest('POST', { ...validProduct, spiciness: 6 }));
 
     expect(invalidPrice.status).toBe(400);
     expect(unsafeImage.status).toBe(400);
@@ -280,6 +293,7 @@ describe('/api/products', () => {
     expect(invalidNutrition.status).toBe(400);
     expect(invalidIngredients.status).toBe(400);
     expect(invalidIngredientsType.status).toBe(400);
+    expect(invalidTasteScore.status).toBe(400);
     expect(productCreate).not.toHaveBeenCalled();
   });
 });

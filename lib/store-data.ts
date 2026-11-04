@@ -61,6 +61,11 @@ export type Product = {
   image: string;
   highlight: string;
   badge?: string | null;
+  badgeText?: string | null;
+  spiciness?: number;
+  chewiness?: number;
+  aroma?: number;
+  upsellProductId?: string | null;
   nutritionFacts?: NutritionFacts | null;
   highlights?: string[];
   variants: ProductVariant[];

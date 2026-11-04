@@ -58,6 +58,10 @@ function numberValue(value: unknown): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
+function isValidTasteScore(value: number | null | undefined): value is number | undefined {
+  return value === undefined || (value !== null && Number.isInteger(value) && value >= 1 && value <= 5);
+}
+
 function createSlug(name: string): string {
   const slug = name.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'san-pham';
@@ -202,18 +206,32 @@ export async function POST(request: Request) {
   const ingredients = body.ingredients == null ? null : typeof body.ingredients === 'string' ? body.ingredients.trim() || null : undefined;
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
+  const badgeText = body.badgeText === undefined ? undefined : typeof body.badgeText === 'string' ? body.badgeText.trim() || null : body.badgeText === null ? null : undefined;
+  const spiciness = body.spiciness === undefined ? 3 : numberValue(body.spiciness);
+  const chewiness = body.chewiness === undefined ? 4 : numberValue(body.chewiness);
+  const aroma = body.aroma === undefined ? 5 : numberValue(body.aroma);
+  const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
+    ? null
+    : typeof body.upsellProductId === 'string' ? body.upsellProductId.trim() || undefined : undefined;
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = productDefaults.stock;
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
+    || !Number.isInteger(spiciness) || spiciness! < 1 || spiciness! > 5 || !Number.isInteger(chewiness) || chewiness! < 1 || chewiness! > 5 || !Number.isInteger(aroma) || aroma! < 1 || aroma! > 5
+    || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
+    || (body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
   return withDatabase(async () => {
+    if (upsellProductId) {
+      const selectedUpsell = await prisma.product.findFirst({ where: { id: upsellProductId, active: true }, select: { id: true } });
+      if (!selectedUpsell) return NextResponse.json({ error: { message: 'Sản phẩm gợi ý không tồn tại hoặc đã ngừng bán.' } }, { status: 400 });
+    }
     const product = await prisma.product.create({
       data: {
         slug: createSlug(name),
@@ -233,6 +251,11 @@ export async function POST(request: Request) {
         image,
         highlight: typeof body.highlight === 'string' && body.highlight.trim() ? body.highlight.trim().slice(0, 40) : 'Sản phẩm mới',
         badge,
+        ...(badgeText !== undefined ? { badgeText } : {}),
+        spiciness: spiciness ?? 3,
+        chewiness: chewiness ?? 4,
+        aroma: aroma ?? 5,
+        ...(upsellProductId ? { upsellProduct: { connect: { id: upsellProductId } } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
         isFeatured: body.isFeatured === true,
@@ -279,20 +302,38 @@ export async function PATCH(request: Request) {
   const ingredients = body.ingredients === undefined ? undefined : body.ingredients == null ? null : typeof body.ingredients === 'string' ? body.ingredients.trim() || null : null;
   const image = normalizeImage(body.imageUrl ?? body.image);
   const badge = normalizeBadge(body.badge);
+  const badgeText = body.badgeText === undefined ? undefined : typeof body.badgeText === 'string' ? body.badgeText.trim() || null : body.badgeText === null ? null : undefined;
+  const spiciness = body.spiciness === undefined ? undefined : numberValue(body.spiciness);
+  const chewiness = body.chewiness === undefined ? undefined : numberValue(body.chewiness);
+  const aroma = body.aroma === undefined ? undefined : numberValue(body.aroma);
+  const upsellWasProvided = body.upsellProductId !== undefined;
+  const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
+    ? null
+    : typeof body.upsellProductId === 'string' ? body.upsellProductId.trim() || undefined : undefined;
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = productDefaults.stock;
 
   if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || (body.ingredients != null && typeof body.ingredients !== 'string') || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants)
+    || !isValidTasteScore(spiciness)
+    || !isValidTasteScore(chewiness)
+    || !isValidTasteScore(aroma)
+    || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
+    || (upsellWasProvided && body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
     || (body.badge != null && (typeof body.badge !== 'string' || body.badge.trim().length > 60)) || (body.nutritionFacts != null && nutritionFacts === null)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, danh mục, giá, khối lượng, tồn kho và mô tả sản phẩm.' } }, { status: 400 });
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, variants: { select: { id: true } } } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, badgeText: true, upsellProductId: true, variants: { select: { id: true } } } });
     if (!previous) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
+    if (upsellProductId) {
+      if (upsellProductId === productId) return NextResponse.json({ error: { message: 'Sản phẩm không thể tự gợi ý chính nó.' } }, { status: 400 });
+      const selectedUpsell = await prisma.product.findFirst({ where: { id: upsellProductId, active: true }, select: { id: true } });
+      if (!selectedUpsell) return NextResponse.json({ error: { message: 'Sản phẩm gợi ý không tồn tại hoặc đã ngừng bán.' } }, { status: 400 });
+    }
     if (variantsProvided && variants?.some((variant) => variant.id && !previous.variants.some((current) => current.id === variant.id))) {
       return NextResponse.json({ error: { message: 'Phân loại không thuộc sản phẩm này.' } }, { status: 400 });
     }
@@ -312,6 +353,11 @@ export async function PATCH(request: Request) {
         image,
         images: [image],
         badge,
+        ...(badgeText !== undefined ? { badgeText } : {}),
+        ...(spiciness !== undefined ? { spiciness } : {}),
+        ...(chewiness !== undefined ? { chewiness } : {}),
+        ...(aroma !== undefined ? { aroma } : {}),
+        ...(upsellWasProvided ? { upsellProduct: upsellProductId ? { connect: { id: upsellProductId } } : { disconnect: true } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         ...(typeof body.isFeatured === 'boolean' ? { isFeatured: body.isFeatured } : {}),
         ...(variantsProvided ? { variants: syncVariants(variants ?? []) } : {}),
@@ -324,7 +370,7 @@ export async function PATCH(request: Request) {
       targetEntity: 'Product',
       targetId: product.id,
       oldValue: previous,
-      newValue: { price: product.price, stock: product.stock, active: product.active },
+      newValue: { price: product.price, stock: product.stock, active: product.active, spiciness: product.spiciness, chewiness: product.chewiness, aroma: product.aroma, badgeText: product.badgeText, upsellProductId: product.upsellProductId },
     });
     revalidateTag('products');
     return NextResponse.json({ product });

@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Minus, Plus, Trash2, Truck } from 'lucide-react';
 
-import { calculateShipping, FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import { calculateShipping } from '@/lib/shipping';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import CartUpsell from '@/components/cart/CartUpsell';
+import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
 
 type CartVariant = { id: string; label: string; price: number; weight: string; stock: number };
 type CartItem = {
@@ -22,6 +25,7 @@ type CartItem = {
   variantId: string | null;
   variantLabel: string | null;
   variants: CartVariant[];
+  upsellProduct: CartUpsellProduct | null;
 };
 
 export function CartPageHeading() {
@@ -106,19 +110,21 @@ function CartItemRow({
   );
 }
 
-export default function CartContent({ initialItems }: { initialItems: CartItem[] }) {
+export default function CartContent({ initialItems, freeShippingThreshold }: { initialItems: CartItem[]; freeShippingThreshold: number }) {
   const { currency, formatCurrency } = useLocaleCurrency();
+  const router = useRouter();
   const isEN = currency === 'SGD';
   const [items, setItems] = useState(initialItems);
   const [cartListRef] = useAutoAnimate();
   const itemsRef = useRef(initialItems);
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug));
+  const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug), freeShippingThreshold);
   const total = subtotal + shipping;
   const freeShipping = items.length > 0 && shipping === 0;
-  const freeShippingApplied = subtotal >= FREE_SHIPPING_THRESHOLD;
-  const progress = Math.min(100, Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100));
-  const remaining = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+  const freeShippingApplied = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
+  const progress = freeShippingThreshold > 0 ? Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100)) : 0;
+  const remaining = Math.max(0, freeShippingThreshold - subtotal);
+  const upsellProduct = items.map((item) => item.upsellProduct).find((product): product is CartUpsellProduct => Boolean(product && product.stock > 0 && !items.some((item) => item.productId === product.id)));
 
   function commitItems(nextItems: CartItem[]) {
     itemsRef.current = nextItems;
@@ -171,17 +177,18 @@ export default function CartContent({ initialItems }: { initialItems: CartItem[]
   return (
     <div className="checkout-layout cart-content-layout">
       <div ref={cartListRef} className="w-full max-w-none">
-        {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}${freeShippingApplied ? ' is-goal-reached' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? (isEN ? 'Congratulations! You unlocked FREE SHIPPING!' : 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.') : (isEN ? `Add ${formatCurrency(remaining)} more to get free nationwide shipping.` : `Mua thêm ${remaining.toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`)}</p></div><div className="free-shipping-track" role="progressbar" aria-label={isEN ? 'Free shipping progress' : 'Tiến trình đạt miễn phí vận chuyển'} aria-valuemin={0} aria-valuemax={FREE_SHIPPING_THRESHOLD} aria-valuenow={Math.min(subtotal, FREE_SHIPPING_THRESHOLD)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, FREE_SHIPPING_THRESHOLD))} / {formatCurrency(FREE_SHIPPING_THRESHOLD)}</small></section>}
+        {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}${freeShippingApplied ? ' is-goal-reached' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? (isEN ? 'Congratulations! You unlocked FREE SHIPPING!' : 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.') : (isEN ? `Add ${formatCurrency(remaining)} more to get free nationwide shipping.` : `Mua thêm ${remaining.toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`)}</p></div><div className="free-shipping-track" role="progressbar" aria-label={isEN ? 'Free shipping progress' : 'Tiến trình đạt miễn phí vận chuyển'} aria-valuemin={0} aria-valuemax={freeShippingThreshold} aria-valuenow={Math.min(subtotal, freeShippingThreshold)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, freeShippingThreshold))} / {formatCurrency(freeShippingThreshold)}</small></section>}
+        {upsellProduct && <CartUpsell product={upsellProduct} onAdded={() => router.refresh()} />}
         {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">{isEN ? 'Your cart is empty.' : 'Giỏ hàng của bạn đang trống.'}</p>}
       </div>
       <aside className="summary-card">
         <h3>{isEN ? 'Order Summary' : 'Tổng thanh toán'}</h3>
         <div className="summary-list">
           <div className="item"><span>{isEN ? 'Subtotal' : 'Tạm tính'}</span><strong>{formatCurrency(subtotal)}</strong></div>
-          <div className="item"><span>{isEN ? 'Shipping' : 'Vận chuyển'}</span><strong>{freeShippingApplied ? <><del>{formatCurrency(35000)}</del> {formatCurrency(0)}</> : items.length && shipping === 0 ? (isEN ? `Free · ${formatCurrency(0)}` : `Miễn phí · ${formatCurrency(0)}`) : formatCurrency(shipping)}</strong></div>
+          <div className="item"><span>{isEN ? 'Shipping' : 'Vận chuyển'}</span><strong>{items.length && shipping === 0 ? (isEN ? `Free · ${formatCurrency(0)}` : `Miễn phí · ${formatCurrency(0)}`) : formatCurrency(shipping)}</strong></div>
           <div className="item"><span>{isEN ? 'Total' : 'Thành tiền'}</span><strong>{formatCurrency(total)}</strong></div>
         </div>
-        {freeShippingApplied && <p className="automatic-shipping-banner" role="status">{isEN ? 'System automatically applied best discount: Free shipping (-35.000đ)' : 'Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ)'}</p>}
+        {freeShippingApplied && <p className="automatic-shipping-banner" role="status">{isEN ? 'Free nationwide shipping unlocked.' : 'Đơn hàng đã đạt ngưỡng miễn phí vận chuyển.'}</p>}
         {!freeShippingApplied && items.length > 0 && shipping === 0 && <p className="free-shipping-note">{isEN ? `Free nationwide shipping (${formatCurrency(0)}).` : 'Bạn được MIỄN PHÍ VẬN CHUYỂN toàn quốc (0đ).'}</p>}
         <div className="cart-footer">
           <Link href="/products" className="secondary-action micro-tactile">{isEN ? 'Continue Shopping' : 'Tiếp tục mua'}</Link>

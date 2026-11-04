@@ -16,6 +16,11 @@ export type DefaultProduct = {
   images: string[];
   highlight: string;
   active: boolean;
+  badgeText?: string | null;
+  spiciness?: number;
+  chewiness?: number;
+  aroma?: number;
+  upsellProductId?: string | null;
 };
 
 export const DEFAULT_PRODUCTS: DefaultProduct[] = [

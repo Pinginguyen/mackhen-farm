@@ -5730,6 +5730,140 @@ textarea {
   color: var(--muted);
 }
 
+.settings-cro-form {
+  display: grid;
+  max-width: 860px;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-cro-form > div:first-child .eyebrow {
+  margin: 0 0 4px;
+  color: #9a6d3e;
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.settings-cro-form h2 {
+  margin: 0;
+  color: var(--forest);
+  font-size: 0.96rem;
+}
+
+.settings-cro-form .field {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.settings-cro-form input,
+.settings-cro-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d6d3d1;
+  border-radius: 7px;
+  background: #fff;
+  color: #142820;
+}
+
+.settings-cro-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.settings-cro-form > button {
+  justify-self: start;
+  min-width: 200px;
+}
+
+.settings-cro-success,
+.settings-cro-error {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.settings-cro-success {
+  color: #166534;
+}
+
+.settings-cro-error {
+  color: #b91c1c;
+}
+
+.settings-cro-form {
+  display: grid;
+  max-width: 860px;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-cro-form > div:first-child .eyebrow {
+  margin: 0 0 4px;
+  color: #9a6d3e;
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.settings-cro-form h2 {
+  margin: 0;
+  color: var(--forest);
+  font-size: 0.96rem;
+}
+
+.settings-cro-form .field {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.settings-cro-form input,
+.settings-cro-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #d6d3d1;
+  border-radius: 7px;
+  background: #fff;
+  color: #142820;
+}
+
+.settings-cro-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.settings-cro-form > button {
+  justify-self: start;
+  min-width: 200px;
+}
+
+.settings-cro-success,
+.settings-cro-error {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.settings-cro-success {
+  color: #166534;
+}
+
+.settings-cro-error {
+  color: #b91c1c;
+}
+
 .auth-card {
   width: min(100%, 560px);
   margin: 0 auto;

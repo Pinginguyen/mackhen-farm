@@ -1,16 +1,18 @@
 import { fetchApiWithFallback } from '@/lib/server-api';
+import { DEFAULT_SYSTEM_SETTINGS, type SystemSettings } from '@/lib/system-settings';
 import SettingsTabs, { type AuditEntry, type MonitoringData } from './settings-tabs';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminSettingsPage({ searchParams }: { searchParams?: { tab?: string } }) {
-  const [audit, monitoring] = await Promise.all([
+  const [audit, monitoring, salesSettings] = await Promise.all([
     fetchApiWithFallback<{ items: AuditEntry[] }>('/api/admin/audit-logs', { items: [] }),
     fetchApiWithFallback<MonitoringData>('/api/admin/monitoring', {
       database: 'unavailable', databaseLatencyMs: null, connectionPooler: 'unknown',
       api: { sampleCount: 0, averageLatencyMs: null, errors500: 0, errors504: 0, errorRate5xxPercent: null, windowMinutes: 15 },
       measuredAt: new Date().toISOString(),
     }),
+    fetchApiWithFallback<{ settings: SystemSettings }>('/api/admin/settings', { settings: DEFAULT_SYSTEM_SETTINGS }),
   ]);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mackhen-farm.vercel.app';
   const bank = process.env.VIETQR_BANK_ID ?? 'MB';
@@ -21,6 +23,8 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
       defaultTab={searchParams?.tab === 'audit' || searchParams?.tab === 'monitoring' ? searchParams.tab : 'general'}
       appUrl={appUrl}
       bank={bank}
+      systemSettings={salesSettings.data.settings}
+      settingsUnavailable={salesSettings.unavailable}
       auditEntries={audit.data.items}
       auditUnavailable={audit.unavailable}
       monitoring={monitoring.data}

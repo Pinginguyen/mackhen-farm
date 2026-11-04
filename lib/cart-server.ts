@@ -2,7 +2,9 @@ import { cookies } from 'next/headers';
 
 import { prisma } from '@/lib/prisma';
 import { calculateShipping } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
 
+export type CartUpsellProduct = { id: string; slug: string; name: string; image: string; price: number; stock: number };
 export type CartSnapshotItem = {
   id: string;
   productId: string;
@@ -11,6 +13,7 @@ export type CartSnapshotItem = {
   variantId: string | null;
   variantLabel: string | null;
   variants: { id: string; label: string; price: number; weight: string; stock: number }[];
+  upsellProduct: CartUpsellProduct | null;
   stock: number;
   name: string;
   quantity: number;
@@ -18,17 +21,18 @@ export type CartSnapshotItem = {
   total: number;
 };
 
-export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } = {}): Promise<{ items: CartSnapshotItem[]; subtotal: number; shipping: number; total: number; unavailable: boolean }> {
+export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } = {}): Promise<{ items: CartSnapshotItem[]; subtotal: number; shipping: number; total: number; freeShippingThreshold: number; tasteGuaranteeText: string; unavailable: boolean }> {
+  const settings = await getSystemSettings();
   try {
     const cookieName = buyNow ? 'bohoch_buy_now' : 'bohoch_cart';
     const cartId = cookies().get(cookieName)?.value;
     if (!cartId) {
-      return { items: [], subtotal: 0, shipping: 0, total: 0, unavailable: false };
+      return { items: [], subtotal: 0, shipping: 0, total: 0, freeShippingThreshold: settings.freeShippingThreshold, tasteGuaranteeText: settings.tasteGuaranteeText, unavailable: false };
     }
 
     const cart = await prisma.cart.findUnique({
       where: { id: decodeURIComponent(cartId) },
-      include: { items: { include: { product: { include: { variants: true } }, variant: true } } },
+      include: { items: { include: { product: { include: { variants: true, upsellProduct: { select: { id: true, slug: true, name: true, image: true, price: true, stock: true, active: true } } } }, variant: true } } },
     });
 
     const items = (cart?.items ?? []).map((item) => ({
@@ -39,6 +43,7 @@ export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } 
       variantId: item.productVariantId,
       variantLabel: item.variant?.title ?? null,
       variants: item.product.variants.map((variant) => ({ ...variant, label: variant.title, stock: variant.inventory })),
+      upsellProduct: item.product.upsellProduct?.active ? item.product.upsellProduct : null,
       stock: item.variant?.inventory ?? item.product.stock,
       name: item.productName,
       quantity: item.quantity,
@@ -47,10 +52,10 @@ export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } 
     }));
 
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug));
+    const shipping = calculateShipping(subtotal, items.map((item) => item.productSlug), settings.freeShippingThreshold);
 
-    return { items, subtotal, shipping, total: subtotal + shipping, unavailable: false };
+    return { items, subtotal, shipping, total: subtotal + shipping, freeShippingThreshold: settings.freeShippingThreshold, tasteGuaranteeText: settings.tasteGuaranteeText, unavailable: false };
   } catch {
-    return { items: [], subtotal: 0, shipping: 0, total: 0, unavailable: true };
+    return { items: [], subtotal: 0, shipping: 0, total: 0, freeShippingThreshold: settings.freeShippingThreshold, tasteGuaranteeText: settings.tasteGuaranteeText, unavailable: true };
   }
 }

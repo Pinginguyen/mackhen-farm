@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
 import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
 import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
   }
 
   return withDatabase(async () => {
+    const settings = await getSystemSettings();
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
         where: { idempotencyKey },
@@ -197,7 +199,7 @@ export async function POST(request: Request) {
           price: item.variant?.price ?? item.product.price,
         }));
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
-        const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug));
+        const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug), settings.freeShippingThreshold);
         const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({ where: { code: voucherCode } }) : null;
         if (isManagedVoucher && !managedVoucher) return { rejected: 'INVALID_VOUCHER' as const };
         const voucherValidationError = managedVoucher ? getManagedVoucherValidationError(managedVoucher, subtotal) : null;
