@@ -7,6 +7,7 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 import { exportDocuments } from '@/lib/b2b-export-documents';
 import ContainerFreightCalculator from '@/components/b2b/ContainerFreightCalculator';
+import { DEFAULT_SYSTEM_SETTINGS, type PublicSystemSettings } from '@/lib/system-settings';
 
 const successNotice = 'Yêu cầu đã được ghi nhận. Quản lý phát triển thị trường sẽ liên hệ với bạn qua Email trong 24h.';
 const emailNotice = 'Yêu cầu đã được lưu, nhưng email thông báo quản trị chưa gửi được. Vui lòng thử lại sau.';
@@ -17,6 +18,16 @@ export default function B2BPartnershipPage() {
   const text = (value: string) => translateContent(value, isEN ? 'en' : 'vi');
   const [toast, setToast] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [settings, setSettings] = useState<PublicSystemSettings>(DEFAULT_SYSTEM_SETTINGS);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/public/settings', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() as Promise<{ settings?: PublicSystemSettings }> : null)
+      .then((result) => { if (active && result?.settings) setSettings(result.settings); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -81,7 +92,7 @@ export default function B2BPartnershipPage() {
         </div>
       </section>
 
-      <div className="b2b-shell b2b-freight-section"><ContainerFreightCalculator /></div>
+      <div className="b2b-shell b2b-freight-section"><ContainerFreightCalculator cartonPacks={settings.b2bItemsPerCarton} cartonWeightKg={settings.b2bCartonWeightKg} /></div>
 
       <section className="b2b-inquiry-band" id="partner-inquiry">
         <div className="b2b-shell b2b-inquiry-grid">

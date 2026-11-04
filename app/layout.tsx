@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import SiteFooter from './site-footer';
+import SiteFooter from './site-footer-server';
 import FloatingContact from './floating-contact';
 import Header from '@/components/layout/Header';
 import SiteHeaderVisibility from '@/components/layout/SiteHeaderVisibility';

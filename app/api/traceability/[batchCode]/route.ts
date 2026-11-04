@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getSystemSettings } from '@/lib/system-settings';
 
 const batches = {
   'BATCH-KB-2026-01': {
@@ -40,5 +41,9 @@ export async function GET(_request: Request, { params }: { params: { batchCode: 
     );
   }
 
-  return NextResponse.json({ success: true, data }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  const settings = await getSystemSettings();
+  return NextResponse.json({
+    success: true,
+    data: { ...data, dppSupplyGPS: settings.dppSupplyGPS, dppLabResult: settings.dppLabResult },
+  }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
 }

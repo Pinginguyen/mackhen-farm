@@ -125,6 +125,16 @@ model SystemSetting {
   id                    String   @id @default("default")
   freeShippingThreshold Int      @default(250000)
   tasteGuaranteeText    String   @default("Bảo hiểm vị giác 100%: Ăn thử gói đầu tiên không hợp khẩu vị Tây Bắc, hoàn tiền hoặc đổi vị mới trong 24h.")
+  companyName           String   @default("CÔNG TY CỔ PHẦN NÔNG SẢN SINH THÁI MẮC KHÉN FARM")
+  taxCode               String   @default("0110892644 do Sở KH&ĐT cấp ngày 15/01/2026")
+  representativeName    String   @default("Trần Trung Châu")
+  address               String   @default("Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La")
+  hotline               String   @default("0762.793.244")
+  email                 String   @default("contact@mackhenfarm.vn")
+  b2bItemsPerCarton     Int      @default(24)
+  b2bCartonWeightKg     Float    @default(3.6)
+  dppSupplyGPS          String   @default("20.738°N, 104.912°E (Sơn La)")
+  dppLabResult          String   @default("Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND")
   updatedAt             DateTime @updatedAt
 }
 

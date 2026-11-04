@@ -1,0 +1,10 @@
+ALTER TABLE "SystemSetting"
+  ADD COLUMN "companyName" TEXT NOT NULL DEFAULT 'CÔNG TY CỔ PHẦN NÔNG SẢN SINH THÁI MẮC KHÉN FARM',
+  ADD COLUMN "taxCode" TEXT NOT NULL DEFAULT '0110892644 do Sở KH&ĐT cấp ngày 15/01/2026',
+  ADD COLUMN "address" TEXT NOT NULL DEFAULT 'Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La',
+  ADD COLUMN "hotline" TEXT NOT NULL DEFAULT '0762.793.244',
+  ADD COLUMN "email" TEXT NOT NULL DEFAULT 'contact@mackhenfarm.vn',
+  ADD COLUMN "b2bItemsPerCarton" INTEGER NOT NULL DEFAULT 24,
+  ADD COLUMN "b2bCartonWeightKg" DOUBLE PRECISION NOT NULL DEFAULT 3.6,
+  ADD COLUMN "dppSupplyGPS" TEXT NOT NULL DEFAULT '20.738°N, 104.912°E (Sơn La)',
+  ADD COLUMN "dppLabResult" TEXT NOT NULL DEFAULT 'Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND';

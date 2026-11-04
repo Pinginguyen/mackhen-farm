@@ -89,7 +89,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
           className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
         >
-          {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <>{t('shopNow')} <ArrowRight size={16} /></>}
+          {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <><span>{locale === 'en' ? 'Shop now' : 'Chọn mua'}</span><ArrowRight size={16} aria-hidden="true" /></>}
         </Link>
       </div>
       {quickViewOpen && <ProductQuickView product={product} onClose={() => setQuickViewOpen(false)} />}

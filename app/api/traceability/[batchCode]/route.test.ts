@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/system-settings', () => ({
+  getSystemSettings: vi.fn().mockResolvedValue({
+    dppSupplyGPS: '20.738°N, 104.912°E (Sơn La)',
+    dppLabResult: 'Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND',
+  }),
+}));
 
 import { GET } from './route';
 
@@ -13,6 +20,8 @@ describe('GET /api/traceability/[batchCode]', () => {
     expect(result.success).toBe(true);
     expect(result.data.batchCode).toBe('BATCH-KB-2026-01');
     expect(result.data.steps).toHaveLength(4);
+    expect(result.data.dppSupplyGPS).toBe('20.738°N, 104.912°E (Sơn La)');
+    expect(result.data.dppLabResult).toContain('Salmonella: Âm tính');
   });
 
   it('returns all four published cham cheo production steps', async () => {

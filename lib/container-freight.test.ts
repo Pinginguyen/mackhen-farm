@@ -21,4 +21,12 @@ describe('calculateContainerFreight', () => {
   it('caps container utilization at 100 percent', () => {
     expect(calculateContainerFreight(3000, 40).containerFillPercent).toBe(100);
   });
+
+  it('uses admin-provided pack and weight values per carton', () => {
+    expect(calculateContainerFreight(2, 40, { packs: 30, netWeightKg: 4.2, volumeCbm: 0.018 })).toMatchObject({
+      packs: 60,
+      netWeightKg: 8.4,
+      totalVolumeCbm: 0.036,
+    });
+  });
 });

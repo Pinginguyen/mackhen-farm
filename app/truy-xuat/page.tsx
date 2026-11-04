@@ -12,6 +12,8 @@ type TraceabilityData = {
   expiryDate: string;
   packaging?: string;
   ingredients?: string;
+  dppSupplyGPS?: string;
+  dppLabResult?: string;
   steps: { label: string; detail: string }[];
 };
 
@@ -121,15 +123,13 @@ export default function TraceabilityPage() {
               <div className="dpp-section-title"><MapPin size={17} aria-hidden="true" /><h4>{isEN ? 'Geo-supply nodes' : 'Các nút chuỗi cung ứng'}</h4></div>
               <ol className="dpp-supply-nodes">
                 <li><span>01</span><div><strong>{isEN ? 'Fresh soy pulp collection' : 'Thu gom bã đậu nành tươi'}</strong><p>{isEN ? 'Soy milk facility, Tien Son Industrial Park, Bac Ninh (ISO 22000 status is supplier-reported).' : 'Nhà máy sữa đậu nành, KCN Tiên Sơn, Bắc Ninh (thông tin ISO 22000 do đơn vị cung cấp).'}</p><small>21.012°N, 106.015°E</small></div></li>
-                <li><span>02</span><div><strong>{isEN ? 'Native mac khen and doi seed region' : 'Vùng nguyên liệu Mắc Khén & Hạt Dổi bản địa'}</strong><p>{isEN ? 'Hua Tat village, Van Ho, Son La.' : 'Bản Hua Tạt, Vân Hồ, Sơn La.'}</p><small>20.738°N, 104.912°E</small></div></li>
+                <li><span>02</span><div><strong>{isEN ? 'Native mac khen and doi seed region' : 'Vùng nguyên liệu Mắc Khén & Hạt Dổi bản địa'}</strong><p>{isEN ? 'Hua Tat village, Van Ho, Son La.' : 'Bản Hua Tạt, Vân Hồ, Sơn La.'}</p><small>{batch.dppSupplyGPS ?? '20.738°N, 104.912°E (Sơn La)'}</small></div></li>
                 <li><span>03</span><div><strong>{isEN ? 'Low-temperature drying' : 'Sấy thăng hoa nhiệt độ thấp'}</strong><p>{isEN ? 'Reported process: 60°C; moisture target reduced from 80% to below 7.5%. Verify against the batch process record.' : 'Quy trình được cung cấp: 60°C; độ ẩm mục tiêu giảm từ 80% xuống dưới 7,5%. Cần đối chiếu hồ sơ sản xuất của lô.'}</p></div></li>
               </ol>
               <div className="dpp-section-title"><FlaskConical size={17} aria-hidden="true" /><h4>{isEN ? 'Food safety indicators' : 'Chỉ số an toàn thực phẩm'}</h4></div>
               <p className="dpp-lab-disclosure">{isEN ? 'Reported test results; the NIFTT laboratory report and batch-specific certificate are not attached.' : 'Kết quả được cung cấp; chưa đính kèm phiếu thử nghiệm NIFTT và chứng thư gắn mã lô.'}</p>
-              <div className="dpp-lab-table-wrap"><table className="dpp-lab-table"><thead><tr><th>{isEN ? 'Indicator' : 'Chỉ tiêu'}</th><th>{isEN ? 'Reported result' : 'Kết quả được cung cấp'}</th><th>{isEN ? 'Reference' : 'Tham chiếu'}</th></tr></thead><tbody>
-                <tr><th>Salmonella</th><td>{isEN ? 'Negative' : 'Âm tính'}</td><td>{isEN ? 'Certificate not attached' : 'Chưa đính kèm chứng thư'}</td></tr>
-                <tr><th>E. coli</th><td>&lt; 10 CFU/g</td><td>QCVN 8-2:2011/BYT</td></tr>
-                <tr><th>{isEN ? 'Aflatoxin / mould' : 'Aflatoxin / Nấm mốc'}</th><td>{isEN ? 'Not detected' : 'Không phát hiện'}</td><td>{isEN ? 'Certificate not attached' : 'Chưa đính kèm chứng thư'}</td></tr>
+              <div className="dpp-lab-table-wrap"><table className="dpp-lab-table"><thead><tr><th>{isEN ? 'Reported lab results' : 'Kết quả kiểm nghiệm được cung cấp'}</th></tr></thead><tbody>
+                <tr><td>{batch.dppLabResult ?? 'Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND'}</td></tr>
               </tbody></table></div>
             </section>
             <div className="traceability-timeline-wrap">

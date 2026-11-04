@@ -5,11 +5,19 @@ import { usePathname } from 'next/navigation';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 import SoundEffect from '@/components/common/SoundEffect';
+import type { PublicSystemSettings } from '@/lib/system-settings';
 
-export default function SiteFooter() {
+export default function SiteFooter({ settings }: { settings: PublicSystemSettings }) {
   const pathname = usePathname();
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
+  const companyName = settings.companyName || 'CÔNG TY CỔ PHẦN NÔNG SẢN SINH THÁI MẮC KHÉN FARM';
+  const taxCode = settings.taxCode || '0110892644 do Sở KH&ĐT cấp ngày 15/01/2026';
+  const representativeName = settings.representativeName || 'Trần Trung Châu';
+  const address = settings.address || 'Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La';
+  const hotline = settings.hotline || '0762.793.244';
+  const email = settings.email || 'contact@mackhenfarm.vn';
+
   if (pathname?.startsWith('/admin')) return null;
 
   return (
@@ -22,8 +30,8 @@ export default function SiteFooter() {
         <section className="site-footer-column">
           <h2>{text('LIÊN HỆ TRỰC TIẾP')}</h2>
           <p>{text('Nhóm 3')} <span>{text('(Sáng lập & Điều hành dự án)')}</span></p>
-          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href="https://zalo.me/0762793244" target="_blank" rel="noopener noreferrer">0762.793.244 {text('(Bấm chat Zalo)')}</a></p>
-          <p>Email: <a href="mailto:trungchau1210@gmail.com">trungchau1210@gmail.com</a></p>
+          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={`https://zalo.me/${hotline.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">{hotline} {text('(Bấm chat Zalo)')}</a></p>
+          <p>Email: <a href={`mailto:${email}`}>{email}</a></p>
           <p>{text('Địa chỉ điều hành: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.')}</p>
           <p>{text('Hỗ trợ kỹ thuật & đổi trả: 8:00 - 22:00 hàng ngày.')}</p>
         </section>
@@ -36,14 +44,14 @@ export default function SiteFooter() {
           <Link className="footer-b2b-link" href="/hop-tac-b2b">{text('Hợp tác B2B (Wholesale)')}</Link>
           <Link className="footer-b2b-link" href="/truy-xuat">{text('Truy xuất nguồn gốc theo Lô')}</Link>
         </nav>
-        <section className="site-footer-column">
+        <section className="site-footer-column footer-legal-column">
           <h2>{text('TIÊU CHUẨN & PHÁP LÝ')}</h2>
-          <strong className="footer-legal-name">CÔNG TY CỔ PHẦN NÔNG SẢN SINH THÁI MẮC KHÉN FARM</strong>
-          <p>Mã số thuế: 0110892644 do Sở KH&amp;ĐT cấp ngày 15/01/2026</p>
-          <p>Người đại diện: Trần Trung Châu · Trụ sở: Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La</p>
-          <p>Hotline: <a href="tel:+84762793244">0762.793.244</a> · Email: <a href="mailto:contact@mackhenfarm.vn">contact@mackhenfarm.vn</a></p>
-          <p>{text('Công khai thông tin người bán theo Nghị định 52/2013/NĐ-CP và Nghị định 85/2021/NĐ-CP.')}</p>
-          <p>{text('Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
+          <strong className="footer-legal-name">{companyName}</strong>
+          <p className="leading-relaxed">Mã số thuế: {taxCode}</p>
+          <p className="leading-relaxed">Người đại diện: {representativeName} · Trụ sở: {address}</p>
+          <p className="leading-relaxed">Hotline: <a href={`tel:${hotline.replace(/[^\d+]/g, '')}`}>{hotline}</a> · Email: <a href={`mailto:${email}`}>{email}</a></p>
+          <p className="leading-relaxed">{text('Công khai thông tin người bán theo Nghị định 52/2013/NĐ-CP và Nghị định 85/2021/NĐ-CP.')}</p>
+          <p className="leading-relaxed">{text('Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
           <a
             href="http://online.gov.vn"
             target="_blank"

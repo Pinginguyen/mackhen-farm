@@ -5,13 +5,16 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { withDatabase } from '@/lib/api-database';
+import type { SystemSettings } from '@/lib/system-settings';
 
 export const dynamic = 'force-dynamic';
 
-function parseSettings(value: unknown): { freeShippingThreshold?: number; tasteGuaranteeText?: string } | null {
+type EditableSettings = Partial<Omit<SystemSettings, 'id' | 'updatedAt'>>;
+
+function parseSettings(value: unknown): EditableSettings | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const body = value as Record<string, unknown>;
-  const settings: { freeShippingThreshold?: number; tasteGuaranteeText?: string } = {};
+  const settings: EditableSettings = {};
 
   if (body.freeShippingThreshold !== undefined) {
     if (typeof body.freeShippingThreshold !== 'number' || !Number.isSafeInteger(body.freeShippingThreshold)
@@ -21,6 +24,33 @@ function parseSettings(value: unknown): { freeShippingThreshold?: number; tasteG
   if (body.tasteGuaranteeText !== undefined) {
     if (typeof body.tasteGuaranteeText !== 'string' || !body.tasteGuaranteeText.trim() || body.tasteGuaranteeText.trim().length > 2000) return null;
     settings.tasteGuaranteeText = body.tasteGuaranteeText.trim();
+  }
+  const textLimits = {
+    companyName: 200,
+    taxCode: 200,
+    representativeName: 150,
+    address: 300,
+    hotline: 40,
+    email: 254,
+    dppSupplyGPS: 200,
+    dppLabResult: 1000,
+  } as const;
+  for (const [key, maxLength] of Object.entries(textLimits) as [keyof typeof textLimits, number][]) {
+    const field = body[key];
+    if (field === undefined) continue;
+    if (typeof field !== 'string' || !field.trim() || field.trim().length > maxLength) return null;
+    settings[key] = field.trim();
+  }
+  if (settings.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email)) return null;
+  if (body.b2bItemsPerCarton !== undefined) {
+    if (typeof body.b2bItemsPerCarton !== 'number' || !Number.isSafeInteger(body.b2bItemsPerCarton)
+      || body.b2bItemsPerCarton < 1 || body.b2bItemsPerCarton > 100_000) return null;
+    settings.b2bItemsPerCarton = body.b2bItemsPerCarton;
+  }
+  if (body.b2bCartonWeightKg !== undefined) {
+    if (typeof body.b2bCartonWeightKg !== 'number' || !Number.isFinite(body.b2bCartonWeightKg)
+      || body.b2bCartonWeightKg <= 0 || body.b2bCartonWeightKg > 10_000) return null;
+    settings.b2bCartonWeightKg = body.b2bCartonWeightKg;
   }
 
   return Object.keys(settings).length ? settings : null;
@@ -51,7 +81,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Dữ liệu cài đặt không hợp lệ.' }, { status: 400 });
   }
   const settings = parseSettings(body);
-  if (!settings) return NextResponse.json({ error: 'Ngưỡng freeship hoặc nội dung bảo hiểm vị giác không hợp lệ.' }, { status: 400 });
+  if (!settings) return NextResponse.json({ error: 'Thông tin cài đặt không hợp lệ hoặc không có thay đổi.' }, { status: 400 });
 
   return withDatabase(async () => {
     const current = await prisma.systemSetting.upsert({
@@ -65,8 +95,8 @@ export async function PATCH(request: Request) {
       action: 'UPDATE_SYSTEM_SETTINGS',
       targetEntity: 'SystemSetting',
       targetId: 'default',
-      oldValue: { freeShippingThreshold: current.freeShippingThreshold, tasteGuaranteeText: current.tasteGuaranteeText },
-      newValue: { freeShippingThreshold: updated.freeShippingThreshold, tasteGuaranteeText: updated.tasteGuaranteeText },
+      oldValue: current,
+      newValue: updated,
     });
     return NextResponse.json({ settings: updated });
   }, 'Admin system settings update failed');

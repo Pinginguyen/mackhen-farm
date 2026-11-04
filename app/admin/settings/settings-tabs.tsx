@@ -98,6 +98,16 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
   const [selectedAudit, setSelectedAudit] = useState<AuditEntry | null>(null);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(String(systemSettings.freeShippingThreshold));
   const [tasteGuaranteeText, setTasteGuaranteeText] = useState(systemSettings.tasteGuaranteeText);
+  const [companyName, setCompanyName] = useState(systemSettings.companyName);
+  const [taxCode, setTaxCode] = useState(systemSettings.taxCode);
+  const [representativeName, setRepresentativeName] = useState(systemSettings.representativeName);
+  const [address, setAddress] = useState(systemSettings.address);
+  const [hotline, setHotline] = useState(systemSettings.hotline);
+  const [email, setEmail] = useState(systemSettings.email);
+  const [b2bItemsPerCarton, setB2bItemsPerCarton] = useState(String(systemSettings.b2bItemsPerCarton));
+  const [b2bCartonWeightKg, setB2bCartonWeightKg] = useState(String(systemSettings.b2bCartonWeightKg));
+  const [dppSupplyGPS, setDppSupplyGPS] = useState(systemSettings.dppSupplyGPS);
+  const [dppLabResult, setDppLabResult] = useState(systemSettings.dppLabResult);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -119,8 +129,14 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
   async function saveSalesSettings(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const threshold = Number(freeShippingThreshold);
-    if (!Number.isSafeInteger(threshold) || threshold < 0 || threshold > 100_000_000 || !tasteGuaranteeText.trim()) {
-      setSettingsFeedback({ type: 'error', text: 'Vui lòng nhập ngưỡng freeship hợp lệ và nội dung bảo hiểm vị giác.' });
+    const itemsPerCarton = Number(b2bItemsPerCarton);
+    const cartonWeightKg = Number(b2bCartonWeightKg);
+    if (!Number.isSafeInteger(threshold) || threshold < 0 || threshold > 100_000_000 || !tasteGuaranteeText.trim()
+      || !Number.isSafeInteger(itemsPerCarton) || itemsPerCarton < 1 || itemsPerCarton > 100_000
+      || !Number.isFinite(cartonWeightKg) || cartonWeightKg <= 0 || cartonWeightKg > 10_000
+      || !companyName.trim() || !taxCode.trim() || !representativeName.trim() || !address.trim() || !hotline.trim() || !dppSupplyGPS.trim() || !dppLabResult.trim()
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setSettingsFeedback({ type: 'error', text: 'Vui lòng kiểm tra các trường bắt buộc, email và thông số thùng hàng.' });
       return;
     }
     setSavingSettings(true);
@@ -129,13 +145,36 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
       const response = await fetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ freeShippingThreshold: threshold, tasteGuaranteeText: tasteGuaranteeText.trim() }),
+        body: JSON.stringify({
+          freeShippingThreshold: threshold,
+          tasteGuaranteeText: tasteGuaranteeText.trim(),
+          companyName: companyName.trim(),
+          taxCode: taxCode.trim(),
+          representativeName: representativeName.trim(),
+          address: address.trim(),
+          hotline: hotline.trim(),
+          email: email.trim(),
+          b2bItemsPerCarton: itemsPerCarton,
+          b2bCartonWeightKg: cartonWeightKg,
+          dppSupplyGPS: dppSupplyGPS.trim(),
+          dppLabResult: dppLabResult.trim(),
+        }),
       });
       const result = await response.json() as { settings?: SystemSettings; error?: string };
       if (!response.ok || !result.settings) throw new Error(result.error ?? 'Không thể lưu cài đặt.');
       setFreeShippingThreshold(String(result.settings.freeShippingThreshold));
       setTasteGuaranteeText(result.settings.tasteGuaranteeText);
-      setSettingsFeedback({ type: 'success', text: 'Đã lưu chính sách bán hàng và chuyển đổi.' });
+      setCompanyName(result.settings.companyName);
+      setTaxCode(result.settings.taxCode);
+      setRepresentativeName(result.settings.representativeName);
+      setAddress(result.settings.address);
+      setHotline(result.settings.hotline);
+      setEmail(result.settings.email);
+      setB2bItemsPerCarton(String(result.settings.b2bItemsPerCarton));
+      setB2bCartonWeightKg(String(result.settings.b2bCartonWeightKg));
+      setDppSupplyGPS(result.settings.dppSupplyGPS);
+      setDppLabResult(result.settings.dppLabResult);
+      setSettingsFeedback({ type: 'success', text: 'Đã lưu cài đặt hệ thống.' });
     } catch (error) {
       setSettingsFeedback({ type: 'error', text: error instanceof Error ? error.message : 'Không thể lưu cài đặt.' });
     } finally {
@@ -155,8 +194,21 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
         {settingsUnavailable && <p className="empty-state" role="status">Không thể tải cài đặt từ cơ sở dữ liệu.</p>}
         <label className="field">Ngưỡng Miễn Phí Vận Chuyển (VNĐ)<input type="number" min={0} max={100000000} step={1000} value={freeShippingThreshold} onChange={(event) => setFreeShippingThreshold(event.target.value)} required /></label>
         <label className="field">Nội dung Cam Kết Bảo hiểm Vị giác<textarea rows={3} maxLength={2000} value={tasteGuaranteeText} onChange={(event) => setTasteGuaranteeText(event.target.value)} required /></label>
+        <div><p className="eyebrow">THÔNG TIN PHÁP LÝ · FOOTER</p><h3>Thông tin doanh nghiệp</h3></div>
+        <label className="field">Tên doanh nghiệp<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} maxLength={200} required /></label>
+        <label className="field">Mã số thuế / thông tin cấp phép<input value={taxCode} onChange={(event) => setTaxCode(event.target.value)} maxLength={200} required /></label>
+        <label className="field">Người đại diện<input value={representativeName} onChange={(event) => setRepresentativeName(event.target.value)} maxLength={150} required /></label>
+        <label className="field">Địa chỉ trụ sở<input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={300} required /></label>
+        <label className="field">Hotline<input type="tel" value={hotline} onChange={(event) => setHotline(event.target.value)} maxLength={40} required /></label>
+        <label className="field">Email liên hệ<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} required /></label>
+        <div><p className="eyebrow">LOGISTICS · B2B</p><h3>Quy cách đóng thùng</h3></div>
+        <label className="field">Số gói mỗi thùng<input type="number" min={1} max={100000} step={1} value={b2bItemsPerCarton} onChange={(event) => setB2bItemsPerCarton(event.target.value)} required /></label>
+        <label className="field">Khối lượng tịnh mỗi thùng (kg)<input type="number" min={0.01} max={10000} step={0.1} value={b2bCartonWeightKg} onChange={(event) => setB2bCartonWeightKg(event.target.value)} required /></label>
+        <div><p className="eyebrow">DIGITAL PRODUCT PASSPORT</p><h3>Truy xuất nguồn gốc</h3></div>
+        <label className="field">Tọa độ vùng nguyên liệu<input value={dppSupplyGPS} onChange={(event) => setDppSupplyGPS(event.target.value)} maxLength={200} required /></label>
+        <label className="field">Kết quả kiểm nghiệm<textarea rows={3} maxLength={1000} value={dppLabResult} onChange={(event) => setDppLabResult(event.target.value)} required /></label>
         {settingsFeedback && <p className={settingsFeedback.type === 'success' ? 'settings-cro-success' : 'settings-cro-error'} role={settingsFeedback.type === 'success' ? 'status' : 'alert'}>{settingsFeedback.text}</p>}
-        <button className="primary-action" type="submit" disabled={savingSettings || settingsUnavailable}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt chính sách'}</button>
+        <button className="primary-action" type="submit" disabled={savingSettings || settingsUnavailable}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt hệ thống'}</button>
       </form>
     </section>}
     {activeTab === 'audit' && <section id="settings-panel-audit" className="admin-settings-tab-panel" role="tabpanel">
