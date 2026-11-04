@@ -38,8 +38,16 @@ export default function SiteFooter() {
         </nav>
         <section className="site-footer-column">
           <h2>{text('TIÊU CHUẨN & PHÁP LÝ')}</h2>
-          <p>{text('Hộ kinh doanh Mắc Khén Farm - Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
-          <p>{text('Tuân thủ Điều 11 Luật Thương mại điện tử về minh bạch giao dịch và bảo vệ người tiêu dùng.')}</p>
+          <strong className="footer-legal-name">CÔNG TY CỔ PHẦN NÔNG SẢN SINH THÁI MẮC KHÉN FARM</strong>
+          <p>Mã số thuế: 0110892644 do Sở KH&amp;ĐT cấp ngày 15/01/2026</p>
+          <p>Người đại diện: Trần Trung Châu · Trụ sở: Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La</p>
+          <p>Hotline: <a href="tel:+84762793244">0762.793.244</a> · Email: <a href="mailto:contact@mackhenfarm.vn">contact@mackhenfarm.vn</a></p>
+          <p>{text('Công khai thông tin người bán theo Nghị định 52/2013/NĐ-CP và Nghị định 85/2021/NĐ-CP.')}</p>
+          <p>{text('Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
+          <a className="moit-notice-badge" href="https://online.gov.vn/" target="_blank" rel="noopener noreferrer" aria-label="Đã thông báo Bộ Công Thương, tra cứu trên cổng online.gov.vn">
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16 2.5 27 7v8.1c0 7.1-4.6 12.1-11 14.4C9.6 27.2 5 22.2 5 15.1V7l11-4.5Z" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m10.5 15.8 3.6 3.5 7.4-7.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"/></svg>
+            <span><strong>ĐÃ THÔNG BÁO</strong><small>BỘ CÔNG THƯƠNG</small></span>
+          </a>
         </section>
       </div>
       <div className="site-footer-bottom">{text('© 2026 Mắc Khén Farm. Dự án bài tập lớn Thương mại điện tử - ĐH Giao thông Vận tải (UTH).')}</div>

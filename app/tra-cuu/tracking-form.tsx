@@ -320,6 +320,16 @@ export default function TrackingForm() {
             <div className="tracking-carrier">
               <span>{text('Đơn vị vận chuyển:')} {order.carrier === 'SPX' ? 'SPX Express' : order.carrier === 'GHTK' ? 'GHTK' : order.carrier === 'VIETTEL_POST' ? 'Viettel Post' : text('Chưa bàn giao')}</span>
               {order.trackingCode && <span>{text('Mã vận đơn:')} <strong>{order.trackingCode}</strong></span>}
+              {order.carrier && order.trackingCode && <a
+                className="tracking-carrier-link"
+                href={order.carrier === 'SPX'
+                  ? `https://spx.vn/track?${encodeURIComponent(order.trackingCode)}`
+                  : order.carrier === 'GHTK'
+                    ? `https://i.ghtk.vn/${encodeURIComponent(order.trackingCode)}`
+                    : `https://viettelpost.com.vn/tra-cuu-hanh-trinh-don-hang?code=${encodeURIComponent(order.trackingCode)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              ><Truck size={15} aria-hidden="true" /> {text('Theo dõi tại hãng vận chuyển')}</a>}
               {order.maskedPhone && <span>{text('Điện thoại:')} <strong>{order.maskedPhone}</strong></span>}
               {order.maskedAddress && <span>{text('Khu vực giao hàng:')} <strong>{text(order.maskedAddress)}</strong></span>}
             </div>

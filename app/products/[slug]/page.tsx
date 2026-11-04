@@ -101,8 +101,30 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
+  const structuredData = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: product.name,
+    image: product.images?.length ? product.images : [product.image],
+    description: product.description,
+    brand: { '@type': 'Brand', name: 'Mắc Khén Farm' },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'VND',
+      price: product.price,
+      availability: `https://schema.org/${product.stock > 0 ? 'InStock' : 'OutOfStock'}`,
+    },
+    ...(reviewCount > 0 ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: (ratingCounts.reduce((sum, count, index) => sum + count * (index + 1), 0) / reviewCount).toFixed(1),
+        reviewCount,
+      },
+    } : {}),
+  };
   return (
     <main className="page-shell product-detail-page !bg-[#FAF7F2]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
       <CroEventTracker eventType="PRODUCT_VIEW" productId={product.id} />
       <section className="detail-section !rounded-2xl !border-stone-200/80 !bg-white !p-5 shadow-xs sm:!p-7">
         <div className="detail-grid">
