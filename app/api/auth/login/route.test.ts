@@ -16,10 +16,10 @@ import { verifySessionToken } from '@/lib/auth';
 
 const secret = 'vercel-admin-session-secret-with-32-characters';
 
-function login(email: string, password = 'correct-password') {
+function login(email: string, password = 'correct-password', ip = '203.0.113.10') {
   return new Request('https://mackhen.example/api/auth/login', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
     body: JSON.stringify({ email, password }),
   });
 }
@@ -76,6 +76,21 @@ describe('POST /api/auth/login', () => {
 
     expect(response.status).toBe(401);
     expect(comparePassword).not.toHaveBeenCalled();
+  });
+
+  it('blocks login after five failed attempts for the same IP and email', async () => {
+    comparePassword.mockResolvedValue(false);
+
+    const responses = await Promise.all(Array.from({ length: 6 }, () => POST(login('bruteforce@example.com'))));
+    const blocked = responses.find((response) => response.status === 429);
+    expect(responses.filter((response) => response.status === 401)).toHaveLength(5);
+    expect(blocked).toBeDefined();
+    if (!blocked) throw new Error('Expected the sixth concurrent attempt to be rate limited.');
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('60');
+    expect(await blocked.json()).toEqual({ error: 'Quá nhiều lần thử thất bại. Vui lòng thử lại sau 1 phút.' });
+    expect(comparePassword).toHaveBeenCalledTimes(5);
   });
 
   it('returns 401 when the account has no password hash', async () => {

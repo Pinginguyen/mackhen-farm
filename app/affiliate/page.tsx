@@ -16,9 +16,7 @@ export default async function AffiliatePortalPage() {
     select: { affiliateCode: true, commissionRate: true, active: true, user: { select: { name: true, email: true } } },
   });
   if (!affiliate) redirect('/dang-nhap?callbackUrl=%2Faffiliate');
-  if (!affiliate.active) {
-    return <main className="affiliate-portal-shell"><section className="affiliate-suspended"><p className="eyebrow">PARTNER ACCOUNT</p><h1>Tài khoản đối tác đang tạm khóa</h1><p>Vui lòng liên hệ Mắc Khén Farm để được hỗ trợ.</p></section></main>;
-  }
+  if (!affiliate.active) redirect('/api/auth/logout?reason=account_suspended');
 
   return <AffiliateDashboard initialAffiliate={{ name: affiliate.user.name, email: affiliate.user.email, affiliateCode: affiliate.affiliateCode, commissionRate: affiliate.commissionRate }} />;
 }

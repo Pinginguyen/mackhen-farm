@@ -25,7 +25,7 @@ describe('PaymentStatusPoller', () => {
 
   it('stops polling after 15 minutes', async () => {
     vi.useFakeTimers();
-    const intervalId = 123;
+    const intervalId = 123 as unknown as ReturnType<typeof window.setInterval>;
     const setIntervalSpy = vi.spyOn(window, 'setInterval').mockReturnValue(intervalId);
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
