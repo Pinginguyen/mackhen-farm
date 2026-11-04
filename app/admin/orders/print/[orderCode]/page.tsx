@@ -52,7 +52,7 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         .packing-party h2, .packing-picklist h2 { margin: 0 0 9px; font-size: 12px; text-transform: uppercase; }
         .packing-party p { margin: 4px 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
         .packing-party strong { font-size: 14px; }
-        .packing-cod { margin: 0 0 20px; padding: 14px 16px; border: 2px solid #8b1e1e; border-radius: 6px; background: #fff8ed; color: #651a1a; font-size: 18px; font-weight: 800; text-align: center; }
+        .packing-cod { margin: 0 0 20px; padding: 14px 16px; border: 2px solid #9B2424; border-radius: 6px; background: #fff8ed; color: #651a1a; font-size: 18px; font-weight: 800; text-align: center; }
         .packing-paid { margin: 0 0 20px; padding: 13px 16px; border: 2px solid #1e3f20; border-radius: 6px; color: #1e3f20; font-size: 16px; font-weight: 800; text-align: center; }
         .packing-pending-payment { margin: 0 0 20px; padding: 12px 14px; border: 1px solid #a8a29e; border-radius: 6px; font-size: 13px; font-weight: 700; text-align: center; }
         .packing-picklist { margin-bottom: 20px; }
@@ -99,7 +99,7 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
         </div>
 
         <div className="packing-sheet-heading">
-          <div><h1>PHIẾU ĐÓNG GÓI &amp; GIAO HÀNG (PICK &amp; PACK SLIP)</h1><p>Ngày tạo: {order.createdAt.toLocaleString('vi-VN')}</p></div>
+          <div><h1>PHIẾU ĐÓNG GÓI &amp; GIAO HÀNG (PICK &amp; PACK SLIP)</h1><p>Ngày tạo: {order.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p></div>
           <div className="packing-sheet-code">
             <div><small>MÃ ĐƠN</small><strong>{order.orderCode}</strong><small>{order.trackingCode ? `Mã vận đơn: ${order.trackingCode}` : 'Chưa có mã vận đơn'}</small></div>
             <OrderBarcode value={order.orderCode} />

@@ -53,9 +53,14 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
 
     void checkStatus();
     const interval = window.setInterval(() => { void checkStatus(); }, 2000);
+    const timeout = window.setTimeout(() => {
+      active = false;
+      window.clearInterval(interval);
+    }, 15 * 60 * 1000);
     return () => {
       active = false;
       window.clearInterval(interval);
+      window.clearTimeout(timeout);
     };
   }, [orderCode, orderId, canPoll, paid, router]);
 

@@ -336,6 +336,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
           <input id="voucher" name="voucher" value={voucher} onChange={(event) => { setVoucher(event.target.value); setAppliedVoucher(''); setVoucherDiscount(0); setVoucherFeedback(null); }} placeholder={isEN ? 'Enter discount code...' : 'Nhập mã giảm giá...'} />
           <button type="button" className="secondary-action" onClick={() => void applyVoucher()} disabled={!voucher.trim() || applyingVoucher}>{applyingVoucher ? (isEN ? 'Checking...' : 'Đang kiểm tra...') : (isEN ? 'Apply' : 'Áp dụng')}</button>
         </div>
+        <p className="checkout-voucher-note">{isEN ? 'Note: Only 1 voucher applicable per order.' : 'Lưu ý: Áp dụng tối đa 01 mã giảm giá cho mỗi đơn hàng.'}</p>
         <button type="button" className="checkout-voucher-picker-trigger" onClick={() => void openVoucherPicker()}><Ticket size={16} /> {isEN ? 'Choose a voucher' : 'Chọn voucher'}</button>
       </div>
       {voucherPickerOpen && <div className="voucher-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setVoucherPickerOpen(false); }}>

@@ -98,7 +98,7 @@ export default function AffiliateDashboard({ initialAffiliate }: { initialAffili
           <thead><tr><th>Mã đơn</th><th>Thời gian</th><th>Giá trị đơn</th><th>Hoa hồng</th><th>Trạng thái hoa hồng</th></tr></thead>
           <tbody>{metrics.orders.map((order) => <tr key={order.orderCode}>
             <td><strong>{order.orderCode}</strong></td>
-            <td>{new Date(order.createdAt).toLocaleString('vi-VN')}</td>
+            <td>{new Date(order.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
             <td>{formatCurrency(order.totalAmount)}</td>
             <td>{formatCurrency(order.commission)}</td>
             <td><span className={`affiliate-payout-status${order.commissionStatus === 'Đã chi trả' ? ' is-paid' : ''}`}>{order.commissionStatus}</span>{order.paymentReference && <small className="affiliate-reference">Mã GD: {order.paymentReference}</small>}</td>

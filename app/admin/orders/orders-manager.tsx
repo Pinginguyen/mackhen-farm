@@ -285,7 +285,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                   <span className={`admin-payment-badge ${order.paymentMethod === 'COD' ? 'cod' : order.paymentMethod.toLowerCase()}`}>{order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}</span>
                   <span className="admin-payment-method-badge">{order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod}</span>
                 </div>
-                <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN')}</time>
+                <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
               </div>
               <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small>{order.affiliateCode && <span className="affiliate-commission-badge">🤝 KOC: {order.affiliateCode} · Hoa hồng (10%): {formatCurrency(order.subtotal * 0.1)}</span>}</div>
             </header>

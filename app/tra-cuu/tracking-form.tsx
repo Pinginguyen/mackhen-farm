@@ -291,7 +291,7 @@ export default function TrackingForm() {
             </section>}
 
             <div className="tracking-invoice-meta">
-              <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</p>
+              <p><strong>{text('Ngày đặt:')}</strong> {new Date(order.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p>
               <p><strong>{text('Người nhận:')}</strong> {order.customerName ?? text('Khách hàng')}</p>
               <p><strong>{text('Điện thoại:')}</strong> {order.phone ?? order.maskedPhone ?? text('Không có')}</p>
               <p><strong>{text('Địa chỉ:')}</strong> {order.address ?? text(order.maskedAddress ?? 'Không có')}</p>

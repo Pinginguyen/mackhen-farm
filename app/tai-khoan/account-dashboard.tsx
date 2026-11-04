@@ -107,7 +107,7 @@ export default function AccountDashboard({ profile, orders, initialTab }: { prof
                 <tbody>{orderList.map((order) => (
                   <tr key={order.orderCode}>
                     <td>{order.orderCode}</td>
-                    <td>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</td>
+                    <td>{new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
                     <td>{order.items.length ? order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') : order.localFallback ? 'Đang đồng bộ sản phẩm' : 'Không có sản phẩm'}</td>
                     <td>{order.totalAmount > 0 ? formatCurrency(order.totalAmount) : 'Đang đồng bộ'}</td>
                     <td>{order.localFallback ? 'Đang đồng bộ đơn hàng' : statusLabels[order.orderStatus] ?? order.orderStatus}</td>

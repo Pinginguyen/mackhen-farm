@@ -17,7 +17,40 @@ describe('PaymentStatusPoller', () => {
     routerPush.mockReset();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('stops polling after 15 minutes', async () => {
+    vi.useFakeTimers();
+    const intervalId = 123;
+    const setIntervalSpy = vi.spyOn(window, 'setInterval').mockReturnValue(intervalId);
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(createElement(PaymentStatusPoller, {
+        orderCode: 'MKF-123456',
+        orderId: 'order-123',
+        canPoll: true,
+        children: createElement('p', null, 'QR'),
+      }));
+      await Promise.resolve();
+    });
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+    await act(async () => {
+      vi.advanceTimersByTime(15 * 60 * 1000);
+      await Promise.resolve();
+    });
+    expect(clearIntervalSpy).toHaveBeenCalledWith(intervalId);
+
+    await act(async () => root.unmount());
+  });
 
   it.each(['PAID', 'SUCCESS'])('celebrates and redirects when polling detects %s', async (status) => {
     vi.stubGlobal('fetch', vi.fn()
