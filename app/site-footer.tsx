@@ -48,7 +48,8 @@ export default function SiteFooter() {
             href="http://online.gov.vn"
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-2.5 bg-white border border-blue-200 px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all group"
+            // BỔ SUNG !no-underline và hover:!bg-blue-50/50 ở đây
+            className="inline-flex items-center gap-2.5 bg-white border border-blue-200 px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all group !no-underline hover:!bg-blue-50/50"
             title="Website đã thông báo với Bộ Công Thương"
           >
             <div className="w-7 h-7 flex-shrink-0 bg-blue-50 text-[#005BA6] rounded-lg flex items-center justify-center border border-blue-100">
@@ -58,8 +59,14 @@ export default function SiteFooter() {
               </svg>
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#005BA6] leading-tight">ĐÃ THÔNG BÁO</span>
-              <span className="text-[9px] uppercase tracking-tight font-bold text-red-600 leading-tight">BỘ CÔNG THƯƠNG</span>
+              {/* BỔ SUNG !no-underline và group-hover:!text-[#005BA6] ở đây */}
+              <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#005BA6] leading-tight !no-underline group-hover:!text-[#005BA6]">
+                ĐÃ THÔNG BÁO
+              </span>
+              {/* BỔ SUNG !no-underline và group-hover:!text-red-600 ở đây */}
+              <span className="text-[9px] uppercase tracking-tight font-bold text-red-600 leading-tight !no-underline group-hover:!text-red-600">
+                BỘ CÔNG THƯƠNG
+              </span>
             </div>
           </a>
         </section>
