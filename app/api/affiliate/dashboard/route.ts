@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { requireAffiliate } from '@/lib/affiliate-auth';
 import { withDatabase } from '@/lib/api-database';
 import { prisma } from '@/lib/prisma';
+import { calculatePercentageAmount } from '@/lib/money';
 
 function commission(totalAmount: number, rate: number): number {
-  return Math.floor(totalAmount * rate / 100);
+  return calculatePercentageAmount(totalAmount, rate);
 }
 
 export async function GET(request: Request): Promise<NextResponse> {

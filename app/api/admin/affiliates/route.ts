@@ -7,11 +7,12 @@ import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { prisma } from '@/lib/prisma';
+import { calculatePercentageAmount } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 
 function commissionFor(amount: number, rate: number): number {
-  return Math.floor(amount * rate / 100);
+  return calculatePercentageAmount(amount, rate);
 }
 
 export async function GET(request: Request) {

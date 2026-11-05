@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
@@ -6,9 +6,11 @@ import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
-import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
+import { calculateManagedVoucherDiscountAmount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
 import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
+import { calculatePercentageAmount } from '@/lib/money';
+import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
 
 type CheckoutItemSnapshot = {
   id?: string;
@@ -180,6 +182,7 @@ export async function POST(request: Request) {
 
   return withDatabase(async () => {
     const settings = await getSystemSettings();
+    let checkoutFingerprint: string | null = null;
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
         where: { idempotencyKey },
@@ -230,7 +233,37 @@ export async function POST(request: Request) {
         const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({ where: { code: voucherCode } }) : null;
         if (isManagedVoucher && !managedVoucher) return { rejected: 'INVALID_VOUCHER' as const };
         const voucherValidationError = managedVoucher ? getManagedVoucherValidationError(managedVoucher, subtotal) : null;
-        if (managedVoucher && voucherValidationError) return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
+
+        let compensationVoucherId: string | null = null;
+        let compensationVoucherInvalid = false;
+        let discount = 0;
+        if (managedVoucher) {
+          discount = calculateManagedVoucherDiscountAmount(managedVoucher, subtotal, shipping);
+        } else if (isCompensationVoucher) {
+          const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
+          if (!voucher) return { rejected: 'INVALID_VOUCHER' as const };
+          compensationVoucherId = voucher.id;
+          compensationVoucherInvalid = voucher.customerPhone !== phone || Boolean(voucher.redeemedAt) || voucher.expiresAt <= new Date();
+          discount = calculatePercentageAmount(subtotal, voucher.discountPercent);
+        }
+        const totalAmount = subtotal + shipping - discount;
+
+        if (!sameCartContents(body.items, currentItems)) {
+          console.warn('Checkout quantity or cart state mismatch rejected.');
+          return { rejected: 'PRICE_MISMATCH' as const };
+        }
+
+        checkoutFingerprint = createCheckoutFingerprint(session?.userId ?? `guest:${phone}`, currentItems, totalAmount);
+        const fingerprintDuplicate = await transaction.order.findFirst({
+          where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+        });
+        if (fingerprintDuplicate) return { ...fingerprintDuplicate, duplicate: true };
+
+        if (managedVoucher && voucherValidationError) {
+          return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
+        }
+        if (compensationVoucherInvalid) return { rejected: 'INVALID_VOUCHER' as const };
 
         if (managedVoucher?.firstOrderOnly && session) {
           const priorOrders = await transaction.order.count({ where: { userId: session.userId, orderStatus: { not: 'CANCELLED' } } });
@@ -240,25 +273,6 @@ export async function POST(request: Request) {
             select: { id: true },
           });
           if (phoneUsed) return { rejected: 'VOUCHER_PHONE_USED' as const };
-        }
-
-        let compensationVoucherId: string | null = null;
-        let discount = 0;
-        if (managedVoucher) {
-          discount = calculateManagedVoucherDiscount(managedVoucher, subtotal, shipping) ?? 0;
-        } else if (isCompensationVoucher) {
-          const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
-          if (!voucher || voucher.customerPhone !== phone || voucher.redeemedAt || voucher.expiresAt <= new Date()) {
-            return { rejected: 'INVALID_VOUCHER' as const };
-          }
-          compensationVoucherId = voucher.id;
-          discount = Math.floor(subtotal * voucher.discountPercent / 100);
-        }
-        const totalAmount = subtotal + shipping - discount;
-
-        if (!sameCartContents(body.items, currentItems)) {
-          console.warn('Checkout quantity or cart state mismatch rejected.');
-          return { rejected: 'PRICE_MISMATCH' as const };
         }
 
         const recentOrders = idempotencyKey ? [] : await transaction.order.findMany({
@@ -363,6 +377,7 @@ export async function POST(request: Request) {
             affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
+            checkoutFingerprint,
             grossAmount: subtotal,
             netAmount: totalAmount,
             reconciled: false,
@@ -378,6 +393,28 @@ export async function POST(request: Request) {
       }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {
       const prismaErrorCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+      if (checkoutFingerprint && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
+        const fingerprintDuplicate = await prisma.order.findFirst({
+          where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+        });
+        if (fingerprintDuplicate && normalizeVietnamesePhone(fingerprintDuplicate.phone) === phone) {
+          const response = NextResponse.json({
+            success: true,
+            orderId: fingerprintDuplicate.id,
+            orderCode: fingerprintDuplicate.orderCode,
+            numericCode: fingerprintDuplicate.numericCode,
+            status: fingerprintDuplicate.orderStatus.toLowerCase(),
+            total: fingerprintDuplicate.totalAmount,
+            totalAmount: fingerprintDuplicate.totalAmount,
+            duplicate: true,
+            redirectUrl: buildPaymentRedirect(fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.totalAmount),
+          }, { status: 200 });
+          setPaymentVerificationCookie(response, fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.phone);
+          if (body.buyNow === true && fingerprintDuplicate.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+          return response;
+        }
+      }
       if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
         const existingOrder = await prisma.order.findUnique({
           where: { idempotencyKey },

@@ -5,6 +5,7 @@ import { withDatabase } from '@/lib/api-database';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { prisma } from '@/lib/prisma';
+import { calculatePercentageAmount } from '@/lib/money';
 
 export async function POST(request: Request, { params }: { params: { affiliateId: string } }) {
   const denied = await requireAdmin(request);
@@ -30,7 +31,7 @@ export async function POST(request: Request, { params }: { params: { affiliateId
           select: { id: true, totalAmount: true, affiliateCommissionRate: true },
         });
         if (!orders.length) return { error: 'NOTHING_DUE' as const };
-        const amount = orders.reduce((sum, order) => sum + Math.floor(order.totalAmount * (order.affiliateCommissionRate ?? affiliate.commissionRate) / 100), 0);
+        const amount = orders.reduce((sum, order) => sum + calculatePercentageAmount(order.totalAmount, order.affiliateCommissionRate ?? affiliate.commissionRate), 0);
         const paidAt = new Date();
         const settled = await transaction.order.updateMany({
           where: { id: { in: orders.map((order) => order.id) }, affiliateCommissionPaidAt: null },

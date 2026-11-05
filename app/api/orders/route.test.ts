@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
+    cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
     userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
@@ -13,7 +13,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
   const tx = {
     cart: { findUnique: mocks.cartFindUnique },
     product: { updateMany: mocks.productUpdateMany },
-    productVariant: { updateMany: vi.fn() },
+    productVariant: { updateMany: mocks.productVariantUpdateMany },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
     user: { update: mocks.userUpdate },
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate },
@@ -22,7 +22,7 @@ const { cartFindUnique, productUpdateMany, customerUpsert, customerCreate, userU
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
     affiliate: { findUnique: mocks.affiliateFindUnique },
   };
-  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
+  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
@@ -45,6 +45,7 @@ describe('POST /api/orders checkout', () => {
       }],
     });
     productUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    productVariantUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     customerUpsert.mockReset().mockResolvedValue({ id: 'customer-1' });
     customerCreate.mockReset().mockResolvedValue({ id: 'customer-1' });
     orderFindUnique.mockReset().mockResolvedValue(null);
@@ -208,7 +209,7 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('rejects a new-member voucher when the phone has a previously successful order', async () => {
-    orderFindFirst.mockResolvedValueOnce({ id: 'previous-order' });
+    orderFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'previous-order' });
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: memberCookie() },
@@ -317,6 +318,7 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         idempotencyKey: 'checkout-attempt-001', grossAmount: 169000, netAmount: 204000, reconciled: false,
+        checkoutFingerprint: expect.any(String),
         holdExpiresAt: expect.any(Date),
       }),
     }));
@@ -339,6 +341,29 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ lotCode: 'LOT-MKF-2026-001', items: { create: [expect.objectContaining({ lotCode: 'LOT-MKF-2026-001' })] } }),
     }));
+  });
+
+  it('atomically rejects a variant checkout when conditional inventory decrement fails', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [{
+      id: 'cart-item-variant', productId: 'spice-1', productVariantId: 'variant-1', productName: 'Hạt Dổi', quantity: 2,
+      product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 5 },
+      variant: { id: 'variant-1', title: 'Túi zip 150g', price: 169000, inventory: 1 },
+    }] });
+    productVariantUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(productVariantUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'variant-1', inventory: { gte: 2 } },
+      data: { inventory: { decrement: 2 } },
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INSUFFICIENT_STOCK');
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('does not sell untraceably when active lots cannot cover the requested quantity', async () => {
@@ -366,6 +391,46 @@ describe('POST /api/orders checkout', () => {
     expect(await response.json()).toMatchObject({ orderId: 'order-existing', orderCode: 'MKF-123456', duplicate: true });
     expect(productUpdateMany).not.toHaveBeenCalled();
     expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns the existing order for a server fingerprint match without a client key', async () => {
+    orderFindFirst.mockResolvedValueOnce({
+      id: 'order-fingerprint-match', orderCode: 'MKF-654321', numericCode: 654321,
+      orderStatus: 'PENDING', totalAmount: 204000, paymentMethod: 'COD', phone: '0762793244',
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ orderId: 'order-fingerprint-match', duplicate: true });
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(orderCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns a fingerprinted retry even when its voucher was consumed by the first request', async () => {
+    voucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-limited', code: 'LIMITED', discountType: 'PERCENTAGE', value: 10,
+      maxDiscount: 30000, minSpend: 0, expiresAt: null, isActive: true,
+      usedCount: 1, usageLimit: 1, freeShipping: false, firstOrderOnly: false,
+    });
+    orderFindFirst.mockResolvedValueOnce({
+      id: 'order-fingerprint-match', orderCode: 'MKF-654321', numericCode: 654321,
+      orderStatus: 'PENDING', totalAmount: 187100, paymentMethod: 'COD', phone: '0762793244',
+    });
+
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'LIMITED' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ orderId: 'order-fingerprint-match', duplicate: true });
+    expect(productUpdateMany).not.toHaveBeenCalled();
+    expect(voucherUpdateMany).not.toHaveBeenCalled();
   });
 
   it('returns the persisted buy-now order when a retry arrives after its cart cookie was cleared', async () => {

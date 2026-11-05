@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Download, FileText, Pencil, Printer, Search, X, Zap } from 'lucide-react';
 import { formatCurrency } from '@/lib/store-data';
 import { getAllowedNextStatuses } from '@/lib/order-workflow';
+import { calculatePercentageAmount } from '@/lib/money';
 
 export type AdminOrder = {
   id: string;
@@ -313,7 +314,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 </div>
                 <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
               </div>
-              <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small>{order.affiliateCode && <span className="affiliate-commission-badge">🤝 KOC: {order.affiliateCode} · Hoa hồng (10%): {formatCurrency(order.subtotal * 0.1)}</span>}</div>
+              <div className="admin-order-total-wrap"><strong className="admin-order-total">{formatCurrency(order.total)}</strong><small>Tiền hàng: {formatCurrency(order.subtotal)} | Phí ship: {formatCurrency(order.shippingFee)} | Giảm giá: −{formatCurrency(order.discountAmount)}</small>{order.affiliateCode && <span className="affiliate-commission-badge">🤝 KOC: {order.affiliateCode} · Hoa hồng (10%): {formatCurrency(calculatePercentageAmount(order.subtotal, 10))}</span>}</div>
             </header>
             {order.note?.trim() && <p className="admin-order-customer-note">Ghi chú của khách: {order.note}</p>}
             {order.paymentMethod === 'COD' && order.total >= 200000 && <p className="cod-risk-badge">Cần xác nhận qua điện thoại</p>}

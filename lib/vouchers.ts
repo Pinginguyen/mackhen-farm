@@ -1,3 +1,5 @@
+import { calculatePercentageAmount } from './money';
+
 export const VOUCHER_CODES = ['FREESHIP', 'GIAM10'] as const;
 
 export type ManagedVoucherRule = {
@@ -30,9 +32,13 @@ export function getManagedVoucherValidationError(voucher: ManagedVoucherRule, su
 
 export function calculateManagedVoucherDiscount(voucher: ManagedVoucherRule, subtotal: number, shipping: number): number | null {
   if (getManagedVoucherValidationError(voucher, subtotal)) return null;
+  return calculateManagedVoucherDiscountAmount(voucher, subtotal, shipping);
+}
+
+export function calculateManagedVoucherDiscountAmount(voucher: ManagedVoucherRule, subtotal: number, shipping: number): number {
   if (voucher.freeShipping) return shipping;
   if (voucher.discountType === 'PERCENTAGE') {
-    const discount = Math.floor(subtotal * voucher.value / 100);
+    const discount = calculatePercentageAmount(subtotal, voucher.value);
     return voucher.maxDiscount === null ? discount : Math.min(discount, voucher.maxDiscount);
   }
   return Math.min(subtotal, voucher.value);
@@ -52,6 +58,6 @@ export function calculateVoucherDiscount(code: string, subtotal: number, shippin
   if (!code) return 0;
   if (getVoucherValidationError(code, subtotal)) return null;
   if (code === 'FREESHIP') return shipping;
-  if (code === 'GIAM10') return Math.min(Math.floor(subtotal * 0.1), 30000);
+  if (code === 'GIAM10') return Math.min(calculatePercentageAmount(subtotal, 10), 30000);
   return null;
 }

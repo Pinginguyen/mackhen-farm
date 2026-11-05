@@ -1,3 +1,5 @@
+import { convertVndToSgdCents, formatSgdCents } from './money';
+
 export type Locale = 'vi' | 'en';
 export type Currency = 'VND' | 'SGD';
 
@@ -476,8 +478,9 @@ export function translateProductName(name: string, locale: Locale): string {
 }
 
 export function formatCurrency(amount: number, currency: Currency): string {
-  if (currency === 'SGD') return `S$ ${(amount / SGD_TO_VND).toFixed(2)}`;
-  return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
+  const wholeVnd = Math.round(amount);
+  if (currency === 'SGD') return `S$ ${formatSgdCents(convertVndToSgdCents(wholeVnd, SGD_TO_VND))}`;
+  return `${wholeVnd.toLocaleString('vi-VN')}đ`;
 }
 
 export function formatApproxVnd(amount: number): string {

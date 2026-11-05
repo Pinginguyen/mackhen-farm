@@ -302,6 +302,7 @@ model Order {
   affiliatePayoutId String?
   totalAmount   Int                  @map("total")
   idempotencyKey String?              @unique
+  checkoutFingerprint String?
   lotCode       String?
   grossAmount   Float                 @default(0)
   netAmount     Float                 @default(0)
@@ -329,6 +330,7 @@ model Order {
   @@index([userId, createdAt])
   @@index([phone, createdAt])
   @@index([affiliateCode, createdAt])
+  @@index([checkoutFingerprint, createdAt])
 }
 
 model OrderItem {

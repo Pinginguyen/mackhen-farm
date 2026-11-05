@@ -6,6 +6,7 @@ import { getRequestSession } from '@/lib/auth';
 import { calculateShipping } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
 import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
+import { calculatePercentageAmount } from '@/lib/money';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
 
     const discount = voucher
       ? calculateManagedVoucherDiscount(voucher, subtotal, shipping)
-      : Math.floor(subtotal * compensationVoucher!.discountPercent / 100);
+      : calculatePercentageAmount(subtotal, compensationVoucher!.discountPercent);
     return NextResponse.json({ code, discount, subtotal, shipping });
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { translateContent } from './translations';
+import { formatCurrency, translateContent } from './translations';
 
 describe('B2B toast translations', () => {
   it.each([
@@ -14,5 +14,13 @@ describe('B2B toast translations', () => {
     ],
   ])('translates the B2B toast to English', (source, expected) => {
     expect(translateContent(source, 'en')).toBe(expected);
+  });
+});
+
+describe('currency formatting', () => {
+  it('converts integer VND into rounded SGD cents', () => {
+    expect(formatCurrency(19000, 'SGD')).toBe('S$ 1.00');
+    expect(formatCurrency(1425, 'SGD')).toBe('S$ 0.08');
+    expect(formatCurrency(65500, 'SGD')).toBe('S$ 3.45');
   });
 });
