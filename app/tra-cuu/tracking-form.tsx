@@ -7,9 +7,10 @@ import { Box, Check, FileText, House, PackageCheck, ShieldCheck, Star, Truck } f
 import { getErrorMessage } from '@/lib/error-message';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
+import { calculateEsgImpact } from '@/lib/esg-impact';
 import WarrantyRequest from './warranty-request';
 
-type TrackedItem = { productId: string; productName: string; productSlug?: string; quantity: number; price: number };
+type TrackedItem = { productId: string; productName: string; productSlug?: string; quantity: number; price: number; weightGrams?: number | null };
 type TrackingTimelineItem = { label: string };
 
 type TrackedOrder = {
@@ -36,11 +37,10 @@ type TrackedOrder = {
   timeline: TrackingTimelineItem[];
 };
 
-const esgImpactFactors = {
-  soyPulpKg: Number(process.env.NEXT_PUBLIC_ESG_SOY_PULP_KG_PER_PACK),
-  waterSavedLiters: Number(process.env.NEXT_PUBLIC_ESG_WATER_LITERS_PER_PACK),
-  co2AvoidedKg: Number(process.env.NEXT_PUBLIC_ESG_CO2_KG_PER_PACK),
-};
+function formatImpactValue(value: number, locale: string): string {
+  const formatted = value.toLocaleString(locale, { maximumFractionDigits: 2 });
+  return locale === 'vi-VN' ? formatted.replace(/,(\d{1,2})$/, '.$1') : formatted;
+}
 
 const steps = [
   { label: 'Đã nhận đơn', icon: Check },
@@ -268,11 +268,13 @@ export default function TrackingForm() {
         const current = activeStep(orderStatus);
         const delivered = ['DELIVERED', 'COMPLETED'].includes(orderStatus);
         const progress = orderStatus === 'CANCELLED' ? 0 : (current / Math.max(1, timeline.length - 1)) * 100;
-        const packageCount = orderItems.reduce((total, item) => total + item.quantity, 0);
+        const packageCount = orderItems.reduce((total, item) => total + (Number.isFinite(item.quantity) ? item.quantity : 0), 0);
+        const impact = calculateEsgImpact(orderItems);
+        const impactLocale = isEN ? 'en-SG' : 'vi-VN';
         const impactMetrics = [
-          { label: text('Bã đậu nành được tái chế'), factor: esgImpactFactors.soyPulpKg, unit: 'kg' },
-          { label: text('Nước ngọt tiết kiệm'), factor: esgImpactFactors.waterSavedLiters, unit: 'L' },
-          { label: text('CO₂ giảm phát thải'), factor: esgImpactFactors.co2AvoidedKg, unit: 'kg CO₂e' },
+          { label: text('Bã đậu nành được tái chế'), value: impact.soyPulpGrams, unit: 'g' },
+          { label: text('Nước ngọt tiết kiệm'), value: impact.waterSavedLiters, unit: text('Lít') },
+          { label: text('CO₂ giảm phát thải'), value: impact.co2AvoidedKg, unit: 'kg' },
         ];
         return (
           <article className={`tracking-order${printOrderCode === order.orderCode ? ' is-print-target' : ''}`} key={order.orderCode}>
@@ -362,13 +364,11 @@ export default function TrackingForm() {
                 <tbody>{impactMetrics.map((metric) => (
                   <tr key={metric.label}>
                     <td>{metric.label}</td>
-                    <td>{Number.isFinite(metric.factor) && metric.factor >= 0
-                      ? `${(packageCount * metric.factor).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { maximumFractionDigits: 2 })} ${metric.unit}`
-                      : text('Chưa có hệ số LCA đã xác minh')}</td>
+                    <td>{formatImpactValue(metric.value, impactLocale)} {metric.unit}</td>
                   </tr>
                 ))}</tbody>
               </table>
-              <small>{text('Ước tính theo hệ số cấu hình của Mắc Khén Farm; không thay thế kiểm định LCA độc lập.')}</small>
+              <small>{text('Ước tính theo hệ số cấu hình sinh thái của Mắc Khén Farm.')}</small>
             </section>
             <p className="tracking-invoice-guarantee">{text('Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.')}</p>
 

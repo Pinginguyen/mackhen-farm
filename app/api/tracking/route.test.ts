@@ -35,7 +35,7 @@ describe('POST /api/tracking', () => {
       createdAt: new Date('2026-10-14T00:00:00Z'),
       deliveredAt: null,
       warrantyRequest: null,
-      items: [{ productId: 'product-1', productName: 'TEST1', product: { slug: 'test1' }, quantity: 1, price: 100000 }],
+      items: [{ productId: 'product-1', productName: 'TEST1', product: { slug: 'test1', weight: 150 }, variant: null, quantity: 1, price: 100000 }],
     });
   });
 
@@ -63,11 +63,11 @@ describe('POST /api/tracking', () => {
       phone: '0762793244', address: 'Lai Chau, Tam Duong, Binh Lu, So 12 duong X',
       customerName: 'Nguyen Van A', paymentMethod: 'COD', subtotal: 169000,
       integrityChecksum: createOrderChecksum({ orderCode: 'MKF-123456', totalAmount: 169000, createdAt: new Date('2026-10-14T00:00:00Z') }),
-      items: [{ productSlug: 'test1' }],
+      items: [{ productSlug: 'test1', weightGrams: 150 }],
     });
     expect(orderFindUnique).toHaveBeenCalledWith(expect.objectContaining({
       include: expect.objectContaining({
-        items: { select: expect.objectContaining({ product: { select: { slug: true } } }) },
+        items: { select: expect.objectContaining({ product: { select: { slug: true, weight: true } }, variant: { select: { weight: true } } }) },
       }),
     }));
   });
