@@ -16,6 +16,7 @@ vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('next/cache', () => ({
   unstable_cache: (callback: () => unknown) => callback,
+  revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
 }));
 

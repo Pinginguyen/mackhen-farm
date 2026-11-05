@@ -47,6 +47,29 @@ type CreatedOrder = {
 };
 type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY'; message?: string };
 
+const CHECKOUT_RATE_LIMIT = 3;
+const CHECKOUT_RATE_WINDOW_MS = 10_000;
+const checkoutRequestsByIp = new Map<string, number[]>();
+
+function isCheckoutRateLimited(request: Request): boolean {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim();
+  if (!ip) return false;
+
+  const now = Date.now();
+  const windowStart = now - CHECKOUT_RATE_WINDOW_MS;
+  for (const [trackedIp, timestamps] of checkoutRequestsByIp) {
+    const recent = timestamps.filter((timestamp) => timestamp > windowStart);
+    if (recent.length) checkoutRequestsByIp.set(trackedIp, recent);
+    else checkoutRequestsByIp.delete(trackedIp);
+  }
+
+  const recentRequests = checkoutRequestsByIp.get(ip) ?? [];
+  if (recentRequests.length >= CHECKOUT_RATE_LIMIT) return true;
+  recentRequests.push(now);
+  checkoutRequestsByIp.set(ip, recentRequests);
+  return false;
+}
+
 function normalizeVietnamesePhone(value: string): string | null {
   const compact = value.trim().replace(/[\s().-]/g, '');
   const national = compact.replace(/^\+?84/, '0');
@@ -101,6 +124,10 @@ function setPaymentVerificationCookie(response: NextResponse, paymentMethod: str
 }
 
 export async function POST(request: Request) {
+  if (isCheckoutRateLimited(request)) {
+    return NextResponse.json({ error: { code: 'RATE_LIMITED', message: 'Quá nhiều yêu cầu đặt hàng. Vui lòng thử lại sau.' } }, { status: 429 });
+  }
+
   let payload: unknown;
   try {
     payload = await request.json();

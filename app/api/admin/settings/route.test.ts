@@ -8,6 +8,7 @@ const { settingsUpsert, settingsUpdate, requireAdmin, writeAuditLog } = vi.hoist
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: { systemSetting: { upsert: settingsUpsert, update: settingsUpdate } } }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));

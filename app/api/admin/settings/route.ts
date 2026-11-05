@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/admin-auth';
@@ -90,6 +91,7 @@ export async function PATCH(request: Request) {
       create: { id: 'default' },
     });
     const updated = await prisma.systemSetting.update({ where: { id: 'default' }, data: settings });
+    revalidatePath('/', 'layout');
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
       action: 'UPDATE_SYSTEM_SETTINGS',

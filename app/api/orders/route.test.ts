@@ -68,6 +68,23 @@ describe('POST /api/orders checkout', () => {
     prisma.$transaction.mockClear();
   });
 
+  it('limits each forwarded IP to three checkout requests per ten seconds', async () => {
+    const makeRateLimitedRequest = () => new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': '192.0.2.45' },
+      body: JSON.stringify({}),
+    });
+
+    expect((await POST(makeRateLimitedRequest())).status).toBe(400);
+    expect((await POST(makeRateLimitedRequest())).status).toBe(400);
+    expect((await POST(makeRateLimitedRequest())).status).toBe(400);
+    const limitedResponse = await POST(makeRateLimitedRequest());
+
+    expect(limitedResponse.status).toBe(429);
+    expect((await limitedResponse.json()).error.code).toBe('RATE_LIMITED');
+    expect(cartFindUnique).not.toHaveBeenCalled();
+  });
+
   it('rejects new MoMo orders before accessing the database', async () => {
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',

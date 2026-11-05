@@ -5,11 +5,26 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 type SepayPayload = {
+  id?: unknown;
+  transactionId?: unknown;
   content?: unknown;
   description?: unknown;
   transferAmount?: unknown;
   referenceCode?: unknown;
 };
+
+function getTransactionId(payload: SepayPayload): string | null {
+  for (const value of [payload.transactionId, payload.id, payload.referenceCode]) {
+    if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 120);
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
+  }
+  return null;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === 'P2002';
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -45,6 +60,7 @@ export async function POST(request: Request) {
     const payload = body as SepayPayload;
     const orderCode = getOrderCode(payload);
     const transferAmount = getTransferAmount(payload.transferAmount);
+    const transactionId = getTransactionId(payload);
     const referenceCode = typeof payload.referenceCode === 'string'
       ? payload.referenceCode.trim().slice(0, 120)
       : '';
@@ -65,39 +81,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    await prisma.$transaction(async (transaction) => {
-      if (order.paymentStatus !== 'PAID') {
-        await transaction.order.update({
-          where: { id: order.id },
-          data: {
-            paymentStatus: 'PAID',
-            orderStatus: ['CANCELLED', 'DELIVERED'].includes(order.orderStatus) ? order.orderStatus : 'PAID',
-            holdExpiresAt: null,
-          },
-        });
-      }
+    try {
+      await prisma.$transaction(async (transaction) => {
+        if (order.paymentStatus !== 'PAID') {
+          await transaction.order.update({
+            where: { id: order.id },
+            data: {
+              paymentStatus: 'PAID',
+              orderStatus: ['CANCELLED', 'DELIVERED'].includes(order.orderStatus) ? order.orderStatus : 'PAID',
+              holdExpiresAt: null,
+              ...(transactionId ? { sepayTransactionId: transactionId } : {}),
+            },
+          });
+        }
 
-      const payment = await transaction.payment.findFirst({
-        where: { orderId: order.id },
-        orderBy: { createdAt: 'desc' },
-      });
-      const paymentData = {
-        status: 'PAID' as const,
-        amount: transferAmount,
-        ...(referenceCode ? { externalId: referenceCode } : {}),
-      };
-      if (payment) {
-        await transaction.payment.update({ where: { id: payment.id }, data: paymentData });
-      } else {
-        await transaction.payment.create({
-          data: {
-            orderId: order.id,
-            orderCode: order.numericCode,
-            ...paymentData,
-          },
+        const payment = await transaction.payment.findFirst({
+          where: { orderId: order.id },
+          orderBy: { createdAt: 'desc' },
         });
-      }
-    });
+        const paymentData = {
+          status: 'PAID' as const,
+          amount: transferAmount,
+          ...(referenceCode ? { externalId: referenceCode } : {}),
+        };
+        if (payment) {
+          await transaction.payment.update({ where: { id: payment.id }, data: paymentData });
+        } else {
+          await transaction.payment.create({
+            data: {
+              orderId: order.id,
+              orderCode: order.numericCode,
+              ...paymentData,
+            },
+          });
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return NextResponse.json({ success: true });
+      throw error;
+    }
   } catch (error) {
     console.error('SePay payment webhook failed:', error instanceof Error ? error.name : 'UnknownError');
   }

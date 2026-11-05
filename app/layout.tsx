@@ -13,6 +13,7 @@ import { Suspense } from 'react';
 import AffiliateTracker from '@/components/marketing/AffiliateTracker';
 import CartDrawer from '@/components/cart/CartDrawer';
 import MobileBottomDock from '@/components/layout/MobileBottomDock';
+import CookieConsent from '@/components/common/CookieConsent';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="texture-overlay" aria-hidden="true" />
           <div className="app-viewport overflow-x-clip">
             <Suspense fallback={null}><AffiliateTracker /></Suspense>
+            <CookieConsent />
             <SiteHeaderVisibility>
               <Header />
             </SiteHeaderVisibility>

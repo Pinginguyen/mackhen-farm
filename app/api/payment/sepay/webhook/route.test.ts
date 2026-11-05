@@ -85,12 +85,24 @@ describe('POST /api/payment/sepay/webhook', () => {
     expect(orderFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { orderCode: 'MKF-123456' } }));
     expect(orderUpdate).toHaveBeenCalledWith({
       where: { id: 'order-1' },
-      data: { paymentStatus: 'PAID', orderStatus: 'PAID', holdExpiresAt: null },
+      data: { paymentStatus: 'PAID', orderStatus: 'PAID', holdExpiresAt: null, sepayTransactionId: 'SP-9988' },
     });
     expect(paymentUpdate).toHaveBeenCalledWith({
       where: { id: 'payment-1' },
       data: { status: 'PAID', amount: 70000, externalId: 'SP-9988' },
     });
+  });
+
+  it('acknowledges a duplicate SePay transaction when the unique constraint rejects it', async () => {
+    orderUpdate.mockRejectedValueOnce(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
+
+    const response = await POST(makeRequest({
+      content: 'MKF-123456', transferAmount: 70000, id: 9988, referenceCode: 'SP-9988',
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(paymentFindFirst).not.toHaveBeenCalled();
   });
 
   it('accepts MoMo orders paid through the linked MB Bank QR', async () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag, unstable_cache } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
@@ -364,6 +364,7 @@ export async function PATCH(request: Request) {
       },
       include: { variants: true },
     });
+    revalidatePath('/', 'layout');
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
       action: previous.price !== product.price ? 'UPDATE_PRICE' : 'ADJUST_STOCK',

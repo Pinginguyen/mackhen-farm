@@ -283,6 +283,7 @@ model Order {
   orderStatus   OrderStatus          @default(PENDING) @map("status")
   paymentMethod CheckoutPaymentMethod @default(COD)
   paymentStatus PaymentStatus        @default(PENDING)
+  sepayTransactionId String?          @unique
   refundAmount  Int                  @default(0)
   refundedAt    DateTime?
   subtotal      Int

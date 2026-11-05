@@ -2,17 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { normalizeAffiliateCode, storeAffiliateCode } from '@/lib/affiliate-attribution';
+import { hasAffiliateConsent, normalizeAffiliateCode, storeAffiliateCode } from '@/lib/affiliate-attribution';
 
 export default function AffiliateTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const ref = searchParams.get('ref');
   const [notice, setNotice] = useState('');
+  const [consentRevision, setConsentRevision] = useState(0);
   const trackedCode = useRef<string | null>(null);
 
   useEffect(() => {
-    if (pathname.startsWith('/admin') || !ref) {
+    const updateConsent = () => setConsentRevision((revision) => revision + 1);
+    window.addEventListener('mkf-cookie-consent-change', updateConsent);
+    return () => window.removeEventListener('mkf-cookie-consent-change', updateConsent);
+  }, []);
+
+  useEffect(() => {
+    if (pathname.startsWith('/admin') || !ref || !hasAffiliateConsent()) {
       setNotice('');
       return;
     }
@@ -35,7 +42,7 @@ export default function AffiliateTracker() {
     setNotice(code);
     const timeout = window.setTimeout(() => setNotice(''), 6500);
     return () => window.clearTimeout(timeout);
-  }, [pathname, ref]);
+  }, [pathname, ref, consentRevision]);
 
   if (!notice || pathname.startsWith('/admin')) return null;
   return <div className="affiliate-attribution-notice" role="status">🎉 Bạn đang nhận ưu đãi đặc quyền qua liên kết của đối tác {notice}!</div>;
