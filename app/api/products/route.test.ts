@@ -173,6 +173,12 @@ describe('/api/products', () => {
         spiciness: validProduct.spiciness,
         chewiness: validProduct.chewiness,
         aroma: validProduct.aroma,
+        labelAxis1: 'Độ cay',
+        labelAxis2: 'Độ dai giòn',
+        labelAxis3: 'Hương Mắc Khén',
+        valueAxis1: 60,
+        valueAxis2: 80,
+        valueAxis3: 100,
         upsellProduct: { connect: { id: 'upsell-1' } },
         isFeatured: true,
         nutritionFacts: validProduct.nutritionFacts,
@@ -195,6 +201,54 @@ describe('/api/products', () => {
       unit: '150g',
       variants: { create: variants },
     }), include: { variants: true } });
+  });
+
+  it('creates a product with Admin-defined sensory labels and percentages', async () => {
+    await POST(makeRequest('POST', {
+      ...validProduct,
+      labelAxis1: 'Độ tê đầu lưỡi',
+      labelAxis2: 'Mùi hạt dổi rang',
+      labelAxis3: 'Hương hậu vị',
+      valueAxis1: 35,
+      valueAxis2: 72,
+      valueAxis3: 96,
+    }));
+
+    expect(productCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        labelAxis1: 'Độ tê đầu lưỡi',
+        labelAxis2: 'Mùi hạt dổi rang',
+        labelAxis3: 'Hương hậu vị',
+        valueAxis1: 35,
+        valueAxis2: 72,
+        valueAxis3: 96,
+      }),
+    }));
+  });
+
+  it('updates sensory labels and percentages without changing the product identity', async () => {
+    await PATCH(makeRequest('PATCH', {
+      id: 'product-1',
+      ...validProduct,
+      labelAxis1: 'Độ nồng gia vị',
+      labelAxis2: 'Độ bùi',
+      labelAxis3: 'Hương rang',
+      valueAxis1: 22,
+      valueAxis2: 65,
+      valueAxis3: 88,
+    }));
+
+    expect(productUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'product-1' },
+      data: expect.objectContaining({
+        labelAxis1: 'Độ nồng gia vị',
+        labelAxis2: 'Độ bùi',
+        labelAxis3: 'Hương rang',
+        valueAxis1: 22,
+        valueAxis2: 65,
+        valueAxis3: 88,
+      }),
+    }));
   });
 
   it('updates variant fields by ID and deletes omitted variants', async () => {
@@ -287,6 +341,8 @@ describe('/api/products', () => {
     const invalidIngredients = await POST(makeRequest('POST', { ...validProduct, ingredients: 'x'.repeat(5001) }));
     const invalidIngredientsType = await PATCH(makeRequest('PATCH', { id: 'product-1', ...validProduct, ingredients: { value: 'not text' } }));
     const invalidTasteScore = await POST(makeRequest('POST', { ...validProduct, spiciness: 6 }));
+    const invalidAxisValue = await POST(makeRequest('POST', { ...validProduct, valueAxis2: 101 }));
+    const emptyAxisLabel = await POST(makeRequest('POST', { ...validProduct, labelAxis1: '   ' }));
 
     expect(invalidPrice.status).toBe(400);
     expect(unsafeImage.status).toBe(400);
@@ -295,6 +351,8 @@ describe('/api/products', () => {
     expect(invalidIngredients.status).toBe(400);
     expect(invalidIngredientsType.status).toBe(400);
     expect(invalidTasteScore.status).toBe(400);
+    expect(invalidAxisValue.status).toBe(400);
+    expect(emptyAxisLabel.status).toBe(400);
     expect(productCreate).not.toHaveBeenCalled();
   });
 });

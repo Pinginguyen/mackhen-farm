@@ -13290,6 +13290,42 @@ body {
   margin: 0;
 }
 
+.admin-sensory-axis-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-sensory-axis-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 1.2fr) 52px;
+  align-items: end;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e8e1d8;
+  border-radius: 10px;
+  background: #fffdfa;
+}
+
+.admin-sensory-axis-row .field {
+  margin: 0;
+}
+
+.admin-sensory-axis-row input[type="range"] {
+  min-height: 42px;
+  padding: 0;
+  accent-color: #841e1e;
+  cursor: pointer;
+}
+
+.admin-sensory-axis-value {
+  align-self: end;
+  padding: 11px 0;
+  color: #841e1e;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  text-align: right;
+}
+
 .admin-new-product-form .field {
   display: grid;
   min-width: 0;
@@ -13500,6 +13536,14 @@ body {
 
   .admin-nutrition-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-sensory-axis-row {
+    grid-template-columns: minmax(0, 1fr) 52px;
+  }
+
+  .admin-sensory-axis-row .field:first-child {
+    grid-column: 1 / -1;
   }
 
   .admin-product-full-width {

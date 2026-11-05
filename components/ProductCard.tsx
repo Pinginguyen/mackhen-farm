@@ -79,7 +79,18 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
         <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
-        <TasteSensoryMeter compact spiciness={product.spiciness} chewiness={product.chewiness} aroma={product.aroma} />
+        <TasteSensoryMeter
+          compact
+          spiciness={product.spiciness}
+          chewiness={product.chewiness}
+          aroma={product.aroma}
+          labelAxis1={product.labelAxis1}
+          labelAxis2={product.labelAxis2}
+          labelAxis3={product.labelAxis3}
+          valueAxis1={product.valueAxis1}
+          valueAxis2={product.valueAxis2}
+          valueAxis3={product.valueAxis3}
+        />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
         <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div></div>
         <Link

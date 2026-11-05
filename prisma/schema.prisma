@@ -94,6 +94,12 @@ model Product {
   spiciness     Int              @default(3)
   chewiness     Int              @default(4)
   aroma         Int              @default(5)
+  labelAxis1    String           @default("Độ cay")
+  labelAxis2    String           @default("Độ dai giòn")
+  labelAxis3    String           @default("Hương Mắc Khén")
+  valueAxis1    Int              @default(60)
+  valueAxis2    Int              @default(80)
+  valueAxis3    Int              @default(100)
   stock         Int              @default(0)
   description   String
   ingredients   String?          @db.Text

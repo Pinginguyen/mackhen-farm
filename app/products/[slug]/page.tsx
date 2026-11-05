@@ -149,7 +149,17 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
               <ProductRating rating={product.rating} size="sm" />
             </div>
-            <TasteSensoryMeter spiciness={product.spiciness} chewiness={product.chewiness} aroma={product.aroma} />
+            <TasteSensoryMeter
+              spiciness={product.spiciness}
+              chewiness={product.chewiness}
+              aroma={product.aroma}
+              labelAxis1={product.labelAxis1}
+              labelAxis2={product.labelAxis2}
+              labelAxis3={product.labelAxis3}
+              valueAxis1={product.valueAxis1}
+              valueAxis2={product.valueAxis2}
+              valueAxis3={product.valueAxis3}
+            />
             <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">

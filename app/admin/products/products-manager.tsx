@@ -30,6 +30,12 @@ type ProductDraft = {
   spiciness: string;
   chewiness: string;
   aroma: string;
+  labelAxis1: string;
+  labelAxis2: string;
+  labelAxis3: string;
+  valueAxis1: string;
+  valueAxis2: string;
+  valueAxis3: string;
   upsellProductId: string;
   isFeatured: boolean;
   variants: VariantDraft[];
@@ -66,6 +72,12 @@ const emptyDraft: ProductDraft = {
   spiciness: '3',
   chewiness: '4',
   aroma: '5',
+  labelAxis1: 'Độ cay',
+  labelAxis2: 'Độ dai giòn',
+  labelAxis3: 'Hương Mắc Khén',
+  valueAxis1: '60',
+  valueAxis2: '80',
+  valueAxis3: '100',
   upsellProductId: '',
   isFeatured: false,
   variants: [],
@@ -160,6 +172,12 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       spiciness: String(product.spiciness ?? 3),
       chewiness: String(product.chewiness ?? 4),
       aroma: String(product.aroma ?? 5),
+      labelAxis1: product.labelAxis1 ?? 'Độ cay',
+      labelAxis2: product.labelAxis2 ?? 'Độ dai giòn',
+      labelAxis3: product.labelAxis3 ?? 'Hương Mắc Khén',
+      valueAxis1: String(product.valueAxis1 ?? 60),
+      valueAxis2: String(product.valueAxis2 ?? 80),
+      valueAxis3: String(product.valueAxis3 ?? 100),
       upsellProductId: product.upsellProductId ?? '',
       isFeatured: product.isFeatured ?? false,
       variants: (product.variants ?? []).map((variant) => ({
@@ -228,6 +246,12 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           spiciness: Number(draft.spiciness),
           chewiness: Number(draft.chewiness),
           aroma: Number(draft.aroma),
+          labelAxis1: draft.labelAxis1.trim(),
+          labelAxis2: draft.labelAxis2.trim(),
+          labelAxis3: draft.labelAxis3.trim(),
+          valueAxis1: Number(draft.valueAxis1),
+          valueAxis2: Number(draft.valueAxis2),
+          valueAxis3: Number(draft.valueAxis3),
           upsellProductId: draft.upsellProductId || null,
           isFeatured: draft.isFeatured,
           variants: draft.variants.map((variant) => ({
@@ -429,12 +453,16 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
               <label className="field admin-product-full-width">Nhãn nổi bật (Badge tag) - Tùy chọn<input value={draft.badge} onChange={(event) => setDraft({ ...draft, badge: event.target.value })} maxLength={60} placeholder="Ví dụ: Sản phẩm mới, Bán chạy, Giảm 15%..." /><small>Để trống nếu không muốn hiển thị nhãn đỏ trên ảnh sản phẩm.</small></label>
               <fieldset className="admin-product-variants admin-product-full-width">
                 <legend>THIẾT LẬP VỊ GIÁC &amp; HIỂN THỊ TRỰC QUAN</legend>
-                <div className="admin-nutrition-grid">
+                <div className="admin-sensory-axis-list">
                   {([
-                    ['spiciness', 'Độ cay'],
-                    ['chewiness', 'Độ dai giòn'],
-                    ['aroma', 'Hương Mắc Khén'],
-                  ] as const).map(([field, label]) => <label className="field" key={field}>{label}<select value={draft[field]} onChange={(event) => setDraft((current) => ({ ...current, [field]: event.target.value }))}>{[1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score} / 5</option>)}</select></label>)}
+                    ['labelAxis1', 'valueAxis1', 'Trục 1'],
+                    ['labelAxis2', 'valueAxis2', 'Trục 2'],
+                    ['labelAxis3', 'valueAxis3', 'Trục 3'],
+                  ] as const).map(([labelField, valueField, axisTitle]) => <div className="admin-sensory-axis-row" key={labelField}>
+                    <label className="field">{axisTitle} · Nhãn<input value={draft[labelField]} onChange={(event) => setDraft((current) => ({ ...current, [labelField]: event.target.value }))} maxLength={60} required /></label>
+                    <label className="field">Mức độ · {draft[valueField]}%<input type="range" min={0} max={100} step={1} value={draft[valueField]} onChange={(event) => setDraft((current) => ({ ...current, [valueField]: event.target.value }))} aria-label={`${axisTitle} mức độ phần trăm`} /></label>
+                    <output className="admin-sensory-axis-value" aria-live="polite">{draft[valueField]}%</output>
+                  </div>)}
                 </div>
                 <label className="field admin-product-full-width">Chữ trên tem huy hiệu<input value={draft.badgeText} onChange={(event) => setDraft((current) => ({ ...current, badgeText: event.target.value }))} maxLength={80} placeholder="Ví dụ: OCOP 4 Sao, High-Protein, Bản Hua Tạt..." /></label>
                 <label className="field admin-product-full-width">Sản phẩm gợi ý bán kèm (Upsell)<select value={draft.upsellProductId} onChange={(event) => setDraft((current) => ({ ...current, upsellProductId: event.target.value }))}><option value="">Không gợi ý sản phẩm bán kèm</option>{products.filter((item) => item.active && item.id !== editingProduct?.id).map((item) => <option value={item.id} key={item.id}>{item.name} · {item.price.toLocaleString('vi-VN')}đ</option>)}</select></label>

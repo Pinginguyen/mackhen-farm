@@ -30,6 +30,12 @@ export type CatalogProduct = {
   spiciness?: number;
   chewiness?: number;
   aroma?: number;
+  labelAxis1?: string;
+  labelAxis2?: string;
+  labelAxis3?: string;
+  valueAxis1?: number;
+  valueAxis2?: number;
+  valueAxis3?: number;
   upsellProductId?: string | null;
   isFeatured?: boolean;
   nutritionFacts?: NutritionFacts | null;

@@ -62,6 +62,17 @@ function isValidTasteScore(value: number | null | undefined): value is number | 
   return value === undefined || (value !== null && Number.isInteger(value) && value >= 1 && value <= 5);
 }
 
+function parseAxisLabel(value: unknown, fallback: string): string | null {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'string') return null;
+  const label = value.trim();
+  return label && label.length <= 60 ? label : null;
+}
+
+function isValidAxisValue(value: number | null | undefined): value is number | undefined {
+  return value === undefined || (value !== null && Number.isInteger(value) && value >= 0 && value <= 100);
+}
+
 function createSlug(name: string): string {
   const slug = name.toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'san-pham';
@@ -210,6 +221,12 @@ export async function POST(request: Request) {
   const spiciness = body.spiciness === undefined ? 3 : numberValue(body.spiciness);
   const chewiness = body.chewiness === undefined ? 4 : numberValue(body.chewiness);
   const aroma = body.aroma === undefined ? 5 : numberValue(body.aroma);
+  const labelAxis1 = parseAxisLabel(body.labelAxis1, 'Độ cay');
+  const labelAxis2 = parseAxisLabel(body.labelAxis2, 'Độ dai giòn');
+  const labelAxis3 = parseAxisLabel(body.labelAxis3, 'Hương Mắc Khén');
+  const valueAxis1 = body.valueAxis1 === undefined ? 60 : numberValue(body.valueAxis1);
+  const valueAxis2 = body.valueAxis2 === undefined ? 80 : numberValue(body.valueAxis2);
+  const valueAxis3 = body.valueAxis3 === undefined ? 100 : numberValue(body.valueAxis3);
   const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
     ? null
     : typeof body.upsellProductId === 'string' ? body.upsellProductId.trim() || undefined : undefined;
@@ -220,6 +237,7 @@ export async function POST(request: Request) {
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
     || !Number.isInteger(spiciness) || spiciness! < 1 || spiciness! > 5 || !Number.isInteger(chewiness) || chewiness! < 1 || chewiness! > 5 || !Number.isInteger(aroma) || aroma! < 1 || aroma! > 5
+    || !labelAxis1 || !labelAxis2 || !labelAxis3 || !isValidAxisValue(valueAxis1) || !isValidAxisValue(valueAxis2) || !isValidAxisValue(valueAxis3)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
     || (body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
@@ -255,6 +273,12 @@ export async function POST(request: Request) {
         spiciness: spiciness ?? 3,
         chewiness: chewiness ?? 4,
         aroma: aroma ?? 5,
+        labelAxis1,
+        labelAxis2,
+        labelAxis3,
+        valueAxis1,
+        valueAxis2,
+        valueAxis3,
         ...(upsellProductId ? { upsellProduct: { connect: { id: upsellProductId } } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
@@ -306,6 +330,12 @@ export async function PATCH(request: Request) {
   const spiciness = body.spiciness === undefined ? undefined : numberValue(body.spiciness);
   const chewiness = body.chewiness === undefined ? undefined : numberValue(body.chewiness);
   const aroma = body.aroma === undefined ? undefined : numberValue(body.aroma);
+  const labelAxis1 = body.labelAxis1 === undefined ? undefined : parseAxisLabel(body.labelAxis1, 'Độ cay');
+  const labelAxis2 = body.labelAxis2 === undefined ? undefined : parseAxisLabel(body.labelAxis2, 'Độ dai giòn');
+  const labelAxis3 = body.labelAxis3 === undefined ? undefined : parseAxisLabel(body.labelAxis3, 'Hương Mắc Khén');
+  const valueAxis1 = body.valueAxis1 === undefined ? undefined : numberValue(body.valueAxis1);
+  const valueAxis2 = body.valueAxis2 === undefined ? undefined : numberValue(body.valueAxis2);
+  const valueAxis3 = body.valueAxis3 === undefined ? undefined : numberValue(body.valueAxis3);
   const upsellWasProvided = body.upsellProductId !== undefined;
   const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
     ? null
@@ -319,6 +349,12 @@ export async function PATCH(request: Request) {
     || !isValidTasteScore(spiciness)
     || !isValidTasteScore(chewiness)
     || !isValidTasteScore(aroma)
+    || (body.labelAxis1 !== undefined && !labelAxis1)
+    || (body.labelAxis2 !== undefined && !labelAxis2)
+    || (body.labelAxis3 !== undefined && !labelAxis3)
+    || !isValidAxisValue(valueAxis1)
+    || !isValidAxisValue(valueAxis2)
+    || !isValidAxisValue(valueAxis3)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
     || (upsellWasProvided && body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
@@ -327,7 +363,7 @@ export async function PATCH(request: Request) {
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, badgeText: true, upsellProductId: true, variants: { select: { id: true } } } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, labelAxis1: true, labelAxis2: true, labelAxis3: true, valueAxis1: true, valueAxis2: true, valueAxis3: true, badgeText: true, upsellProductId: true, variants: { select: { id: true } } } });
     if (!previous) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
     if (upsellProductId) {
       if (upsellProductId === productId) return NextResponse.json({ error: { message: 'Sản phẩm không thể tự gợi ý chính nó.' } }, { status: 400 });
@@ -357,6 +393,12 @@ export async function PATCH(request: Request) {
         ...(spiciness !== undefined ? { spiciness } : {}),
         ...(chewiness !== undefined ? { chewiness } : {}),
         ...(aroma !== undefined ? { aroma } : {}),
+        ...(labelAxis1 != null ? { labelAxis1 } : {}),
+        ...(labelAxis2 != null ? { labelAxis2 } : {}),
+        ...(labelAxis3 != null ? { labelAxis3 } : {}),
+        ...(valueAxis1 !== undefined ? { valueAxis1 } : {}),
+        ...(valueAxis2 !== undefined ? { valueAxis2 } : {}),
+        ...(valueAxis3 !== undefined ? { valueAxis3 } : {}),
         ...(upsellWasProvided ? { upsellProduct: upsellProductId ? { connect: { id: upsellProductId } } : { disconnect: true } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         ...(typeof body.isFeatured === 'boolean' ? { isFeatured: body.isFeatured } : {}),
@@ -371,7 +413,7 @@ export async function PATCH(request: Request) {
       targetEntity: 'Product',
       targetId: product.id,
       oldValue: previous,
-      newValue: { price: product.price, stock: product.stock, active: product.active, spiciness: product.spiciness, chewiness: product.chewiness, aroma: product.aroma, badgeText: product.badgeText, upsellProductId: product.upsellProductId },
+      newValue: { price: product.price, stock: product.stock, active: product.active, spiciness: product.spiciness, chewiness: product.chewiness, aroma: product.aroma, labelAxis1: product.labelAxis1, labelAxis2: product.labelAxis2, labelAxis3: product.labelAxis3, valueAxis1: product.valueAxis1, valueAxis2: product.valueAxis2, valueAxis3: product.valueAxis3, badgeText: product.badgeText, upsellProductId: product.upsellProductId },
     });
     revalidateTag('products');
     return NextResponse.json({ product });
