@@ -32,6 +32,7 @@ const statusOptions = [
   ['PENDING', 'Chờ xác nhận'],
   ['CONFIRMED', 'Đã xác nhận'],
   ['PROCESSING', 'Đang đóng gói'],
+  ['HANDED_OFF', 'Đã bàn giao 3PL'],
   ['IN_TRANSIT', 'Đang giao hàng'],
   ['SHIPPING', 'Đang giao hàng'],
   ['DELIVERED', 'Giao thành công'],
@@ -134,7 +135,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
     setPending(order.orderCode);
     setToast('');
     try {
-      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: selectedStatus, ...(selectedPaymentStatus !== order.paymentStatus ? { paymentStatus: selectedPaymentStatus } : {}), carrier: selectedCarrier, trackingCode: trackingInput }) });
+      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: selectedStatus, ...(selectedPaymentStatus !== order.paymentStatus ? { paymentStatus: selectedPaymentStatus } : {}), ...(selectedStatus === 'CANCELLED' ? { cancelReason } : {}), carrier: selectedCarrier, trackingCode: trackingInput }) });
       const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
       else {
@@ -358,7 +359,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                   <option value="">Giữ nguyên: {orderStatusLabels[order.status] ?? order.status}</option>
                   {statusOptions.filter(([value]) => orderStatusValues.has(value)
                     && (value === order.status || getAllowedNextStatuses(order.status).includes(value)))
-                    .map(([value, label]) => <option key={value} value={value} disabled={value === 'CANCELLED'}>{label}</option>)}
+                    .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue="">
                   <option value="">Giữ nguyên: {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}</option>

@@ -33,7 +33,8 @@ describe('Admin order status controls', () => {
     expect(orderStatusSelect).toContain('Chờ xác nhận');
     expect(orderStatusSelect).not.toContain('value="PAID"');
     expect(orderStatusSelect).not.toContain('Đã thanh toán');
-    expect(orderStatusSelect).not.toContain('value="HANDED_OFF"');
+    expect(orderStatusSelect).toContain('value="CANCELLED"');
+    expect(orderStatusSelect).not.toContain('disabled=""');
 
     expect(paymentStatusSelect).toContain('value="PENDING"');
     expect(paymentStatusSelect).toContain('value="PAID"');
@@ -41,9 +42,16 @@ describe('Admin order status controls', () => {
     expect(paymentStatusSelect).toContain('Đã hoàn tiền');
 
     const deliveryHtml = renderToStaticMarkup(createElement(OrdersManager, {
+      orders: [{ ...order, status: 'PROCESSING' }],
+    }));
+    const processingStatusSelect = deliveryHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
+    expect(processingStatusSelect).toContain('value="HANDED_OFF"');
+    expect(processingStatusSelect).toContain('Đã bàn giao 3PL');
+
+    const handedOffHtml = renderToStaticMarkup(createElement(OrdersManager, {
       orders: [{ ...order, status: 'HANDED_OFF' }],
     }));
-    const deliveryStatusSelect = deliveryHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
+    const deliveryStatusSelect = handedOffHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
     expect(deliveryStatusSelect).toContain('value="IN_TRANSIT"');
     expect(deliveryStatusSelect).toContain('value="SHIPPING"');
     expect(deliveryStatusSelect).toContain('value="RETURNED"');
