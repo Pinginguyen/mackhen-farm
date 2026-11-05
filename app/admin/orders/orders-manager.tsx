@@ -29,11 +29,37 @@ export type AdminOrder = {
 };
 
 const statusOptions = [
-  ['PENDING', 'Chờ thanh toán / xác nhận'], ['CONFIRMED', 'Đã xác nhận'], ['PAID', 'Đã thanh toán'], ['PROCESSING', 'Đang đóng gói phòng sạch'],
-  ['HANDED_OFF', 'Đã bàn giao 3PL'], ['IN_TRANSIT', 'Đang giao hàng'], ['SHIPPING', 'Đang giao (cũ)'],
-  ['DELIVERED', 'Giao thành công'], ['COMPLETED', 'Hoàn tất'], ['RETURNED', 'Chuyển hoàn'], ['CANCELLED', 'Đã hủy'],
-];
-const orderStatusLabels: Record<string, string> = { PENDING: 'Chờ thanh toán / xác nhận', CONFIRMED: 'Đã xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao hàng', SHIPPING: 'Đang giao', DELIVERED: 'Giao thành công', COMPLETED: 'Hoàn tất', RETURNED: 'Chuyển hoàn', CANCELLED: 'Đã hủy' };
+  ['PENDING', 'Chờ xác nhận'],
+  ['CONFIRMED', 'Đã xác nhận'],
+  ['PROCESSING', 'Đang đóng gói'],
+  ['IN_TRANSIT', 'Đang giao hàng'],
+  ['SHIPPING', 'Đang giao hàng'],
+  ['DELIVERED', 'Giao thành công'],
+  ['COMPLETED', 'Hoàn tất'],
+  ['RETURNED', 'Hoàn hàng'],
+  ['CANCELLED', 'Đã hủy'],
+] as const;
+const orderStatusValues = new Set<string>(statusOptions.map(([value]) => value));
+const orderStatusLabels: Record<string, string> = {
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  PAID: 'Chờ xử lý',
+  PROCESSING: 'Đang đóng gói',
+  HANDED_OFF: 'Đã bàn giao đơn vị vận chuyển',
+  IN_TRANSIT: 'Đang giao hàng',
+  SHIPPING: 'Đang giao hàng',
+  DELIVERED: 'Giao thành công',
+  COMPLETED: 'Hoàn tất',
+  RETURNED: 'Hoàn hàng',
+  CANCELLED: 'Đã hủy',
+};
+const paymentStatusLabels: Record<string, string> = {
+  PENDING: 'Chưa thanh toán',
+  PAID: 'Đã thanh toán',
+  REFUNDED: 'Đã hoàn tiền',
+  FAILED: 'Thanh toán thất bại',
+  CANCELLED: 'Thanh toán đã hủy',
+};
 
 export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const [orderList, setOrderList] = useState(orders);
@@ -58,10 +84,10 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
 
   const tabs = [
     { id: 'ALL', label: 'Tất cả' },
-    { id: 'PENDING', label: 'Chờ thanh toán / xác nhận' },
-    { id: 'PAID', label: 'Đã thanh toán' },
-    { id: 'PROCESSING', label: 'Đóng gói · FEFO & hút oxy' },
-    { id: 'HANDED_OFF', label: 'Đã bàn giao 3PL' },
+    { id: 'PENDING', label: 'Chờ xử lý' },
+    { id: 'PAID', label: 'Thanh toán: Đã thanh toán' },
+    { id: 'PROCESSING', label: 'Đang đóng gói' },
+    { id: 'HANDED_OFF', label: 'Đã bàn giao vận chuyển' },
     { id: 'IN_TRANSIT', label: 'Đang giao hàng' },
     { id: 'SUCCESS', label: 'Giao thành công' },
     { id: 'RETURNS', label: 'Đổi trả / bảo hành' },
@@ -101,14 +127,14 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   async function save(event: React.FormEvent<HTMLFormElement>, order: AdminOrder) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const selectedStatus = String(form.get('status') ?? order.status);
-    const selectedPaymentStatus = String(form.get('paymentStatus') ?? order.paymentStatus);
+    const selectedStatus = String(form.get('status') ?? '') || order.status;
+    const selectedPaymentStatus = String(form.get('paymentStatus') ?? '') || order.paymentStatus;
     const selectedCarrier = String(form.get('carrier') ?? '');
     const trackingInput = String(form.get('trackingCode') ?? '');
     setPending(order.orderCode);
     setToast('');
     try {
-      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: selectedStatus, paymentStatus: selectedPaymentStatus, carrier: selectedCarrier, trackingCode: trackingInput }) });
+      const response = await fetch('/api/admin/orders', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ orderCode: order.orderCode, status: selectedStatus, ...(selectedPaymentStatus !== order.paymentStatus ? { paymentStatus: selectedPaymentStatus } : {}), carrier: selectedCarrier, trackingCode: trackingInput }) });
       const result = await response.json() as { status?: string; paymentStatus?: string; carrier?: string | null; trackingCode?: string | null; error?: { message?: string } };
       if (!response.ok) setToast(result.error?.message ?? 'Không thể cập nhật đơn.');
       else {
@@ -282,7 +308,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 <div className="admin-order-title-row">
                   <strong className="admin-order-code">{order.orderCode}</strong>
                   <span className={`admin-status-badge status-${order.status.toLowerCase()}`}>{orderStatusLabels[order.status] ?? order.status}</span>
-                  <span className={`admin-payment-badge ${order.paymentMethod === 'COD' ? 'cod' : order.paymentMethod.toLowerCase()}`}>{order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}</span>
+                  <span className={`admin-payment-badge ${order.paymentMethod === 'COD' ? 'cod' : order.paymentMethod.toLowerCase()}`}>{paymentStatusLabels[order.paymentStatus] ?? 'Chưa thanh toán'}</span>
                   <span className="admin-payment-method-badge">{order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod}</span>
                 </div>
                 <time dateTime={order.createdAt}>{new Date(order.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
@@ -328,8 +354,18 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             {order.hasOpenCase && <p className="admin-open-case-badge">Đang có yêu cầu đổi trả / bảo hành cần xử lý</p>}
             <form className="admin-order-toolbar" onSubmit={(event) => save(event, order)}>
               <div className="admin-order-toolbar-controls grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <label className="field">Trạng thái đơn<select name="status" defaultValue={order.status}>{statusOptions.filter(([value]) => value === order.status || getAllowedNextStatuses(order.status).includes(value)).map(([value, label]) => <option key={value} value={value} disabled={value === 'PAID' || value === 'CANCELLED'}>{label}</option>)}</select></label>
-                <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue={order.paymentStatus}><option value="PENDING">Chưa thanh toán</option><option value="PAID" disabled={order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID'}>Đã thanh toán</option></select></label>
+                <label className="field">Trạng thái đơn<select name="status" defaultValue="">
+                  <option value="">Giữ nguyên: {orderStatusLabels[order.status] ?? order.status}</option>
+                  {statusOptions.filter(([value]) => orderStatusValues.has(value)
+                    && (value === order.status || getAllowedNextStatuses(order.status).includes(value)))
+                    .map(([value, label]) => <option key={value} value={value} disabled={value === 'CANCELLED'}>{label}</option>)}
+                </select></label>
+                <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue="">
+                  <option value="">Giữ nguyên: {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}</option>
+                  <option value="PENDING" disabled={order.paymentStatus === 'REFUNDED'}>Chưa thanh toán</option>
+                  <option value="PAID" disabled={order.paymentStatus === 'REFUNDED' || (order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID')}>Đã thanh toán</option>
+                  <option value="REFUNDED" disabled={order.paymentStatus !== 'REFUNDED'}>Đã hoàn tiền</option>
+                </select></label>
                 <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
                 <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} placeholder="Nhập mã vận đơn..." /></label>
               </div>
