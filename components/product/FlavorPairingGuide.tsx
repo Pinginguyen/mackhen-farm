@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GlassWater, Plus, Sparkles } from 'lucide-react';
+import { Crown, Plus, Sparkles } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
 type PairingProduct = { id: string; slug: string; name: string; image: string; price: number; stock: number };
@@ -72,18 +72,18 @@ export default function FlavorPairingGuide({ products }: { products: PairingProd
   }
 
   return (
-    <section className="flavor-pairing-guide" aria-labelledby="flavor-pairing-title">
-      <div className="flavor-pairing-heading"><span className="flavor-pairing-mark"><GlassWater size={18} aria-hidden="true" /></span><div><p className="eyebrow">{isEN ? 'TASTE NOTES' : 'GỢI Ý THƯỞNG VỊ'}</p><h2 id="flavor-pairing-title">{isEN ? 'A Northwest pairing, your way' : 'Phối vị Tây Bắc theo gu của bạn'}</h2></div></div>
+    <section className="flavor-pairing-guide !gap-5 !rounded-3xl !border-[#d4a373]/40 !bg-[#142820] !p-5 !text-[#faf7f2] !shadow-[0_24px_55px_-30px_rgba(20,40,32,0.8)] sm:!p-7" style={{ backgroundImage: 'linear-gradient(135deg, #142820 0%, #263b30 100%)' }} aria-labelledby="flavor-pairing-title">
+      <div className="flavor-pairing-heading"><span className="flavor-pairing-mark !h-11 !w-11 !flex-[0_0_44px] !rounded-2xl !border-[#d4a373]/50 !bg-[#d4a373]/10 !text-[#e7bd83]"><Crown size={19} aria-hidden="true" /></span><div><p className="eyebrow !text-[#e7bd83]">{isEN ? 'TASTE NOTES' : 'GỢI Ý THƯỞNG VỊ'}</p><h2 className="!text-[#faf7f2]" id="flavor-pairing-title">{isEN ? 'A Northwest pairing, your way' : 'Phối vị Tây Bắc theo gu của bạn'}</h2></div></div>
       <div className="flavor-pairing-tabs" role="group" aria-label={isEN ? 'Choose a pairing style' : 'Chọn gu thưởng thức'}>
-        {(Object.keys(pairingGuides) as PairingTaste[]).map((taste) => <button key={taste} type="button" aria-pressed={selectedTaste === taste} className={selectedTaste === taste ? 'is-selected' : ''} onClick={() => { setSelectedTaste(taste); setMessage(''); }}>{isEN ? pairingGuides[taste].titleEn : pairingGuides[taste].titleVi}</button>)}
+        {(Object.keys(pairingGuides) as PairingTaste[]).map((taste) => <button key={taste} type="button" aria-pressed={selectedTaste === taste} className={`!min-h-11 !rounded-full !px-3 !text-xs !transition-all !duration-200 ${selectedTaste === taste ? '!border-[#d4a373] !bg-[#d4a373] !text-white !shadow-sm' : '!border-white/20 !bg-white/5 !text-[#f4ece0] hover:!border-[#d4a373]/70 hover:!bg-white/10'}`} onClick={() => { setSelectedTaste(taste); setMessage(''); }}>{isEN ? pairingGuides[taste].titleEn : pairingGuides[taste].titleVi}</button>)}
       </div>
-      <p className="flavor-pairing-advice"><Sparkles size={16} aria-hidden="true" />{isEN ? guide.adviceEn : guide.adviceVi}</p>
+      <p className="flavor-pairing-advice !m-0 !text-sm !leading-relaxed !text-[#ebe7dd]"><Sparkles className="!text-[#e7bd83]" size={17} aria-hidden="true" />{isEN ? guide.adviceEn : guide.adviceVi}</p>
       <div className="flavor-pairing-products">
-        {recommendations.map((product) => <article key={product.slug}><img src={product.image} alt="" width={52} height={52} /><span><strong>{translateProductName(product.name)}</strong><small>{formatCurrency(product.price)}</small></span></article>)}
+        {recommendations.map((product) => <article className="!min-h-[82px] !rounded-2xl !border-white/10 !bg-white/[0.07] !p-3 !backdrop-blur-md" key={product.slug}><img className="!h-14 !w-14 !flex-[0_0_56px] !rounded-xl" src={product.image} alt="" width={56} height={56} /><span className="!gap-2"><strong className="!text-sm !leading-snug !text-[#faf7f2]">{translateProductName(product.name)}</strong><small className="!text-[#e7bd83]">{formatCurrency(product.price)}</small></span></article>)}
         {!recommendations.length && <p>{isEN ? 'Pairing products are currently unavailable.' : 'Các món gợi ý hiện đang tạm hết hàng.'}</p>}
       </div>
-      <button className="flavor-pairing-add" type="button" onClick={() => void addPair()} disabled={!recommendations.length || pending}><Plus size={16} aria-hidden="true" />{pending ? (isEN ? 'Adding pair…' : 'Đang thêm cặp món…') : (isEN ? 'Add Pair to Cart' : 'Thêm cặp đôi vào giỏ')}</button>
-      {message && <p className="flavor-pairing-message" role="status">{message}</p>}
+      <button className="flavor-pairing-add !inline-flex !min-h-12 !w-full !items-center !justify-center !gap-2 !rounded-2xl !border !border-[#e7bd83] !bg-[#d4a373] !px-5 !font-semibold !text-[#142820] !shadow-md !transition-all !duration-300 hover:!bg-[#e2b984] hover:!shadow-lg active:!scale-[0.98] disabled:!cursor-not-allowed disabled:!opacity-55 sm:!w-auto" type="button" onClick={() => void addPair()} disabled={!recommendations.length || pending}><Plus size={17} aria-hidden="true" />{pending ? (isEN ? 'Adding pair…' : 'Đang thêm cặp món…') : (isEN ? 'Add Pair to Cart' : 'Thêm cặp đôi vào giỏ')}</button>
+      {message && <p className="flavor-pairing-message !text-[#dce8dc]" role="status">{message}</p>}
     </section>
   );
 }

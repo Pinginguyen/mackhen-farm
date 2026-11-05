@@ -164,7 +164,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   return (
     <div className="cart-add-control">
       <div className="detail-prices">
-        <strong className="!text-[#9B2424] !text-3xl !font-bold">{formatCurrency(selectedPrice)}</strong>
+        <strong className="!text-[#841E1E] !text-3xl !font-bold">{formatCurrency(selectedPrice)}</strong>
         {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del className="!text-stone-400">{formatCurrency(selectedOriginalPrice)}</del>}
       </div>
       {variants.length >= 2 && (
@@ -185,8 +185,8 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className={`primary-action micro-tactile transition-all duration-200 active:scale-90 hover:scale-[1.02] hover:shadow-lg ${isAdded ? 'bg-emerald-600 text-white animate-bounce' : 'bg-[#9B2424] text-white'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
-        <button className="secondary-action micro-tactile" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
+        <button className={`primary-action micro-tactile !min-h-[58px] !rounded-2xl !px-5 !text-base !font-semibold !shadow-md !transition-all !duration-300 active:!scale-[0.98] hover:!shadow-lg ${isAdded ? '!bg-emerald-600 !text-white animate-bounce' : '!bg-[#841E1E] !text-white hover:!bg-[#701818]'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
+        <button className="secondary-action micro-tactile !min-h-[58px] !rounded-2xl !border-2 !border-[#841E1E] !bg-transparent !px-5 !text-base !font-semibold !text-[#841E1E] !transition-all !duration-300 hover:!bg-[#841E1E]/5 active:!scale-[0.98]" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
       <StickyQuickBuyBar
         product={{ name, image, price: selectedPrice }}

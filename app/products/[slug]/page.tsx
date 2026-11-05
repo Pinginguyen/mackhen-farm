@@ -129,7 +129,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
     <main className="page-shell product-detail-page !bg-[#FAF7F2]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
       <CroEventTracker eventType="PRODUCT_VIEW" productId={product.id} />
-      <section className="detail-section !rounded-2xl !border-stone-200/80 !bg-white !p-5 shadow-xs sm:!p-7">
+      <section className="detail-section !rounded-3xl !border-[#e8e1d8] !bg-white !p-5 !shadow-[0_24px_70px_-38px_rgba(20,40,32,0.28)] sm:!p-8">
         <div className="detail-grid">
           <ProductImageGallery image={product.image} images={product.images ?? []} name={product.name} />
           <div className="detail-copy">

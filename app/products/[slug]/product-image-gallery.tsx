@@ -33,10 +33,10 @@ export default function ProductImageGallery({ image, images, name }: { image: st
 
   return (
     <div className="detail-gallery">
-      <button className="detail-media" type="button" onClick={() => setZoomOpen(true)} onMouseMove={moveLens} onMouseLeave={() => setLens(null)} aria-label={`Phóng to ảnh ${name}`}>
-        <img src={activeImage} alt={name} />
+      <button className="detail-media group !overflow-hidden !rounded-3xl !border !border-white/70 !bg-white/35 !shadow-[0_25px_60px_-15px_rgba(132,30,30,0.18)] !backdrop-blur-md" type="button" onClick={() => setZoomOpen(true)} onMouseMove={moveLens} onMouseLeave={() => setLens(null)} aria-label={`Phóng to ảnh ${name}`}>
+        <img className="!rounded-3xl" src={activeImage} alt={name} />
         <span className={`product-optical-lens${lens ? ' is-visible' : ''}`} aria-hidden="true" style={lens ? { left: lens.x, top: lens.y, backgroundImage: `url("${activeImage}")`, backgroundPosition: `${lens.xPercent}% ${lens.yPercent}%` } : undefined} />
-        <span className="detail-zoom-button" aria-hidden="true"><Maximize2 size={18} /></span>
+        <span className="detail-zoom-button !bottom-4 !right-4 !h-12 !w-12 !border-white/60 !bg-[#142820]/70 !shadow-lg !backdrop-blur-md transition-all duration-300 group-hover:!scale-105 group-hover:!bg-[#841E1E]" aria-hidden="true"><Maximize2 size={19} /></span>
       </button>
       {galleryImages.length > 1 && galleryImages.map((galleryImage, index) => (
         <button
