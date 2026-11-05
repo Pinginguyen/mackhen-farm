@@ -12,7 +12,7 @@ import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
 import MarqueeBanner from '@/components/home/MarqueeBanner';
-import ProductCylinder3D from '@/components/home/ProductCylinder3D';
+import ProductCylinder3DLoader from '@/components/home/ProductCylinder3DLoader';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 
@@ -84,7 +84,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
 
       <MarqueeBanner />
 
-      <ProductCylinder3D products={products} />
+      <ProductCylinder3DLoader products={products} />
 
       <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
 

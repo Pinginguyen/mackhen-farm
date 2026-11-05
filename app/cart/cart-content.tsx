@@ -132,7 +132,7 @@ export default function CartContent({ initialItems, freeShippingThreshold }: { i
     try {
       window.localStorage.setItem('bohoch_cart_quantities', JSON.stringify(nextItems.map(({ id, quantity, variantId }) => ({ id, quantity, variantId }))));
     } catch {
-      return;
+      // Cart synchronization can still use BroadcastChannel without local storage.
     }
     window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: nextItems.reduce((sum, item) => sum + item.quantity, 0) } }));
   }
@@ -143,6 +143,23 @@ export default function CartContent({ initialItems, freeShippingThreshold }: { i
     } catch {
       return;
     }
+  }, []);
+
+  useEffect(() => {
+    const syncCart = async () => {
+      try {
+        const response = await fetch('/api/cart', { cache: 'no-store' });
+        if (!response.ok) return;
+        const result = await response.json() as { items?: CartItem[] };
+        const nextItems = result.items ?? [];
+        itemsRef.current = nextItems;
+        setItems(nextItems);
+      } catch {
+        return;
+      }
+    };
+    window.addEventListener('mackhen:cart-sync', syncCart);
+    return () => window.removeEventListener('mackhen:cart-sync', syncCart);
   }, []);
 
   async function updateItem(itemId: string, quantity: number, variantId: string | null) {

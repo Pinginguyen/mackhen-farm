@@ -26,6 +26,17 @@ const defaultContextValue: LocaleCurrencyContextValue = {
 
 const LocaleCurrencyContext = createContext<LocaleCurrencyContextValue>(defaultContextValue);
 const STORAGE_KEY = 'mackhen_locale_currency';
+const LOCALE_CURRENCY_COOKIE = 'mackhen_locale_currency';
+
+function readLocaleCurrencyCookie(): { locale?: unknown; currency?: unknown } | null {
+  const cookie = document.cookie.split('; ').find((part) => part.startsWith(`${LOCALE_CURRENCY_COOKIE}=`));
+  if (!cookie) return null;
+  try {
+    return JSON.parse(decodeURIComponent(cookie.slice(LOCALE_CURRENCY_COOKIE.length + 1))) as { locale?: unknown; currency?: unknown };
+  } catch {
+    return null;
+  }
+}
 
 export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>('vi');
@@ -34,7 +45,8 @@ export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as { locale?: unknown; currency?: unknown } | null;
+      const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as { locale?: unknown; currency?: unknown } | null
+        ?? readLocaleCurrencyCookie();
       if (saved?.locale === 'vi' || saved?.locale === 'en') setLocale(saved.locale);
       if (saved?.currency === 'VND' || saved?.currency === 'SGD') setCurrency(saved.currency);
     } catch {
@@ -47,10 +59,21 @@ export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
     if (!storageReady) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ locale, currency }));
+      document.cookie = `${LOCALE_CURRENCY_COOKIE}=${encodeURIComponent(JSON.stringify({ locale, currency }))}; Path=/; Max-Age=31536000; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
     } catch {
       // The current selection still works for this page when storage is unavailable.
     }
   }, [currency, locale, storageReady]);
+
+  useEffect(() => {
+    const applyPreference = (event: Event) => {
+      const preference = (event as CustomEvent<{ locale?: unknown; currency?: unknown }>).detail;
+      if (preference?.locale === 'vi' || preference?.locale === 'en') setLocale(preference.locale);
+      if (preference?.currency === 'VND' || preference?.currency === 'SGD') setCurrency(preference.currency);
+    };
+    window.addEventListener('mackhen:locale-currency-sync', applyPreference);
+    return () => window.removeEventListener('mackhen:locale-currency-sync', applyPreference);
+  }, []);
 
   const value: LocaleCurrencyContextValue = {
     locale,
@@ -58,6 +81,11 @@ export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
     setLocaleCurrency: (nextLocale, nextCurrency) => {
       setLocale(nextLocale);
       setCurrency(nextCurrency);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mackhen:locale-currency-change', {
+          detail: { locale: nextLocale, currency: nextCurrency },
+        }));
+      }
     },
     t: (key) => translations[locale][key],
     translateProductName: (name) => translateProductName(name, locale),

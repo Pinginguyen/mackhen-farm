@@ -62,6 +62,13 @@ export default function CartDrawer() {
 
   useEffect(() => {
     if (!open) return;
+    const syncCart = () => { void loadCart(); };
+    window.addEventListener('mackhen:cart-sync', syncCart);
+    return () => window.removeEventListener('mackhen:cart-sync', syncCart);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
     document.body.style.overflow = 'hidden';
