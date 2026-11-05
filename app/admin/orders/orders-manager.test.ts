@@ -35,6 +35,8 @@ describe('Admin order status controls', () => {
     expect(orderStatusSelect).not.toContain('Đã thanh toán');
     expect(orderStatusSelect).toContain('value="CANCELLED"');
     expect(orderStatusSelect).not.toContain('disabled=""');
+    expect(orderStatusSelect).toContain('Giữ nguyên (Không đổi)');
+    expect((orderStatusSelect.match(/Đang giao hàng/g) ?? [])).toHaveLength(0);
 
     expect(paymentStatusSelect).toContain('value="PENDING"');
     expect(paymentStatusSelect).toContain('value="PAID"');
@@ -52,11 +54,25 @@ describe('Admin order status controls', () => {
       orders: [{ ...order, status: 'HANDED_OFF' }],
     }));
     const deliveryStatusSelect = handedOffHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
-    expect(deliveryStatusSelect).toContain('value="IN_TRANSIT"');
     expect(deliveryStatusSelect).toContain('value="SHIPPING"');
     expect(deliveryStatusSelect).toContain('value="RETURNED"');
     expect(deliveryStatusSelect).toContain('Đang giao hàng');
+    expect(deliveryStatusSelect).not.toContain('value="IN_TRANSIT"');
+    expect((deliveryStatusSelect.match(/Đang giao hàng/g) ?? [])).toHaveLength(1);
     expect(deliveryStatusSelect).toContain('Hoàn hàng');
+
+    const shippingHtml = renderToStaticMarkup(createElement(OrdersManager, {
+      orders: [{ ...order, status: 'SHIPPING' }],
+    }));
+    const shippingStatusSelect = shippingHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
+    expect(shippingStatusSelect).toContain('value="DELIVERED"');
+    expect(shippingStatusSelect).toContain('value="RETURNED"');
+
+    const deliveredHtml = renderToStaticMarkup(createElement(OrdersManager, {
+      orders: [{ ...order, status: 'DELIVERED' }],
+    }));
+    const deliveredStatusSelect = deliveredHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
+    expect(deliveredStatusSelect).toContain('value="COMPLETED"');
   });
 
   it('keeps a legacy PAID order status without exposing it as an order option', () => {
@@ -65,7 +81,7 @@ describe('Admin order status controls', () => {
     }));
     const orderStatusSelect = html.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
 
-    expect(orderStatusSelect).toContain('Giữ nguyên: Chờ xử lý');
+    expect(orderStatusSelect).toContain('Giữ nguyên (Không đổi): Chờ xử lý');
     expect(orderStatusSelect).not.toContain('value="PAID"');
     expect(orderStatusSelect).not.toContain('Đã thanh toán');
   });
