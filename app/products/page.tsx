@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { normalizeNutritionFacts } from '@/lib/store-data';
+import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,15 +26,35 @@ export default async function ProductsPage({ searchParams }: { searchParams?: { 
   }
 
   return (
-    <main className="page-shell !bg-[#FAF7F2]">
-      <section className="page-card !rounded-2xl !border !border-stone-200/70 !bg-white shadow-sm">
-        <div className="page-title">
+    <main className="page-shell products-page">
+      <section className="products-artisan-hero" aria-labelledby="products-hero-title">
+        <div className="products-artisan-copy">
+          <p className="products-artisan-kicker">MẮC KHÉN FARM <span /> SƠN LA</p>
+          <h1 id="products-hero-title">ĐẶC SẢN NÔNG SẢN TÂY BẮC</h1>
+          <p className="products-artisan-description">
+            Từ bã đậu nành địa phương đến món ăn giàu đạm, kết hợp mắc khén và hạt dổi mang hương vị núi rừng.
+          </p>
+          <p className="products-artisan-note">Thực phẩm tuần hoàn · Nguyên liệu rõ nguồn gốc</p>
+        </div>
+        <div className="products-artisan-visual">
+          <Image
+            src="/products/hat-mac-khen.jpg"
+            alt="Hạt mắc khén Sơn La, gia vị đặc trưng Tây Bắc"
+            fill
+            priority
+            sizes="(max-width: 760px) 100vw, 42vw"
+          />
+          <span>HƯƠNG VỊ TỪ VÙNG CAO</span>
+        </div>
+      </section>
+
+      <section className="products-catalog" aria-labelledby="products-catalog-title">
+        <header className="products-catalog-heading">
           <div>
             <p className="eyebrow">Danh mục sản phẩm</p>
-            <h2 className="text-2xl font-semibold text-stone-900">Khám phá sản phẩm Tây Bắc</h2>
+            <h2 id="products-catalog-title">Khám phá sản phẩm Tây Bắc</h2>
           </div>
-        </div>
-
+        </header>
         <ProductCatalogFilter products={products} initialQuery={searchParams?.search ?? ''} />
       </section>
     </main>

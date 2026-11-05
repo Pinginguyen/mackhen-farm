@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Search } from 'lucide-react';
 
 import ProductCard from '@/components/ProductCard';
 import type { NutritionFacts } from '@/lib/store-data';
@@ -69,13 +70,17 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
           {tabs.map((tab) => <button type="button" key={tab.id} role="tab" aria-selected={filter === tab.id} className={filter === tab.id ? 'is-active' : ''} onClick={() => setFilter(tab.id)}>{filter === tab.id && <motion.span layoutId="catalog-active-tab" className="catalog-tab-indicator" transition={{ type: 'spring', stiffness: 420, damping: 34 }} />}<span className="catalog-tab-label">{tab.label}</span></button>)}
         </div>
         <div className="catalog-facet-filters">
-          <label className="field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>
-          <label className="catalog-protein-toggle"><input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />{text('Giàu đạm (>20g Protein)')}</label>
-          <label className="catalog-search-field"><span className="visually-hidden">{text('Tìm trong danh mục')}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Tìm sản phẩm trong danh mục')} /></label>
+          <label className="field catalog-price-field">{text('Mức giá')}<select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value as typeof priceFilter)}><option value="ALL">{text('Tất cả mức giá')}</option><option value="UNDER_50">{text('Dưới 50k')}</option><option value="50_100">{text('50k - 100k')}</option><option value="OVER_150">{text('Combo trên 150k')}</option></select></label>
+          <label className={`catalog-protein-toggle${proteinOnly ? ' is-active' : ''}`}>
+            <input type="checkbox" checked={proteinOnly} onChange={(event) => setProteinOnly(event.target.checked)} />
+            <span className="catalog-protein-icon" aria-hidden="true">💪</span>
+            <span>{text('Giàu đạm (>20g Protein)')}</span>
+          </label>
+          <label className="catalog-search-field"><span className="visually-hidden">{text('Tìm trong danh mục')}</span><Search size={18} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Tìm sản phẩm trong danh mục')} /></label>
           <span className="catalog-filter-count">{visibleProducts.length} {text('sản phẩm')}</span>
         </div>
       </>}
-      <div className="product-grid catalog-products" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
+      <div className="product-grid catalog-products grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" key={`${filter}-${priceFilter}-${proteinOnly}-${normalizedQuery}`}>
         {visibleProducts.map((product, index) => <ProductCard key={product.id} product={product} index={index} />)}
         {!visibleProducts.length && <p className="empty-state">{text('Danh mục hiện chưa có sản phẩm.')}</p>}
       </div>
