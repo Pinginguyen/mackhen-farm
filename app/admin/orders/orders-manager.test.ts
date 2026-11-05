@@ -67,6 +67,7 @@ describe('Admin order status controls', () => {
     const shippingStatusSelect = shippingHtml.match(/<select name="status"[\s\S]*?<\/select>/)?.[0] ?? '';
     expect(shippingStatusSelect).toContain('value="DELIVERED"');
     expect(shippingStatusSelect).toContain('value="RETURNED"');
+    expect(shippingStatusSelect).toContain('value="COMPLETED" disabled=""');
 
     const deliveredHtml = renderToStaticMarkup(createElement(OrdersManager, {
       orders: [{ ...order, status: 'DELIVERED' }],

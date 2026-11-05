@@ -357,8 +357,13 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 <label className="field">Trạng thái đơn<select name="status" defaultValue="">
                   <option value="">Giữ nguyên (Không đổi): {orderStatusLabels[order.status] ?? order.status}</option>
                   {statusOptions.filter(([value]) => orderStatusValues.has(value)
-                    && getAllowedNextStatuses(order.status).includes(value))
-                    .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    && (getAllowedNextStatuses(order.status).includes(value)
+                      || (order.status === 'SHIPPING' && value === 'COMPLETED')))
+                    .map(([value, label]) => <option
+                      key={value}
+                      value={value}
+                      disabled={order.status === 'SHIPPING' && value === 'COMPLETED'}
+                    >{label}</option>)}
                 </select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue="">
                   <option value="">Giữ nguyên: {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}</option>
