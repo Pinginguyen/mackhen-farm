@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { hash } = require('bcryptjs');
 require('dotenv').config();
+const siteAssetDefaults = require('../lib/site-asset-defaults.json');
 
 const prisma = new PrismaClient();
 
@@ -137,6 +138,14 @@ const products = [
 ];
 
 async function main() {
+  for (const asset of siteAssetDefaults) {
+    await prisma.siteAsset.upsert({
+      where: { key: asset.key },
+      update: {},
+      create: asset,
+    });
+  }
+
   const slugs = products.map((product) => product.slug);
 
   // ĐÃ TĂNG TIMEOUT LÊN 60 GIÂY ĐỂ TRUYỀN DỮ LIỆU SANG SINGAPORE KHÔNG BỊ NGẮT
@@ -278,6 +287,7 @@ async function main() {
 });
 
   const count = await prisma.product.count({ where: { active: true } });
+  console.log(`Seeded ${siteAssetDefaults.length} storefront image slots.`);
   console.log(`Seeded ${count} active products and ${coreVouchers.length} core vouchers into database.`);
   console.log(`Admin account ready: ${admin.email} (${admin.role}).`);
 }

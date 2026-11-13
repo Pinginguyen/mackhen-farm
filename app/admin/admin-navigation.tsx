@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardList, Handshake, LayoutDashboard, Package, RotateCcw, Settings, Tag, Users, Wallet } from 'lucide-react';
+import { BarChart3, ClipboardList, Handshake, Image, LayoutDashboard, Package, RotateCcw, Settings, Tag, Users, Wallet } from 'lucide-react';
 
 const groups = [
   { label: 'KINH DOANH', items: [
@@ -14,6 +14,7 @@ const groups = [
   ] },
   { label: 'CỬA HÀNG', items: [
     { href: '/admin/products', label: 'Sản phẩm & kho', icon: Package },
+    { href: '/admin/media', label: 'Quản lý hình ảnh', icon: Image },
     { href: '/admin/customers', label: 'Khách hàng', icon: Users },
     { href: '/admin/vouchers', label: 'Voucher & Khuyến mãi', icon: Tag },
   ] },

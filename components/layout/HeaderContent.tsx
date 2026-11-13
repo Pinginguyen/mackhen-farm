@@ -9,14 +9,14 @@ import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
-export default function HeaderContent({ user }: { user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null }) {
+export default function HeaderContent({ user, logoUrl }: { user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null; logoUrl: string }) {
   const { locale, t } = useLocaleCurrency();
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
     <header className="topbar site-header fixed top-0 left-0 right-0 w-full z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm transition-all duration-300 !py-2">
       <Link className="brand-wrap" href="/">
-        <span className="brand-badge">M</span>
+        {logoUrl ? <img className="brand-logo-image" src={logoUrl} alt="Mắc Khén Farm" /> : <span className="brand-badge">M</span>}
         <span>
           <small className="eyebrow">{translateContent('Nông sản sấy vị Tây Bắc', locale)}</small>
           <strong className="site-brand-name">Mắc Khén Farm</strong>

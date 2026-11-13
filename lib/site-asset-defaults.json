@@ -1,0 +1,30 @@
+[
+  {
+    "key": "HERO_BANNER_MAIN",
+    "label": "Ảnh bìa Hero trang chủ",
+    "category": "HERO",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Khô bò thực vật Mắc Khén Farm xé sợi"
+  },
+  {
+    "key": "LOGO_HEADER",
+    "label": "Logo Header",
+    "category": "LOGO",
+    "imageUrl": "",
+    "altText": "Mắc Khén Farm"
+  },
+  {
+    "key": "PROMO_BANNER_HOME",
+    "label": "Banner khuyến mãi trang chủ",
+    "category": "BANNER",
+    "imageUrl": "/products/combo.jpg",
+    "altText": "Combo sản phẩm Mắc Khén Farm"
+  },
+  {
+    "key": "BADGE_UPCYCLED",
+    "label": "Điểm nhấn Upcycled Food",
+    "category": "BADGE",
+    "imageUrl": "/products/soy-pulp.svg",
+    "altText": "Bã đậu nành upcycled"
+  }
+]

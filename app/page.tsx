@@ -15,6 +15,7 @@ import MarqueeBanner from '@/components/home/MarqueeBanner';
 import ProductCylinder3DLoader from '@/components/home/ProductCylinder3DLoader';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import { getSiteAsset } from '@/lib/site-assets';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -23,6 +24,11 @@ const homeRevealGroups = [
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
+  const [heroImageUrl, promoBannerUrl, upcycledBadgeUrl] = await Promise.all([
+    getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
+    getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
+    getSiteAsset('BADGE_UPCYCLED', '/products/soy-pulp.svg'),
+  ]);
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
   try {
@@ -47,7 +53,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
         <div className="hero-copy">
           <div className="hero-badges">
-            <span className="pill"><LocalizedText text="Upcycled Food · Hương vị Tây Bắc" /></span>
+            <span className="pill"><img className="hero-upcycled-badge" src={upcycledBadgeUrl} alt="" /><LocalizedText text="Upcycled Food · Hương vị Tây Bắc" /></span>
             <Link href="/products" className="hero-proof-badge"><Sparkles size={16} /><LocalizedText text="Gia vị Tây Bắc" /></Link>
           </div>
           <h1><span className="hero-title-main"><LocalizedText text="Khô bò thực vật" /></span><span className="hero-title-accent"><LocalizedText text="High-Protein, đậm vị Tây Bắc" /></span></h1>
@@ -77,12 +83,23 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
         <div className="hero-media">
           <div className="photo-card animate-float">
-            <LocalizedHeroImage />
+            <LocalizedHeroImage imageUrl={heroImageUrl} />
           </div>
         </div>
       </section>
 
       <MarqueeBanner />
+
+      <section className="home-promo-banner-wrap">
+        <Link className="home-promo-banner" href="/khuyen-mai">
+          <img src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
+          <span className="home-promo-banner-copy">
+            <span className="eyebrow"><LocalizedText text="Ưu đãi đặc sản Tây Bắc" /></span>
+            <strong><LocalizedText text="Khám phá ưu đãi đang mở" /></strong>
+            <span><LocalizedText text="Xem voucher và quà tặng" /> <ArrowRight size={16} aria-hidden="true" /></span>
+          </span>
+        </Link>
+      </section>
 
       <ProductCylinder3DLoader products={products} />
 

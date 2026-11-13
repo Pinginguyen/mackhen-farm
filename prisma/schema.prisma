@@ -566,3 +566,13 @@ model Voucher {
 
   @@index([isActive, expiresAt])
 }
+
+model SiteAsset {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  category  String   @default("STOREFRONT")
+  imageUrl  String
+  altText   String?
+  updatedAt DateTime @updatedAt
+}
