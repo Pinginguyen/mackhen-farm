@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, ShieldCheck, Sparkles, Truck } from 'lucide-react';
+import { ArrowRight, Sparkles, Truck } from 'lucide-react';
 
 import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
@@ -24,10 +24,15 @@ const homeRevealGroups = [
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
-  const [heroImageUrl, promoBannerUrl, upcycledBadgeUrl] = await Promise.all([
+  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, upcycledBadgeUrl, featureBadge1, featureBadge2, featureBadge3, storyImageUrl] = await Promise.all([
     getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
+    getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
     getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
     getSiteAsset('BADGE_UPCYCLED', '/products/soy-pulp.svg'),
+    getSiteAsset('BADGE_FEATURE_1', '/products/soy-pulp.svg'),
+    getSiteAsset('BADGE_FEATURE_2', '/products/combo.jpg'),
+    getSiteAsset('BADGE_FEATURE_3', '/products/hat-mac-khen.jpg'),
+    getSiteAsset('STORY_SECTION_IMAGE', '/products/xe-soi.jpg'),
   ]);
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
@@ -71,19 +76,19 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           </div>
           <ul className="trust-list hero-checklist">
             <li>
-              <ShieldCheck size={16} /> <LocalizedText text="Tận dụng bã đậu nành địa phương" />
+              <img className="hero-feature-icon" src={featureBadge1} alt="" /> <LocalizedText text="Tận dụng bã đậu nành địa phương" />
             </li>
             <li>
-              <Truck size={16} /> <LocalizedText text="Đóng gói sẵn sàng vận chuyển" />
+              <img className="hero-feature-icon" src={featureBadge2} alt="" /> <LocalizedText text="Đóng gói sẵn sàng vận chuyển" />
             </li>
             <li>
-              <Sparkles size={16} /> <LocalizedText text="Mùi vị đặc trưng Tây Bắc" />
+              <img className="hero-feature-icon" src={featureBadge3} alt="" /> <LocalizedText text="Mùi vị đặc trưng Tây Bắc" />
             </li>
           </ul>
         </div>
         <div className="hero-media">
           <div className="photo-card animate-float">
-            <LocalizedHeroImage imageUrl={heroImageUrl} />
+            <LocalizedHeroImage imageUrl={heroImageUrl} mobileImageUrl={heroImageMobileUrl} />
           </div>
         </div>
       </section>
@@ -141,6 +146,7 @@ export default async function HomePage({ searchParams }: { searchParams: { error
           <p className="eyebrow"><LocalizedText text="Vì sao lựa chọn Mắc Khén Farm?" /></p>
           <h2><LocalizedText text="Tận dụng trọn nguyên liệu, giữ trọn vị ngon." /></h2>
         </div>
+        <img className="story-section-image" src={storyImageUrl} alt="Câu chuyện thương hiệu Mắc Khén Farm" />
         <div className="story-grid">
           {[
             'Mô hình Upcycled Food biến bã đậu nành sau sản xuất thành nguồn đạm thực vật cho món ăn vặt.',

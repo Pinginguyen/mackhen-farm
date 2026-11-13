@@ -7,7 +7,7 @@ import { translateContent } from '@/lib/translations';
 import SoundEffect from '@/components/common/SoundEffect';
 import type { PublicSystemSettings } from '@/lib/system-settings';
 
-export default function SiteFooter({ settings }: { settings: PublicSystemSettings }) {
+export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { settings: PublicSystemSettings; footerLogoUrl: string; bctBadgeUrl: string }) {
   const pathname = usePathname();
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
@@ -24,7 +24,7 @@ export default function SiteFooter({ settings }: { settings: PublicSystemSetting
     <footer className="site-footer">
       <div className="site-footer-inner">
         <section className="site-footer-column">
-          <Link className="footer-brand" href="/">MẮC KHÉN FARM</Link>
+          <Link className="footer-brand" href="/">{footerLogoUrl ? <img className="footer-brand-image" src={footerLogoUrl} alt="Mắc Khén Farm" /> : 'MẮC KHÉN FARM'}</Link>
           <p>{text('Khô bò thực vật High-Protein chuẩn vị Tây Bắc. Tiên phong ứng dụng mô hình thực phẩm sinh thái (Upcycled Food) từ bã đậu nành địa phương.')}</p>
         </section>
         <section className="site-footer-column">
@@ -61,22 +61,18 @@ export default function SiteFooter({ settings }: { settings: PublicSystemSetting
             className="inline-flex items-center gap-2.5 bg-white border border-blue-200 px-3.5 py-2 rounded-xl shadow-sm hover:shadow-md transition-all group !no-underline hover:!bg-blue-50/50"
             title="Website đã thông báo với Bộ Công Thương"
           >
-            <div className="w-7 h-7 flex-shrink-0 bg-blue-50 text-[#005BA6] rounded-lg flex items-center justify-center border border-blue-100">
-              <svg className="w-4 h-4 text-[#005BA6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <polyline points="9 12 11 14 15 10" />
-              </svg>
-            </div>
-            <div className="flex flex-col text-left">
-              {/* BỔ SUNG !no-underline và group-hover:!text-[#005BA6] ở đây */}
-              <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#005BA6] leading-tight !no-underline group-hover:!text-[#005BA6]">
-                ĐÃ THÔNG BÁO
-              </span>
-              {/* BỔ SUNG !no-underline và group-hover:!text-red-600 ở đây */}
-              <span className="text-[9px] uppercase tracking-tight font-bold text-red-600 leading-tight !no-underline group-hover:!text-red-600">
-                BỘ CÔNG THƯƠNG
-              </span>
-            </div>
+            {bctBadgeUrl ? <img className="footer-bct-badge" src={bctBadgeUrl} alt="Đã thông báo Bộ Công Thương" /> : <>
+              <div className="w-7 h-7 flex-shrink-0 bg-blue-50 text-[#005BA6] rounded-lg flex items-center justify-center border border-blue-100">
+                <svg className="w-4 h-4 text-[#005BA6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
+                </svg>
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-[10px] uppercase tracking-wider font-extrabold text-[#005BA6] leading-tight !no-underline group-hover:!text-[#005BA6]">ĐÃ THÔNG BÁO</span>
+                <span className="text-[9px] uppercase tracking-tight font-bold text-red-600 leading-tight !no-underline group-hover:!text-red-600">BỘ CÔNG THƯƠNG</span>
+              </div>
+            </>}
           </a>
         </section>
       </div>

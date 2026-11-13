@@ -2,29 +2,99 @@
   {
     "key": "HERO_BANNER_MAIN",
     "label": "Ảnh bìa Hero trang chủ",
-    "category": "HERO",
+    "category": "HOME",
     "imageUrl": "/products/xe-soi.jpg",
     "altText": "Khô bò thực vật Mắc Khén Farm xé sợi"
   },
   {
-    "key": "LOGO_HEADER",
-    "label": "Logo Header",
-    "category": "LOGO",
-    "imageUrl": "",
-    "altText": "Mắc Khén Farm"
+    "key": "HERO_BANNER_MOBILE",
+    "label": "Ảnh bìa Hero cho điện thoại",
+    "category": "HOME",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Khô bò thực vật Mắc Khén Farm xé sợi"
   },
   {
     "key": "PROMO_BANNER_HOME",
     "label": "Banner khuyến mãi trang chủ",
-    "category": "BANNER",
+    "category": "HOME",
     "imageUrl": "/products/combo.jpg",
     "altText": "Combo sản phẩm Mắc Khén Farm"
   },
   {
     "key": "BADGE_UPCYCLED",
     "label": "Điểm nhấn Upcycled Food",
-    "category": "BADGE",
+    "category": "HOME",
     "imageUrl": "/products/soy-pulp.svg",
     "altText": "Bã đậu nành upcycled"
+  },
+  {
+    "key": "BADGE_FEATURE_1",
+    "label": "Icon Đậu nành địa phương",
+    "category": "HOME",
+    "imageUrl": "/products/soy-pulp.svg",
+    "altText": "Đậu nành địa phương"
+  },
+  {
+    "key": "BADGE_FEATURE_2",
+    "label": "Icon Đóng gói vận chuyển",
+    "category": "HOME",
+    "imageUrl": "/products/combo.jpg",
+    "altText": "Đóng gói sẵn sàng vận chuyển"
+  },
+  {
+    "key": "BADGE_FEATURE_3",
+    "label": "Icon Mùi vị đặc trưng Tây Bắc",
+    "category": "HOME",
+    "imageUrl": "/products/hat-mac-khen.jpg",
+    "altText": "Mắc khén và gia vị Tây Bắc"
+  },
+  {
+    "key": "STORY_SECTION_IMAGE",
+    "label": "Ảnh Câu chuyện thương hiệu / Nông trại",
+    "category": "HOME",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Câu chuyện thương hiệu Mắc Khén Farm"
+  },
+  {
+    "key": "LOGO_HEADER",
+    "label": "Logo Header",
+    "category": "BRANDING",
+    "imageUrl": "",
+    "altText": "Mắc Khén Farm"
+  },
+  {
+    "key": "LOGO_FOOTER",
+    "label": "Logo Footer (chữ trắng nền tối)",
+    "category": "BRANDING",
+    "imageUrl": "",
+    "altText": "Mắc Khén Farm"
+  },
+  {
+    "key": "BADGE_BCT",
+    "label": "Huy hiệu Đã thông báo Bộ Công Thương",
+    "category": "BRANDING",
+    "imageUrl": "",
+    "altText": "Đã thông báo Bộ Công Thương"
+  },
+  {
+    "key": "OG_IMAGE",
+    "label": "Ảnh chia sẻ Facebook / Zalo (OpenGraph 1200x630)",
+    "category": "BRANDING",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Mắc Khén Farm - Khô bò thực vật vị Tây Bắc"
+  },
+  {
+    "key": "B2B_HERO_BANNER",
+    "label": "Banner trang Hợp tác B2B",
+    "category": "SPECIAL",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Sản phẩm thực vật Mắc Khén Farm mang hương vị Tây Bắc"
+  },
+  {
+    "key": "TRACEABILITY_BANNER",
+    "label": "Banner trang Truy xuất nguồn gốc",
+    "category": "SPECIAL",
+    "imageUrl": "/products/soy-pulp.svg",
+    "altText": "Chuỗi cung ứng thực phẩm Upcycled"
   }
 ]

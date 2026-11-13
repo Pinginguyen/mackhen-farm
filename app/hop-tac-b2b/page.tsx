@@ -8,6 +8,7 @@ import { translateContent } from '@/lib/translations';
 import { exportDocuments } from '@/lib/b2b-export-documents';
 import ContainerFreightCalculator from '@/components/b2b/ContainerFreightCalculator';
 import { DEFAULT_SYSTEM_SETTINGS, type PublicSystemSettings } from '@/lib/system-settings';
+import { fetchPublicSiteAsset } from '@/lib/site-asset-client';
 
 const successNotice = 'Yêu cầu đã được ghi nhận. Quản lý phát triển thị trường sẽ liên hệ với bạn qua Email trong 24h.';
 const emailNotice = 'Yêu cầu đã được lưu, nhưng email thông báo quản trị chưa gửi được. Vui lòng thử lại sau.';
@@ -19,6 +20,14 @@ export default function B2BPartnershipPage() {
   const [toast, setToast] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [settings, setSettings] = useState<PublicSystemSettings>(DEFAULT_SYSTEM_SETTINGS);
+  const [heroBannerUrl, setHeroBannerUrl] = useState('/products/xe-soi.jpg');
+
+  useEffect(() => {
+    let active = true;
+    fetchPublicSiteAsset('B2B_HERO_BANNER', '/products/xe-soi.jpg')
+      .then((url) => { if (active) setHeroBannerUrl(url); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -70,7 +79,7 @@ export default function B2BPartnershipPage() {
             <div className="b2b-market-list"><span>Singapore</span><span>Malaysia</span><span>Australia</span></div>
           </div>
           <figure className="b2b-hero-image">
-            <img src="/products/xe-soi.jpg" alt={text('Sản phẩm thực vật Mắc Khén Farm mang hương vị Tây Bắc')} />
+            <img src={heroBannerUrl} alt={text('Sản phẩm thực vật Mắc Khén Farm mang hương vị Tây Bắc')} />
             <figcaption><span>Origin</span><strong>Northwest Vietnam</strong></figcaption>
           </figure>
         </div>

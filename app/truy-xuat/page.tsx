@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Cog, Flame, FlaskConical, Leaf, LoaderCircle, MapPin, Search, ShieldCheck } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
+import { fetchPublicSiteAsset } from '@/lib/site-asset-client';
 
 type TraceabilityData = {
   batchCode: string;
@@ -37,6 +38,14 @@ export default function TraceabilityPage() {
   const [batch, setBatch] = useState<TraceabilityData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [heroBannerUrl, setHeroBannerUrl] = useState('/products/soy-pulp.svg');
+
+  useEffect(() => {
+    let active = true;
+    fetchPublicSiteAsset('TRACEABILITY_BANNER', '/products/soy-pulp.svg')
+      .then((url) => { if (active) setHeroBannerUrl(url); });
+    return () => { active = false; };
+  }, []);
 
   async function searchBatch(batchCode: string) {
     const normalizedCode = batchCode.trim().toUpperCase();
@@ -75,6 +84,7 @@ export default function TraceabilityPage() {
   return (
     <main className="traceability-page">
       <section className="traceability-hero">
+        <img className="traceability-hero-banner" src={heroBannerUrl} alt="" aria-hidden="true" />
         <div className="traceability-shell traceability-hero-inner">
           <div>
             <p className="traceability-eyebrow"><span /> FOOD SAFETY · SUPPLY CHAIN TRANSPARENCY</p>

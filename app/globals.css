@@ -980,6 +980,18 @@ textarea {
   overflow: hidden;
 }
 
+.photo-card picture {
+  display: block;
+  width: 100%;
+}
+
+.hero-feature-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  object-fit: contain;
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-14px); }
@@ -2063,6 +2075,23 @@ textarea {
   letter-spacing: 0.04em;
 }
 
+.footer-brand-image {
+  display: block;
+  width: auto;
+  max-width: 220px;
+  height: 46px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.footer-bct-badge {
+  display: block;
+  width: auto;
+  max-width: 240px;
+  height: 56px;
+  object-fit: contain;
+}
+
 .site-footer-column {
   display: flex;
   min-width: 0;
@@ -2138,11 +2167,31 @@ textarea {
 }
 
 .traceability-hero {
+  position: relative;
+  isolation: isolate;
   overflow: hidden;
   background-color: #173e32;
   background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 36px 36px;
   color: #f6f4e9;
+}
+
+.traceability-hero::before {
+  position: absolute;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(23, 62, 50, 0.94), rgba(23, 62, 50, 0.62));
+  content: '';
+  inset: 0;
+}
+
+.traceability-hero-banner {
+  position: absolute;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
+  inset: 0;
 }
 
 .traceability-hero-inner {
@@ -11283,6 +11332,15 @@ body {
   margin-top: 0;
 }
 
+.home-page .story-section-image {
+  display: block;
+  width: min(760px, 100%);
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
 .home-page .mini-panel,
 .home-page .product-card,
 .home-page .story-item,
@@ -14126,6 +14184,34 @@ body {
   gap: 16px;
 }
 
+.admin-media-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.admin-media-filters button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #57534e;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-media-filters button.is-active {
+  border-color: #ead1cb;
+  background: #fff7f5;
+  color: #9b2424;
+}
+
 .admin-media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
@@ -14185,6 +14271,21 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.admin-media-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin: -5px 0 0;
+  color: #78716c;
+  font-size: 0.74rem;
+}
+
+.admin-media-dimensions strong {
+  color: #44403c;
+  font-variant-numeric: tabular-nums;
 }
 
 .admin-media-empty {

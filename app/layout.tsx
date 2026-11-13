@@ -15,6 +15,7 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import MobileBottomDock from '@/components/layout/MobileBottomDock';
 import CookieConsent from '@/components/common/CookieConsent';
 import CartSync from '@/components/cart/CartSync';
+import { getSiteAsset } from '@/lib/site-assets';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -23,25 +24,31 @@ const beVietnamPro = Be_Vietnam_Pro({
   variable: '--font-be-vietnam-pro',
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhen-farm.vercel.app'),
-  title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
-  description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
-  openGraph: {
-    type: 'website',
-    locale: 'vi_VN',
-    siteName: 'Mắc Khén Farm',
-    title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
-    description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
-    images: [{ url: '/products/xe-soi.jpg', alt: 'Mắc Khén Farm - Khô bò thực vật vị Tây Bắc' }],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc',
-    description: 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.',
-    images: ['/products/xe-soi.jpg'],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const ogImage = await getSiteAsset('OG_IMAGE', '/products/xe-soi.jpg');
+  const title = 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc';
+  const description = 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.';
+
+  return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhen-farm.vercel.app'),
+    title,
+    description,
+    openGraph: {
+      type: 'website',
+      locale: 'vi_VN',
+      siteName: 'Mắc Khén Farm',
+      title,
+      description,
+      images: [{ url: ogImage, alt: 'Mắc Khén Farm - Khô bò thực vật vị Tây Bắc' }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
