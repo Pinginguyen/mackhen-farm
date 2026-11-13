@@ -24,7 +24,7 @@ vi.mock('@/lib/prisma', () => ({ prisma }));
 
 import { POST } from './route';
 
-const secret = 'MACKHEN_FARM_SECRET_KEY_2026';
+const secret = 'test-payment-webhook-secret-long-enough';
 
 function makeRequest(body: unknown, webhookSecret = secret) {
   return new Request('https://mackhen.example/api/payment/webhook', {
@@ -52,6 +52,15 @@ describe('POST /api/payment/webhook', () => {
   it('rejects requests without the webhook secret', async () => {
     const response = await POST(makeRequest({ orderCode: 'MKF-123456', amount: 65000 }, 'wrong-secret'));
     expect(response.status).toBe(401);
+    expect(orderFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the webhook secret is not configured', async () => {
+    vi.stubEnv('PAYMENT_WEBHOOK_SECRET', '');
+
+    const response = await POST(makeRequest({ orderCode: 'MKF-123456', amount: 65000 }));
+
+    expect(response.status).toBe(503);
     expect(orderFindFirst).not.toHaveBeenCalled();
   });
 

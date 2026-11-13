@@ -17,3 +17,4 @@ coverage
 # Sentry Config File
 .env.sentry-build-plugin
 .env*
+.last-run.json

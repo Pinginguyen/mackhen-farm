@@ -21,6 +21,15 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum InventoryMovementType {
+  RECEIPT
+  RESERVATION
+  RELEASE
+  SHIPMENT
+  RETURN
+  ADJUSTMENT
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -118,6 +127,7 @@ model Product {
   cartItems     CartItem[]
   orderItems    OrderItem[]
   reviews       Review[]
+  inventoryMovements InventoryMovement[]
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
     productionLots ProductionLot[]
@@ -156,6 +166,7 @@ model ProductVariant {
   product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems     CartItem[]
   orderItems    OrderItem[]
+  inventoryMovements InventoryMovement[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -175,6 +186,7 @@ model ProductionLot {
   testReportUrl String?
   receivingNote String?
   product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  inventoryMovements InventoryMovement[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -315,6 +327,7 @@ model Order {
   customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   items         OrderItem[]
+  inventoryMovements InventoryMovement[]
   payments      Payment[]
   warrantyRequest WarrantyRequest?
   returnRequests ReturnRequest[]
@@ -349,6 +362,28 @@ model OrderItem {
   variant          ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
+}
+
+model InventoryMovement {
+  id               String                @id @default(cuid())
+  idempotencyKey   String?               @unique
+  productId        String
+  productVariantId String?
+  productionLotId  String?
+  orderId          String?
+  type             InventoryMovementType
+  delta            Int
+  reference        String?
+  createdAt        DateTime              @default(now())
+  product          Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productVariant   ProductVariant?       @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  productionLot    ProductionLot?        @relation(fields: [productionLotId], references: [id], onDelete: SetNull)
+  order            Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([productVariantId, createdAt])
+  @@index([productionLotId, createdAt])
+  @@index([orderId, createdAt])
 }
 
 model B2bInquiry {

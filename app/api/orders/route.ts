@@ -11,6 +11,7 @@ import { writeAuditLog } from '@/lib/audit-log';
 import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import { calculatePercentageAmount } from '@/lib/money';
 import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
+import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
 
 type CheckoutItemSnapshot = {
   id?: string;
@@ -317,6 +318,7 @@ export async function POST(request: Request) {
         }
 
         const reservedLotCodes = new Map<string, string>();
+        const reservedLotIds = new Map<string, string>();
         for (const item of cart.items) {
           const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
@@ -343,6 +345,7 @@ export async function POST(request: Request) {
             });
             if (!lotStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
             reservedLotCodes.set(item.id, lot.lotCode);
+            reservedLotIds.set(lot.lotCode, lot.id);
           }
         }
 
@@ -357,7 +360,7 @@ export async function POST(request: Request) {
         const numericCode = randomInt(100000, 1000000);
         const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
 
-        return transaction.order.create({
+        const order = await transaction.order.create({
           data: {
             orderCode,
             numericCode,
@@ -389,7 +392,21 @@ export async function POST(request: Request) {
               return { productId: item.productId, productVariantId: item.productVariantId, productName: item.product.name, variantLabel: item.variant?.title, quantity: item.quantity, price, lineTotal: item.quantity * price, lotCode: reservedLotCodes.get(item.id) };
             }) },
           },
+          include: { items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } },
         });
+        for (const item of order.items) {
+          await recordMovement(transaction, {
+            orderId: order.id,
+            productId: item.productId,
+            variantId: item.productVariantId,
+            productionLotId: item.lotCode ? reservedLotIds.get(item.lotCode) : null,
+            type: 'RESERVATION',
+            delta: -item.quantity,
+            idempotencyKey: orderMovementKey(item.id, 'RESERVATION'),
+            reference: `Checkout ${order.orderCode}`,
+          });
+        }
+        return order;
       }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {
       const prismaErrorCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;

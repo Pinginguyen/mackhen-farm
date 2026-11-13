@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindUnique, orderUpdate, returnFindUnique, returnUpdate, voucherCreate, requireAdmin, writeAuditLog, prisma } = vi.hoisted(() => {
+const { orderFindUnique, orderUpdate, orderUpdateMany, movementCreateMany, movementFindUnique, returnFindUnique, returnUpdate, voucherCreate, requireAdmin, writeAuditLog, prisma } = vi.hoisted(() => {
   const mocks = {
-    orderFindUnique: vi.fn(), orderUpdate: vi.fn(), returnFindUnique: vi.fn(), returnUpdate: vi.fn(),
+    orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(), movementCreateMany: vi.fn(), movementFindUnique: vi.fn(), returnFindUnique: vi.fn(), returnUpdate: vi.fn(),
     voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
   };
   const db = {
-    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
+    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
+    inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
     product: { update: vi.fn() },
     productVariant: { update: vi.fn() },
     productionLot: { updateMany: vi.fn() },
@@ -50,6 +51,9 @@ describe('admin operational safety', () => {
       phone: '0762793244', address: 'Địa chỉ cũ', note: null, carrier: null, trackingCode: null, deliveredAt: null, items: [],
     });
     orderUpdate.mockReset().mockImplementation(({ where, data }) => Promise.resolve({ orderCode: where.orderCode, ...data }));
+    orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
     returnFindUnique.mockReset().mockResolvedValue({
       status: 'REFUND_APPROVED', orderId: 'order-1', customerPhone: '0762793244',
       refundBankName: 'MB', refundAccountNumber: '123456', refundAccountHolder: 'Nguyen An',

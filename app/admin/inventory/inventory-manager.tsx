@@ -117,7 +117,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
             <td><strong className={item.available < 0 ? 'inventory-critical' : item.available < 20 ? 'inventory-atp-warning' : ''}>{item.available}</strong>{item.available < 20 && <span className={item.available < 0 ? 'inventory-critical' : 'inventory-atp-warning'}><AlertTriangle size={13} /> {item.available < 0 ? 'Vượt tồn' : 'Cần tái đặt hàng'}</span>}</td>
             <td>{item.active ? 'Đang bán' : 'Đã ẩn'}</td>
             <td><div className="admin-lot-list">{item.productionLots.length ? item.productionLots.map((lot) => <div className="admin-lot-row" key={lot.id}>
-              <span><strong>{lot.lotCode}</strong><small>{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN')}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
+              <span><strong>{lot.lotCode}</strong><small>{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
               <span className={`admin-lot-status ${lot.status.toLowerCase()}`}>{statusLabels[lot.status] ?? lot.status}</span>
               {lot.status !== 'RECALLED' && lot.status !== 'EXPIRED' && <button type="button" className="admin-lot-pause" disabled={busy} onClick={() => void pauseLot(lot.lotCode)} title="Tạm dừng lô và ẩn sản phẩm"><PauseCircle size={15} /> Tạm dừng lô</button>}
             </div>) : <span>Chưa khai báo lô</span>}</div></td>

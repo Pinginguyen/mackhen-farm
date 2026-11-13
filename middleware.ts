@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 const rateLimitBuckets = new Map<string, number[]>();
 const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
@@ -6,28 +8,82 @@ const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   '/api/orders': { limit: 3, windowMs: 10_000 },
   '/api/auth/login': { limit: 10, windowMs: 60_000 },
 };
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+const redisLimiters = new Map<string, Ratelimit>();
+if (redisUrl && redisToken) {
+  const redis = new Redis({ url: redisUrl, token: redisToken });
+  for (const [pathname, rule] of Object.entries(RATE_LIMITS)) {
+    redisLimiters.set(pathname, new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(rule.limit, `${rule.windowMs / 1000} s`),
+      prefix: `mackhen-farm:middleware:${pathname}`,
+    }));
+  }
+}
+let warnedMissingRateLimitStore = false;
 const LOCALE_CURRENCY_COOKIE = 'mackhen_locale_currency';
 
 type LocalePreference = { locale: 'vi' | 'en'; currency: 'VND' | 'SGD' };
 
-function rateLimitResponse(request: NextRequest): NextResponse | null {
+function clientIp(request: NextRequest): string {
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+
+  const cloudflareIp = request.headers.get('cf-connecting-ip')?.trim();
+  if (cloudflareIp) return cloudflareIp;
+
+  const proxyHeadersTrusted = process.env.VERCEL === '1' || process.env.TRUST_PROXY_HEADERS === '1';
+  if (!proxyHeadersTrusted) return 'unknown';
+
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function rateLimitedResponse(retryAfter: number): NextResponse {
+  return NextResponse.json(
+    { error: { code: 'RATE_LIMITED', message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' } },
+    { status: 429, headers: { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' } },
+  );
+}
+
+async function rateLimitResponse(request: NextRequest): Promise<NextResponse | null> {
   if (request.method !== 'POST') return null;
   const rule = RATE_LIMITS[request.nextUrl.pathname];
   if (!rule) return null;
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
-    || request.headers.get('x-real-ip')?.trim()
-    || 'unknown';
+  const ip = clientIp(request);
   const key = `${request.nextUrl.pathname}:${ip}`;
+  const limiter = redisLimiters.get(request.nextUrl.pathname);
+  if (limiter) {
+    try {
+      const result = await limiter.limit(ip);
+      return result.success ? null : rateLimitedResponse(Math.max(1, Math.ceil((result.reset - Date.now()) / 1000)));
+    } catch (error) {
+      console.error('[RATE_LIMIT_STORE_UNAVAILABLE]', error instanceof Error ? error.name : 'UnknownError');
+      return NextResponse.json(
+        { error: { code: 'RATE_LIMIT_UNAVAILABLE', message: 'Không thể xác thực giới hạn yêu cầu. Vui lòng thử lại.' } },
+        { status: 503, headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' } },
+      );
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: { code: 'RATE_LIMIT_UNAVAILABLE', message: 'Dịch vụ giới hạn yêu cầu chưa được cấu hình.' } },
+      { status: 503, headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' } },
+    );
+  }
+  if (!warnedMissingRateLimitStore) {
+    console.warn('[RATE_LIMIT_LOCAL_FALLBACK] Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for shared rate limiting.');
+    warnedMissingRateLimitStore = true;
+  }
+
   const now = Date.now();
   const windowStart = now - rule.windowMs;
   const requests = (rateLimitBuckets.get(key) ?? []).filter((timestamp) => timestamp > windowStart);
   if (requests.length >= rule.limit) {
     const retryAfter = Math.max(1, Math.ceil((requests[0] + rule.windowMs - now) / 1000));
-    return NextResponse.json(
-      { error: { code: 'RATE_LIMITED', message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' } },
-      { status: 429, headers: { 'Retry-After': String(retryAfter), 'Cache-Control': 'no-store' } },
-    );
+    return rateLimitedResponse(retryAfter);
   }
 
   requests.push(now);
@@ -96,7 +152,7 @@ async function readSession(token: string | undefined, secret: string | undefined
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const limited = rateLimitResponse(request);
+  const limited = await rateLimitResponse(request);
   if (limited) return limited;
 
   const isAdminApi = pathname === '/api/admin' || pathname.startsWith('/api/admin/');

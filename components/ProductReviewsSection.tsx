@@ -285,11 +285,11 @@ export default function ProductReviewsSection({
                 <div className="review-card-rating-row">
                   <ProductRating rating={review.rating} showValue={false} size="sm" />
                   <span aria-hidden="true">·</span>
-                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString(isEN ? 'en-SG' : 'vi-VN')}</time>
+                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
                 </div>
                 <p className="review-comment-text">{review.comment}</p>
                 {review.adminReply && <div className="review-merchant-reply">
-                  <header><Store size={15} aria-hidden="true" /><strong>{isEN ? 'Reply from Mac Khen Farm' : 'Phản hồi từ Mắc Khén Farm'}</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN') : ''}</time></header>
+                  <header><Store size={15} aria-hidden="true" /><strong>{isEN ? 'Reply from Mac Khen Farm' : 'Phản hồi từ Mắc Khén Farm'}</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}</time></header>
                   <p>{review.adminReply}</p>
                 </div>}
                 {isAdmin && <button type="button" className="review-admin-reply-toggle" onClick={() => { setAdminReplyDraft(review.adminReply ?? ''); setAdminReplyOpen(adminReplyOpen === review.id ? null : review.id); }}>
@@ -302,7 +302,7 @@ export default function ProductReviewsSection({
                 </form>}
                 {!!review.replies.length && <div className="review-thread-replies">
                   {review.replies.map((reply) => <article className={reply.authorRole === 'ADMIN' ? 'is-admin-reply' : ''} key={reply.id}>
-                    <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN')}</time></header>
+                    <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time></header>
                     <p>{reply.content}</p>
                   </article>)}
                 </div>}

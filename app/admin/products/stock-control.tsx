@@ -16,7 +16,11 @@ export default function StockControl({ productId, currentPrice, currentStock, ac
     setMessage('');
     setSaving(true);
     try {
-      const response = await fetch('/api/admin/inventory', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId, ...payload }) });
+      const response = await fetch('/api/admin/inventory', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', ...(payload.stockDelta !== undefined ? { 'idempotency-key': window.crypto.randomUUID() } : {}) },
+        body: JSON.stringify({ productId, ...payload }),
+      });
       const result = await response.json() as { message?: string; error?: { message?: string }; product?: { price: number; stock: number; active: boolean } };
       if (!response.ok || !result.product) {
         setMessage(result.error?.message ?? 'Không thể cập nhật sản phẩm.');

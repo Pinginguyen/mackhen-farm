@@ -54,7 +54,7 @@ export default async function AdminCustomersPage({ searchParams }: { searchParam
         <div className="table-card admin-customers-table-wrap"><table className="admin-customers-table">
           <thead><tr><th>Khách hàng</th><th>Email</th><th>Điện thoại</th><th>Đơn đã đặt</th><th>Đã chi tiêu</th><th>Ngày tham gia</th></tr></thead>
           <tbody>{customers.map((customer) => <tr key={customer.id}>
-            <td><strong>{customer.name}</strong></td><td>{customer.email}</td><td>{customer.phone ?? '—'}</td><td>{customer._count.orders.toLocaleString('vi-VN')}</td><td>{formatCurrency(spentByUser.get(customer.id) ?? 0)}</td><td>{new Date(customer.createdAt).toLocaleDateString('vi-VN')}</td>
+            <td><strong>{customer.name}</strong></td><td>{customer.email}</td><td>{customer.phone ?? '—'}</td><td>{customer._count.orders.toLocaleString('vi-VN')}</td><td>{formatCurrency(spentByUser.get(customer.id) ?? 0)}</td><td>{new Date(customer.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
           </tr>)}
           {!customers.length && !unavailable && <tr><td colSpan={6}>Chưa có khách hàng phù hợp.</td></tr>}</tbody>
         </table></div>

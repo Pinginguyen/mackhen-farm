@@ -301,15 +301,15 @@ export default function ReturnRequestsManager() {
                 <small>Gợi ý theo giá trị đơn hàng: {selected.order.totalAmount.toLocaleString('vi-VN')}đ · Voucher dùng một lần, hết hạn sau 30 ngày.</small>
               </label>}
               {selected.issuedVoucher && <section className="admin-return-refund-info" aria-label="Voucher đền bù đã phát hành">
-                <div><h3>Voucher đền bù</h3><p>Giảm {selected.issuedVoucher.value.toLocaleString('vi-VN')}đ · hết hạn {selected.issuedVoucher.expiresAt ? new Date(selected.issuedVoucher.expiresAt).toLocaleDateString('vi-VN') : 'không thời hạn'}</p></div>
+                <div><h3>Voucher đền bù</h3><p>Giảm {selected.issuedVoucher.value.toLocaleString('vi-VN')}đ · hết hạn {selected.issuedVoucher.expiresAt ? new Date(selected.issuedVoucher.expiresAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'không thời hạn'}</p></div>
                 <div className="admin-return-refund-field"><strong>{selected.issuedVoucher.code}</strong><button className="admin-return-copy-button" type="button" onClick={() => void copyRefundField('Mã voucher', selected.issuedVoucher!.code)}><Copy size={15} /><span>Sao chép mã</span></button></div>
               </section>}
               {selected.compensationVoucher && <section className="admin-return-refund-info" aria-label="Voucher bồi thường 50% đã phát hành">
-                <div><h3>Voucher bồi thường {selected.compensationVoucher.discountPercent}%</h3><p>Đơn dùng một lần · hết hạn {new Date(selected.compensationVoucher.expiresAt).toLocaleDateString('vi-VN')}</p></div>
+                <div><h3>Voucher bồi thường {selected.compensationVoucher.discountPercent}%</h3><p>Đơn dùng một lần · hết hạn {new Date(selected.compensationVoucher.expiresAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p></div>
                 <div className="admin-return-refund-field"><strong>{selected.compensationVoucher.code}</strong><button className="admin-return-copy-button" type="button" onClick={() => void copyRefundField('Mã voucher', selected.compensationVoucher!.code)}><Copy size={15} /><span>Sao chép mã</span></button></div>
               </section>}
               {selected.status === 'REFUND_APPROVED' && resolutionMethod === 'REFUND' && <>
-                <p className="admin-return-action-note">Đã được {selected.refundApprovedBy ?? 'Admin'} phê duyệt{selected.refundApprovedAt ? ` lúc ${new Date(selected.refundApprovedAt).toLocaleString('vi-VN')}` : ''}. Hãy thực hiện chuyển khoản ngoài hệ thống, sau đó nhập mã tham chiếu để xác nhận hoàn tất.</p>
+                <p className="admin-return-action-note">Đã được {selected.refundApprovedBy ?? 'Admin'} phê duyệt{selected.refundApprovedAt ? ` lúc ${new Date(selected.refundApprovedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}` : ''}. Hãy thực hiện chuyển khoản ngoài hệ thống, sau đó nhập mã tham chiếu để xác nhận hoàn tất.</p>
                 <label className="admin-return-admin-note">Mã tham chiếu giao dịch (bắt buộc)<input value={refundTransferReference} onChange={(event) => setRefundTransferReference(event.target.value)} maxLength={160} required aria-invalid={Boolean(error && !refundTransferReference.trim())} placeholder="Mã giao dịch ngân hàng / ví" /></label>
               </>}
               <div className="admin-return-detail-description"><span>Mô tả chi tiết</span><p>{selected.description}</p></div>

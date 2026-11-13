@@ -24,7 +24,10 @@ function isDatabaseUnavailable(error: unknown): boolean {
 }
 
 export async function POST(request: Request) {
-  const expectedSecret = process.env.PAYMENT_WEBHOOK_SECRET || 'MACKHEN_FARM_SECRET_KEY_2026';
+  const expectedSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+  if (!expectedSecret) {
+    return NextResponse.json({ success: false, message: 'Webhook chưa được cấu hình.' }, { status: 503 });
+  }
   if (request.headers.get('x-webhook-secret') !== expectedSecret) {
     return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
   }

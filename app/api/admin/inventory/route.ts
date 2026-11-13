@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
+import { recordMovement } from '@/lib/services/inventory-ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +58,8 @@ export async function PATCH(request: Request) {
     }
     const body = payload as { action?: string; productId?: string; price?: number; stock?: number; stockDelta?: number; active?: boolean; lotCode?: string; mfgDate?: string; expDate?: string; receivedQty?: number; testReportUrl?: string; receivingNote?: string };
     const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
+    const suppliedIdempotencyKey = request.headers.get('idempotency-key')?.trim();
+    const adjustmentKey = suppliedIdempotencyKey && suppliedIdempotencyKey.length <= 160 ? suppliedIdempotencyKey : randomUUID();
 
     if (body.action === 'CREATE_LOT') {
       const lotCode = body.lotCode?.trim().toUpperCase() ?? '';
@@ -70,8 +74,19 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: { message: 'Mã lô, số lượng, ngày sản xuất/hạn dùng hoặc hồ sơ kiểm nghiệm không hợp lệ.' } }, { status: 400 });
       }
       return withDatabase(async () => {
-        const lot = await prisma.productionLot.create({
-          data: { lotCode, productId: body.productId!, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
+        const lot = await prisma.$transaction(async (transaction) => {
+          const createdLot = await transaction.productionLot.create({
+            data: { lotCode, productId: body.productId!, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
+          });
+          await recordMovement(transaction, {
+            productId: body.productId!,
+            productionLotId: createdLot.id,
+            type: 'RECEIPT',
+            delta: body.receivedQty!,
+            idempotencyKey: `production-lot:${lotCode}:RECEIPT`,
+            reference: `Lot receipt ${lotCode}`,
+          });
+          return createdLot;
         });
         await writeAuditLog(request, { adminEmail, action: 'CREATE_PRODUCTION_LOT', targetEntity: 'Inventory', targetId: lot.lotCode, newValue: lot });
         return NextResponse.json({ lot }, { status: 201 });
@@ -110,15 +125,31 @@ export async function PATCH(request: Request) {
     }
     return withDatabase(async () => {
       const result = await prisma.$transaction(async (transaction) => {
-        const current = await transaction.product.findUnique({ where: { id: body.productId }, select: { stock: true, price: true, active: true, variants: { select: { id: true } } } });
+        const current = await transaction.product.findUnique({ where: { id: body.productId }, select: { id: true, stock: true, price: true, active: true, variants: { select: { id: true } } } });
         if (!current) return null;
         if (current.variants?.length && (hasPrice || hasStock || hasStockDelta)) return { variantManaged: true as const };
+        if (hasStockDelta && suppliedIdempotencyKey && suppliedIdempotencyKey.length <= 160) {
+          const previousMovement = await transaction.inventoryMovement.findUnique({
+            where: { idempotencyKey: `admin-stock:${adjustmentKey}:${body.productId}` },
+          });
+          if (previousMovement) return { product: current, current, duplicate: true as const };
+        }
         const data: { price?: number; stock?: number; active?: boolean } = {};
         if (hasPrice) data.price = body.price;
         if (hasStock) data.stock = body.stock;
         if (hasStockDelta) data.stock = Math.max(0, current.stock + body.stockDelta!);
         if (hasActive) data.active = body.active;
         const updated = await transaction.product.update({ where: { id: body.productId }, data });
+        const stockDelta = updated.stock - current.stock;
+        if (stockDelta !== 0) {
+          await recordMovement(transaction, {
+            productId: body.productId!,
+            type: 'ADJUSTMENT',
+            delta: stockDelta,
+            idempotencyKey: `admin-stock:${adjustmentKey}:${body.productId}`,
+            reference: `Manual inventory adjustment by ${adminEmail}`,
+          });
+        }
         return { product: updated, current };
       });
       if (!result) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });

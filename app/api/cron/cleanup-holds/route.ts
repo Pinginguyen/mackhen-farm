@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
+import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
         paymentStatus: 'PENDING',
         orderStatus: { in: ['PENDING', 'CONFIRMED'] },
       },
-      select: { id: true, items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } },
+      select: { id: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } },
       orderBy: { holdExpiresAt: 'asc' },
       take: 500,
     });
@@ -40,13 +41,25 @@ export async function POST(request: Request) {
         if (!claimed.count) return 0;
 
         for (const item of expiredOrder.items) {
+          let productionLotId: string | null = null;
           await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
           if (item.productVariantId) {
             await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
           }
           if (item.lotCode) {
-            await transaction.productionLot.update({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+            const lot = await transaction.productionLot.update({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } }, select: { id: true } });
+            productionLotId = lot.id;
           }
+          await recordMovement(transaction, {
+            orderId: expiredOrder.id,
+            productId: item.productId,
+            variantId: item.productVariantId,
+            productionLotId,
+            type: 'RELEASE',
+            delta: item.quantity,
+            idempotencyKey: orderMovementKey(item.id, 'RELEASE'),
+            reference: `Expired hold ${expiredOrder.id}`,
+          });
         }
         return expiredOrder.items.reduce((sum, item) => sum + item.quantity, 0);
       });

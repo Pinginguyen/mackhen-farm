@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextResponse } from 'next/server';
 
-const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, orderItemGroupBy, productionLotFindUnique, productionLotCreate, productionLotUpdate, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
+const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, orderItemGroupBy, productionLotFindUnique, productionLotCreate, productionLotUpdate, movementCreateMany, movementFindUnique, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
   const mocks = {
   productFindUnique: vi.fn(),
   productFindMany: vi.fn(),
@@ -11,13 +11,16 @@ const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, or
   productionLotFindUnique: vi.fn(),
   productionLotCreate: vi.fn(),
   productionLotUpdate: vi.fn(),
+  movementCreateMany: vi.fn(),
+  movementFindUnique: vi.fn(),
   orderItemFindMany: vi.fn(),
   requireAdmin: vi.fn(),
   };
   const tx = {
     product: { findUnique: mocks.productFindUnique, update: mocks.productUpdate },
     productVariant: { updateMany: mocks.variantUpdateMany },
-    productionLot: { update: mocks.productionLotUpdate },
+    productionLot: { create: mocks.productionLotCreate, update: mocks.productionLotUpdate },
+    inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
   };
   return { ...mocks, transaction: tx };
 });
@@ -42,6 +45,8 @@ describe('PATCH /api/admin/inventory', () => {
     productionLotFindUnique.mockReset();
     productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-1', lotCode: 'LOT-MKF-2026-001' });
     productionLotUpdate.mockReset().mockResolvedValue({});
+    movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
     orderItemFindMany.mockReset().mockResolvedValue([]);
     requireAdmin.mockReset();
     requireAdmin.mockResolvedValue(null);
@@ -61,6 +66,7 @@ describe('PATCH /api/admin/inventory', () => {
 
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { price: 79000, stock: 24 } });
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'ADJUSTMENT', delta: 12 })] }));
     expect(variantUpdateMany).not.toHaveBeenCalled();
     expect(body.message).toBe('Đã cập nhật giá và tồn kho thành công!');
   });
@@ -68,16 +74,31 @@ describe('PATCH /api/admin/inventory', () => {
   it('applies quick stock deltas without allowing negative inventory', async () => {
     productFindUnique.mockResolvedValue({ stock: 1, variants: [] });
     productUpdate.mockResolvedValue({ id: 'product-1', price: 79000, stock: 0, active: true });
+    movementFindUnique.mockReset().mockResolvedValueOnce(null).mockResolvedValue({ id: 'movement-1' });
     const request = new Request('https://mackhen.example/api/admin/inventory', {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'manual-adjustment-1' },
       body: JSON.stringify({ productId: 'product-1', stockDelta: -2 }),
     });
 
     const response = await PATCH(request);
     expect(response.status).toBe(200);
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: 0 } });
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'ADJUSTMENT', delta: -1, idempotencyKey: 'admin-stock:manual-adjustment-1:product-1' })] }));
     expect(variantUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the same stock delta twice when an idempotency key is retried', async () => {
+    movementFindUnique.mockResolvedValueOnce({ id: 'movement-1' });
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/inventory', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'manual-adjustment-retry' },
+      body: JSON.stringify({ productId: 'product-1', stockDelta: -2 }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(productUpdate).not.toHaveBeenCalled();
+    expect(movementCreateMany).not.toHaveBeenCalled();
   });
 
   it('requires product variants to be edited through their own controls', async () => {
@@ -110,6 +131,7 @@ describe('PATCH /api/admin/inventory', () => {
 
     expect(response.status).toBe(201);
     expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ lotCode: 'LOT-MKF-2026-001', receivedQty: 40, availableQty: 40 }) }));
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'RECEIPT', delta: 40, productionLotId: 'lot-1' })] }));
   });
 
   it('pauses a lot, hides its product, and returns customers for outreach', async () => {

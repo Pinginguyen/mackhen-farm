@@ -40,6 +40,7 @@ export default function SiteFooter({ settings }: { settings: PublicSystemSetting
           <Link href="/tra-cuu">{text('Tra cứu hành trình đơn hàng')}</Link>
           <Link href="/tra-cuu#return-request-form">{text('Chính sách bảo hành vị giác (Đổi mới trong 24h)')}</Link>
           <Link href="/chinh-sach-bao-mat" className="hover:text-amber-300 transition-colors">{text('Chính sách bảo mật dữ liệu (Nghị định 13)')}</Link>
+          <Link href="/terms">{text('Điều khoản dịch vụ')}</Link>
           <Link href="/products">{text('Danh mục sản phẩm khô bò & gia vị')}</Link>
           <Link className="footer-b2b-link" href="/hop-tac-b2b">{text('Hợp tác B2B (Wholesale)')}</Link>
           <Link className="footer-b2b-link" href="/truy-xuat">{text('Truy xuất nguồn gốc theo Lô')}</Link>

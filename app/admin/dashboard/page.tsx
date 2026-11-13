@@ -150,7 +150,7 @@ export default async function AdminDashboardPage() {
 
         <section className="admin-panel admin-urgent-returns">
           <header><div><p className="eyebrow">Ưu tiên CSKH</p><h3>Đổi trả / bảo hành cần xử lý</h3></div><span className="admin-count-badge warning">{urgentReturns.length}</span></header>
-          {urgentReturns.length ? <ul>{urgentReturns.map((request) => <li key={request.id}><span><strong>{request.order.orderCode}</strong><small>{request.order.customerName} · {request.issueType}</small></span><time>{new Date(request.createdAt).toLocaleDateString('vi-VN')}</time></li>)}</ul> : <p>Không có yêu cầu đang chờ xử lý.</p>}
+          {urgentReturns.length ? <ul>{urgentReturns.map((request) => <li key={request.id}><span><strong>{request.order.orderCode}</strong><small>{request.order.customerName} · {request.issueType}</small></span><time dateTime={request.createdAt}>{new Date(request.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time></li>)}</ul> : <p>Không có yêu cầu đang chờ xử lý.</p>}
           <Link href="/admin/returns">Mở trung tâm đổi trả <ArrowUpRight size={15} /></Link>
         </section>
       </section>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { randomInt } from 'node:crypto';
 
 import { prisma } from '@/lib/prisma';
@@ -6,6 +7,7 @@ import { withDatabase } from '@/lib/api-database';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
+import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
 import type { Prisma } from '@prisma/client';
 import { allowedTransitions, orderStatuses } from '@/lib/order-workflow';
 
@@ -26,6 +28,15 @@ const statusLabels: Record<string, (typeof statuses)[number]> = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function runOrderUpdateTransaction<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    Sentry.captureException(error, { tags: { route: '/api/admin/orders', operation: 'order-update' } });
+    throw error;
+  }
 }
 
 export async function GET(request: Request) {
@@ -130,7 +141,7 @@ export async function PATCH(request: Request) {
       trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
-      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { orderStatus: true, paymentStatus: true, paymentMethod: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, items: { select: { productId: true, productVariantId: true, quantity: true, lotCode: true } } } });
+      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderStatus: true, paymentStatus: true, paymentMethod: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const targetStatus = requestedStatus ?? currentOrder.orderStatus;
       const nextStatuses: readonly string[] = allowedTransitions[currentOrder.orderStatus];
@@ -165,28 +176,49 @@ export async function PATCH(request: Request) {
       }
       const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
       const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
-      const order = ['RETURNED', 'CANCELLED'].includes(targetStatus) && targetStatus !== currentOrder.orderStatus
-        ? await prisma.$transaction(async (transaction) => {
-          if (currentOrder.orderStatus !== targetStatus) {
-            const claimed = await transaction.order.updateMany({
-              where: { orderCode, orderStatus: currentOrder.orderStatus },
-              data: { orderStatus: targetStatus },
-            });
-            if (claimed.count !== 1) return null;
+      const statusChanged = targetStatus !== currentOrder.orderStatus;
+      const returningInventory = statusChanged && ['RETURNED', 'CANCELLED'].includes(targetStatus);
+      const preserveCarrier = targetStatus === 'CANCELLED' && statusChanged;
+      const clearCarrier = targetStatus === 'RETURNED' && statusChanged;
+      const order = await runOrderUpdateTransaction(() => prisma.$transaction(async (transaction) => {
+        const claimed = await transaction.order.updateMany({
+          where: {
+            orderCode,
+            orderStatus: currentOrder.orderStatus,
+            ...(currentOrder.updatedAt ? { updatedAt: currentOrder.updatedAt } : {}),
+          },
+          data: { orderStatus: targetStatus },
+        });
+        if (claimed.count !== 1) return null;
 
-            for (const item of currentOrder.items) {
-              await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-              if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
-              if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
-            }
+        if (statusChanged && ['CONFIRMED', 'PAID', 'CANCELLED', 'RETURNED'].includes(targetStatus)) {
+          const movementType = targetStatus === 'CANCELLED' ? 'RELEASE' : targetStatus === 'RETURNED' ? 'RETURN' : 'RESERVATION';
+          for (const item of currentOrder.items) {
+            const productionLot = item.lotCode
+              ? await transaction.productionLot.findUnique({ where: { lotCode: item.lotCode }, select: { id: true } })
+              : null;
+            await recordMovement(transaction, {
+              orderId: currentOrder.id,
+              productId: item.productId,
+              variantId: item.productVariantId,
+              productionLotId: productionLot?.id,
+              type: movementType,
+              delta: movementType === 'RESERVATION' ? -item.quantity : item.quantity,
+              idempotencyKey: orderMovementKey(item.id, movementType),
+              reference: `${targetStatus} ${orderCode}`,
+            });
           }
-          if (targetStatus === 'CANCELLED') return transaction.order.update({ where: { orderCode }, data: { orderStatus: targetStatus, deliveredAt: null } });
-          return transaction.order.update({
-            where: { orderCode },
-            data: { orderStatus: targetStatus, carrier: null, trackingCode: null, deliveredAt: null },
-          });
-        })
-        : await prisma.order.update({
+        }
+
+        if (returningInventory) {
+          for (const item of currentOrder.items) {
+            await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+            if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
+            if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+          }
+        }
+
+        return transaction.order.update({
           where: { orderCode },
           data: {
             orderStatus: targetStatus,
@@ -194,13 +226,13 @@ export async function PATCH(request: Request) {
             ...(body.phone !== undefined ? { phone: normalizedPhone } : {}),
             ...(body.address !== undefined ? { address } : {}),
             ...(manualPayment ? { note: [currentOrder.note?.trim(), `[Thanh toán thủ công bởi ${getRequestSession(request)?.email ?? 'unknown-admin'}]: ${paymentReason}`].filter(Boolean).join('\n') } : {}),
-            carrier: normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : requestedStatus && requestedStatus !== currentOrder.orderStatus ? null : currentOrder.carrier,
-            trackingCode: trackingCode || (body.trackingCode !== undefined ? null : requestedStatus && requestedStatus !== currentOrder.orderStatus ? null : currentOrder.trackingCode),
+            carrier: preserveCarrier ? currentOrder.carrier : clearCarrier ? null : normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : statusChanged ? null : currentOrder.carrier,
+            trackingCode: preserveCarrier ? currentOrder.trackingCode : clearCarrier ? null : trackingCode || (body.trackingCode !== undefined ? null : statusChanged ? null : currentOrder.trackingCode),
             deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
           },
         });
+      }));
       if (!order) return NextResponse.json({ error: { message: 'Xung đột trạng thái đơn hàng.' } }, { status: 409 });
-      const statusChanged = targetStatus !== currentOrder.orderStatus;
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
         action: statusChanged ? targetStatus === 'CANCELLED' ? 'CANCEL_ORDER' : targetStatus === 'RETURNED' ? 'RETURN_ORDER' : 'UPDATE_ORDER_STATUS' : manualPayment ? 'MANUAL_CONFIRM_PAYMENT' : updatesRecipient ? 'UPDATE_ORDER_RECIPIENT' : 'UPDATE_ORDER',
@@ -213,6 +245,7 @@ export async function PATCH(request: Request) {
     });
   } catch (error) {
     console.error('Admin order update failed:', error);
+    Sentry.captureException(error, { tags: { route: '/api/admin/orders', operation: 'order-update' } });
     return NextResponse.json({ error: { message: 'Không thể cập nhật đơn hàng.' } }, { status: 500 });
   }
 }

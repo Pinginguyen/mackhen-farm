@@ -357,40 +357,27 @@ async function main(): Promise<void> {
 
       await runStep(8, async (capture) => {
         await navigate('/admin/returns');
-        try {
-          const table = page!.locator('.admin-return-table');
-          await table.waitFor({ state: 'visible', timeout: 15_000 });
-          for (const label of ['Mã đơn hàng', 'Khách hàng', 'Loại sự cố', 'Trạng thái']) {
-            assert(await table.getByRole('columnheader', { name: label }).count() > 0, `Thiếu cột ${label} trong bảng đổi trả.`);
-          }
-          await page!.waitForFunction(() => {
-            const currentTable = document.querySelector('.admin-return-table');
-            return Boolean(currentTable && !currentTable.textContent?.includes('Đang tải yêu cầu...'));
-          }, undefined, { timeout: 15_000 });
-          assert(await page!.getByRole('alert').count() === 0, 'Trang đổi trả báo lỗi khi tải dữ liệu.');
-          const processButtons = page!.getByRole('button', { name: 'Xử lý', exact: true });
-          const processCount = await processButtons.count();
-          if (processCount === 0) {
-            const emptyRows = await table.locator('tbody tr').count();
-            const tableText = await table.locator('tbody').innerText();
-            assert(emptyRows === 0 || /Không có yêu cầu phù hợp|Chưa có yêu cầu đổi trả/i.test(tableText), `Bảng có ${emptyRows} dòng nhưng không có nút xử lý hay Empty State hợp lệ.`);
-            await capture('07_returns.png');
-            return '✓ Bảng hoạt động tốt (Hiện đang ở trạng thái Empty State do chưa có giao dịch)';
-          }
-          await processButtons.first().click();
-          const dialog = page!.getByRole('dialog', { name: /Chi tiết khiếu nại/ });
-          await dialog.waitFor({ state: 'visible', timeout: 10_000 });
-          const actions = await dialog.innerText();
-          assert(actions.includes('Duyệt hoàn tiền'), 'Không tìm thấy thao tác duyệt hoàn tiền.');
-          assert(actions.includes('Duyệt gửi bù (Đơn 0đ)'), 'Không tìm thấy thao tác gửi bù 0đ.');
-          await dialog.getByRole('button', { name: 'Đóng' }).click();
-          await capture('07_returns.png');
-          return 'Bảng yêu cầu và các thao tác Duyệt hoàn tiền, Duyệt gửi bù (Đơn 0đ) hiển thị; không gửi lệnh xử lý.';
-        } catch (error) {
-          await capture('07_returns.png');
-          const detail = error instanceof Error ? ` (${error.message})` : '';
-          return `Empty state / No API data${detail}`;
+        const table = page!.locator('.admin-return-table');
+        await table.waitFor({ state: 'visible', timeout: 15_000 });
+        for (const label of ['Mã đơn hàng', 'Khách hàng', 'Loại sự cố', 'Trạng thái']) {
+          assert(await table.getByRole('columnheader', { name: label }).count() > 0, `Thiếu cột ${label} trong bảng đổi trả.`);
         }
+        await page!.waitForFunction(() => {
+          const currentTable = document.querySelector('.admin-return-table');
+          return Boolean(currentTable && !currentTable.textContent?.includes('Đang tải yêu cầu...'));
+        }, undefined, { timeout: 15_000 });
+        assert(await page!.getByRole('alert').count() === 0, 'Trang đổi trả báo lỗi khi tải dữ liệu.');
+        const processButtons = page!.getByRole('button', { name: 'Xử lý', exact: true });
+        assert(await processButtons.count() > 0, 'Không có yêu cầu đổi trả để xác minh; endpoint trả dữ liệu rỗng.');
+        await processButtons.first().click();
+        const dialog = page!.getByRole('dialog', { name: /Chi tiết khiếu nại/ });
+        await dialog.waitFor({ state: 'visible', timeout: 10_000 });
+        const actions = await dialog.innerText();
+        assert(actions.includes('Duyệt hoàn tiền'), 'Không tìm thấy thao tác duyệt hoàn tiền.');
+        assert(actions.includes('Duyệt gửi bù (Đơn 0đ)'), 'Không tìm thấy thao tác duyệt gửi bù (Đơn 0đ).');
+        await dialog.getByRole('button', { name: 'Đóng' }).click();
+        await capture('07_returns.png');
+        return 'Bảng yêu cầu và các thao tác xử lý hiển thị; không gửi lệnh xử lý.';
       }, ['07_returns.png']);
 
       await runStep(9, async (capture) => {

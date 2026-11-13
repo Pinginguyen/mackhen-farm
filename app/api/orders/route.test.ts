@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
     userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
+    movementCreateMany: vi.fn(), movementFindUnique: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
     voucherFindUnique: vi.fn(), voucherUpdateMany: vi.fn(),
     affiliateFindUnique: vi.fn(),
@@ -18,6 +19,7 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
     user: { update: mocks.userUpdate },
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate },
     productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
+    inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
     affiliate: { findUnique: mocks.affiliateFindUnique },
@@ -64,7 +66,9 @@ describe('POST /api/orders checkout', () => {
     affiliateFindUnique.mockReset().mockResolvedValue(null);
     userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
     orderFindMany.mockReset().mockResolvedValue([]);
-    orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
+    orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, items: [{ id: 'order-item-1', productId: 'spice-1', productVariantId: null, quantity: 1, lotCode: null }] });
+    movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
     cartItemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
     prisma.$transaction.mockClear();
   });
@@ -117,6 +121,10 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 35000, grossAmount: 169000, netAmount: 204000, affiliateCode: 'KOC_TAYBAC', affiliateCommissionRate: 12 }),
+    }));
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ orderId: 'order-1', productId: 'spice-1', type: 'RESERVATION', delta: -1, idempotencyKey: 'order-item:order-item-1:RESERVATION' })],
+      skipDuplicates: true,
     }));
   });
 

@@ -5,8 +5,7 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   typescript: {
-    // Bỏ qua lỗi TypeScript nhỏ để đảm bảo build thành công trên Vercel
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
     // Bỏ qua cảnh báo ESLint khi build

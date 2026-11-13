@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpdate, variantUpdate, lotUpdateMany, requireAdmin, transaction, prisma } = vi.hoisted(() => {
+const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpdate, variantUpdate, lotFindUnique, lotUpdateMany, movementCreateMany, movementFindUnique, requireAdmin, captureException, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(),
-    productUpdate: vi.fn(), variantUpdate: vi.fn(), lotUpdateMany: vi.fn(), requireAdmin: vi.fn(),
+    productUpdate: vi.fn(), variantUpdate: vi.fn(), lotFindUnique: vi.fn(), lotUpdateMany: vi.fn(), movementCreateMany: vi.fn(), movementFindUnique: vi.fn(), requireAdmin: vi.fn(), captureException: vi.fn(),
   };
   const tx = {
     order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
     product: { update: mocks.productUpdate },
     productVariant: { update: mocks.variantUpdate },
-    productionLot: { updateMany: mocks.lotUpdateMany },
+    productionLot: { findUnique: mocks.lotFindUnique, updateMany: mocks.lotUpdateMany },
+    inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
   };
   const db = { order: { findMany: mocks.orderFindMany, findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)) };
   return { ...mocks, transaction: tx, prisma: db };
@@ -17,6 +18,7 @@ const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpd
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
+vi.mock('@sentry/nextjs', () => ({ captureException }));
 
 import { GET, PATCH } from './route';
 
@@ -29,8 +31,12 @@ describe('/api/admin/orders', () => {
     productUpdate.mockReset().mockResolvedValue({});
     variantUpdate.mockReset().mockResolvedValue({});
     lotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    lotFindUnique.mockReset().mockResolvedValue({ id: 'lot-1' });
+    movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
     prisma.$transaction.mockClear();
     requireAdmin.mockReset().mockResolvedValue(null);
+    captureException.mockReset();
   });
 
   it('returns affiliate attribution with the order for KOC commission reconciliation', async () => {
@@ -233,14 +239,29 @@ describe('/api/admin/orders', () => {
   });
 
   it('allows a confirmed COD order to move directly to processing', async () => {
-    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'CONFIRMED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    const updatedAt = new Date('2026-11-03T00:00:00.000Z');
+    orderFindUnique.mockResolvedValueOnce({ orderStatus: 'CONFIRMED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, updatedAt, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING' }),
     }));
 
     expect(response.status).toBe(200);
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(orderUpdateMany).toHaveBeenCalledWith({ where: { orderCode: 'MKF-100001', orderStatus: 'CONFIRMED', updatedAt }, data: { orderStatus: 'PROCESSING' } });
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderStatus: 'PROCESSING' }) }));
+  });
+
+  it('reports transaction failures to Sentry', async () => {
+    prisma.$transaction.mockRejectedValueOnce(new Error('transaction unavailable'));
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'CONFIRMED' }),
+    }));
+
+    expect(response.status).toBe(500);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { route: '/api/admin/orders', operation: 'order-update' } });
   });
 
   it('does not allow a returned order to resume shipping', async () => {
@@ -267,8 +288,8 @@ describe('/api/admin/orders', () => {
 
   it('restocks product, variant, and production lot once when an order is returned', async () => {
     orderFindUnique.mockResolvedValueOnce({
-      orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
-      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      id: 'order-1', orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
+      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
     });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
@@ -283,6 +304,10 @@ describe('/api/admin/orders', () => {
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ type: 'RETURN', delta: 2, idempotencyKey: 'order-item:order-item-1:RETURN' })],
+      skipDuplicates: true,
+    }));
 
     orderFindUnique.mockResolvedValueOnce({
       orderStatus: 'RETURNED', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null,
@@ -325,9 +350,9 @@ describe('/api/admin/orders', () => {
 
   it('cancels an eligible order, restocks inventory transactionally, and accepts a reason', async () => {
     orderFindUnique.mockResolvedValueOnce({
-      orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null,
+      id: 'order-1', orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null,
       phone: '0762793244', address: 'Lai Chau', note: null,
-      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
     });
     orderUpdate.mockResolvedValueOnce({ orderCode: 'MKF-100001', orderStatus: 'CANCELLED', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
 
@@ -342,5 +367,9 @@ describe('/api/admin/orders', () => {
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({ type: 'RELEASE', delta: 2, idempotencyKey: 'order-item:order-item-1:RELEASE' })],
+      skipDuplicates: true,
+    }));
   });
 });

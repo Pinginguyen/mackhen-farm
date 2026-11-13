@@ -6,6 +6,8 @@ import { middleware } from './middleware';
 
 const originalSecret = process.env.AUTH_SECRET;
 const originalNextAuthSecret = process.env.NEXTAUTH_SECRET;
+const originalVercel = process.env.VERCEL;
+const originalTrustProxyHeaders = process.env.TRUST_PROXY_HEADERS;
 const secret = 'middleware-rbac-test-secret-with-32-characters';
 
 function makeRequest(path: string, role?: 'CUSTOMER' | 'ADMIN', headers: Record<string, string> = {}, method = 'GET') {
@@ -25,6 +27,10 @@ afterEach(() => {
   else process.env.AUTH_SECRET = originalSecret;
   if (originalNextAuthSecret === undefined) delete process.env.NEXTAUTH_SECRET;
   else process.env.NEXTAUTH_SECRET = originalNextAuthSecret;
+  if (originalVercel === undefined) delete process.env.VERCEL;
+  else process.env.VERCEL = originalVercel;
+  if (originalTrustProxyHeaders === undefined) delete process.env.TRUST_PROXY_HEADERS;
+  else process.env.TRUST_PROXY_HEADERS = originalTrustProxyHeaders;
 });
 
 describe('RBAC middleware', () => {
@@ -86,7 +92,8 @@ describe('RBAC middleware', () => {
 
   it('rate limits checkout requests at the Edge', async () => {
     const request = () => makeRequest('/api/checkout', undefined, {
-      'x-forwarded-for': '198.51.100.11',
+      'x-real-ip': '198.51.100.11',
+      'x-forwarded-for': '203.0.113.250',
     }, 'POST');
 
     expect((await middleware(request())).status).not.toBe(429);
@@ -100,12 +107,34 @@ describe('RBAC middleware', () => {
 
   it('rate limits repeated login requests at the Edge', async () => {
     const request = () => makeRequest('/api/auth/login', undefined, {
-      'x-forwarded-for': '198.51.100.12',
+      'cf-connecting-ip': '198.51.100.12',
+      'x-forwarded-for': '203.0.113.250',
     }, 'POST');
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
       expect((await middleware(request())).status).not.toBe(429);
     }
     expect((await middleware(request())).status).toBe(429);
+  });
+
+  it('does not trust client-supplied X-Forwarded-For without a trusted proxy', async () => {
+    delete process.env.VERCEL;
+    delete process.env.TRUST_PROXY_HEADERS;
+    const request = (forwardedFor: string) => makeRequest('/api/orders', undefined, { 'x-forwarded-for': forwardedFor }, 'POST');
+
+    expect((await middleware(request('198.51.100.101'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.102'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.103'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.104'))).status).toBe(429);
+  });
+
+  it('uses the client IP from the first X-Forwarded-For entry behind Vercel', async () => {
+    process.env.VERCEL = '1';
+    const request = (chain: string) => makeRequest('/api/orders', undefined, { 'x-forwarded-for': chain }, 'POST');
+
+    expect((await middleware(request('198.51.100.201, 10.0.0.1'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.201, 10.0.0.2'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.201, 10.0.0.3'))).status).not.toBe(429);
+    expect((await middleware(request('198.51.100.201, 10.0.0.4'))).status).toBe(429);
   });
 });
