@@ -17084,7 +17084,12 @@ a.audit-target-chip:hover {
 }
 
 .home-page > .catalog-section .product-card-image-link {
-  aspect-ratio: 1.9;
+  aspect-ratio: 16 / 9;
+}
+
+.home-page > .catalog-section .product-card-image {
+  object-fit: cover;
+  object-position: left center;
 }
 
 .home-page > .catalog-section .card-body {
