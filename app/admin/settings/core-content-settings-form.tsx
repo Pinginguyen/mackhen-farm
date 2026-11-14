@@ -48,7 +48,7 @@ export default function CoreContentSettingsForm({ initialSettings, unavailable }
           <input type="checkbox" checked={settings.announcementBarEnabled} onChange={(event) => update('announcementBarEnabled', event.target.checked)} />
           Hiển thị thanh thông báo
         </label>
-        <label className="field">Chữ chạy thông báo<input value={settings.announcementBarText} onChange={(event) => update('announcementBarText', event.target.value)} maxLength={300} required /></label>
+        <label className="field">Chữ chạy thông báo<input value={settings.announcementBarText} onChange={(event) => update('announcementBarText', event.target.value)} placeholder="MẮC KHÉN SAO KHÔ SƠN LA • 22G ĐẠM THỰC VẬT / 100G • FREESHIP TOÀN QUỐC TỪ 250K • GIAO NHANH 2H • 100% NGUYÊN LIỆU UPCYCLED" maxLength={300} required /><small>Ngăn cách các thông điệp bằng dấu • hoặc |.</small></label>
         <label className="field">Tiêu đề banner khuyến mãi<input value={settings.homePromoTitle} onChange={(event) => update('homePromoTitle', event.target.value)} maxLength={200} required /></label>
         <label className="field">Mã voucher<input value={settings.homePromoVoucherCode} onChange={(event) => update('homePromoVoucherCode', event.target.value)} maxLength={80} required /></label>
       </fieldset>

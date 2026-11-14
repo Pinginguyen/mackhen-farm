@@ -10887,10 +10887,9 @@ body {
   width: 100vw;
   margin: -48px 0 0 -50vw;
   overflow: hidden;
-  border-top: 1px solid rgb(120 53 15 / 30%);
-  border-bottom: 1px solid rgb(120 53 15 / 30%);
-  background: linear-gradient(to right, #142820, #841E1E, #142820);
-  padding-block: 0.75rem;
+  border: 0;
+  background: #1B4332;
+  padding-block: 0.25rem;
   color: #FAF7F2;
   box-shadow: 0 4px 8px rgb(0 0 0 / 12%);
 }
@@ -11258,24 +11257,44 @@ body {
 
 .marquee-content {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 0 auto;
   align-items: center;
-  min-height: 48px;
+  justify-content: space-around;
+  min-height: 28px;
   color: #fdfbf7;
+}
+
+.marquee-viewport {
+  width: 100%;
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  flex: 0 0 max-content;
+  align-items: center;
+  justify-content: space-around;
+  width: max-content;
+  min-width: 100vw;
+  min-height: 28px;
 }
 
 .marquee-item {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  color: #fdfbf7;
+  gap: 12px;
+  color: #FAF7F2;
   font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .marquee-separator {
-  color: #fcd34d;
+  color: #e9c46a;
+  font-size: 0.65rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -16365,7 +16384,7 @@ a.audit-target-chip:hover {
 
 }
 /* --- HIỆU ỨNG RUY-BĂNG CHẠY VÔ TẬN 60FPS --- */
-@keyframes marquee-scroll {
+@keyframes marquee {
   0% {
     transform: translateX(0%);
   }
@@ -16377,7 +16396,7 @@ a.audit-target-chip:hover {
 .marquee-container {
   display: flex;
   width: max-content;
-  animation: marquee-scroll 22s linear infinite;
+  animation: marquee 32s linear infinite;
   will-change: transform;
 }
 

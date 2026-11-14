@@ -35,7 +35,7 @@ export type PublicSystemSettings = Pick<SystemSettings,
 >;
 
 export const DEFAULT_CORE_CONTENT_SETTINGS: CoreContentSettings = {
-  announcementBarText: 'Freeship toàn quốc từ 250k • Giao nhanh 2h',
+  announcementBarText: 'MẮC KHÉN SAO KHÔ SƠN LA • 22G ĐẠM THỰC VẬT / 100G • FREESHIP TOÀN QUỐC TỪ 250K • GIAO NHANH 2H • 100% NGUYÊN LIỆU UPCYCLED',
   announcementBarEnabled: true,
   contactHotline: '0762.793.244',
   contactZalo: 'https://zalo.me/0762793244',
