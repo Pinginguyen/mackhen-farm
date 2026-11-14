@@ -21,34 +21,6 @@
     "altText": "Combo sản phẩm Mắc Khén Farm"
   },
   {
-    "key": "BADGE_UPCYCLED",
-    "label": "Điểm nhấn Upcycled Food",
-    "category": "HOME",
-    "imageUrl": "/products/soy-pulp.svg",
-    "altText": "Bã đậu nành upcycled"
-  },
-  {
-    "key": "BADGE_FEATURE_1",
-    "label": "Icon Đậu nành địa phương",
-    "category": "HOME",
-    "imageUrl": "/products/soy-pulp.svg",
-    "altText": "Đậu nành địa phương"
-  },
-  {
-    "key": "BADGE_FEATURE_2",
-    "label": "Icon Đóng gói vận chuyển",
-    "category": "HOME",
-    "imageUrl": "/products/combo.jpg",
-    "altText": "Đóng gói sẵn sàng vận chuyển"
-  },
-  {
-    "key": "BADGE_FEATURE_3",
-    "label": "Icon Mùi vị đặc trưng Tây Bắc",
-    "category": "HOME",
-    "imageUrl": "/products/hat-mac-khen.jpg",
-    "altText": "Mắc khén và gia vị Tây Bắc"
-  },
-  {
     "key": "STORY_SECTION_IMAGE",
     "label": "Ảnh Câu chuyện thương hiệu / Nông trại",
     "category": "HOME",

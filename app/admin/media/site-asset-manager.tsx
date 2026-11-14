@@ -13,8 +13,8 @@ const filters: { id: MediaFilter; label: string }[] = [
 ];
 
 const filterKeys: Record<Exclude<MediaFilter, 'all'>, string[]> = {
-  home: ['HERO_BANNER_MAIN', 'HERO_BANNER_MOBILE', 'PROMO_BANNER_HOME', 'BADGE_UPCYCLED', 'BADGE_FEATURE_1', 'BADGE_FEATURE_2', 'BADGE_FEATURE_3', 'STORY_SECTION_IMAGE'],
-  branding: ['LOGO_HEADER', 'LOGO_FOOTER', 'BADGE_BCT', 'OG_IMAGE'],
+  home: ['HERO_BANNER_MAIN', 'HERO_BANNER_MOBILE', 'PROMO_BANNER_HOME'],
+  branding: ['LOGO_HEADER', 'LOGO_FOOTER'],
   special: ['B2B_HERO_BANNER', 'TRACEABILITY_BANNER'],
 };
 
@@ -22,18 +22,13 @@ const recommendedDimensions: Record<string, string> = {
   HERO_BANNER_MAIN: '1920 x 1080 px',
   HERO_BANNER_MOBILE: '1080 x 1350 px',
   PROMO_BANNER_HOME: '1600 x 500 px',
-  BADGE_UPCYCLED: '256 x 256 px',
-  BADGE_FEATURE_1: '256 x 256 px',
-  BADGE_FEATURE_2: '256 x 256 px',
-  BADGE_FEATURE_3: '256 x 256 px',
-  STORY_SECTION_IMAGE: '1200 x 900 px',
   LOGO_HEADER: '512 x 512 px',
   LOGO_FOOTER: '512 x 160 px',
-  BADGE_BCT: '600 x 240 px',
-  OG_IMAGE: '1200 x 630 px',
   B2B_HERO_BANNER: '1920 x 900 px',
   TRACEABILITY_BANNER: '1920 x 700 px',
 };
+
+const managedAssetKeys = Object.values(filterKeys).flat();
 
 function categoryLabel(key: string) {
   if (filterKeys.home.includes(key)) return 'Trang chủ';
@@ -93,9 +88,10 @@ export default function SiteAssetManager({ initialItems, unavailable }: { initia
     }
   }
 
+  const managedItems = items.filter((asset) => managedAssetKeys.includes(asset.key));
   const visibleItems = activeFilter === 'all'
-    ? items
-    : items.filter((asset) => filterKeys[activeFilter].includes(asset.key));
+    ? managedItems
+    : managedItems.filter((asset) => filterKeys[activeFilter].includes(asset.key));
 
   return <section className="admin-media-manager">
     {unavailable && <p className="empty-state" role="status">Không thể tải vị trí hình ảnh từ cơ sở dữ liệu.</p>}
