@@ -50,7 +50,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   return (
     <article className={`product-card artisan-product-card group${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
       <div className={`image-box product-card-media${secondImage ? ' has-secondary' : ''}`}>
-        <Link className="product-card-image-link" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
+        <Link className="product-card-image-link aspect-video" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
           <Image className="product-card-image is-primary" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
           {secondImage && <Image className="product-card-image is-secondary" src={secondImage} alt={`${productName}, alternate view`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
         </Link>

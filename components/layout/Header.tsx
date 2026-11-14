@@ -3,9 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
 import HeaderContent from './HeaderContent';
 import { getSiteAsset } from '@/lib/site-assets';
+import { getCoreContentSettings } from '@/lib/system-settings';
 
 export default async function Header() {
-  const logoUrl = await getSiteAsset('LOGO_HEADER', '');
+  const [logoUrl, contentSettings] = await Promise.all([
+    getSiteAsset('LOGO_HEADER', ''),
+    getCoreContentSettings(),
+  ]);
+  const showAnnouncement = contentSettings.announcementBarEnabled && Boolean(contentSettings.announcementBarText.trim());
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   let user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null = null;
   if (session) {
@@ -19,7 +24,12 @@ export default async function Header() {
     }
   }
   return <>
-    <HeaderContent user={user} logoUrl={logoUrl} />
-    <div className="header-spacer w-full" aria-hidden="true" />
+    {showAnnouncement && (
+      <div className="fixed inset-x-0 top-0 z-[60] flex h-8 items-center justify-center overflow-hidden bg-[#1B4332] px-4 text-center text-xs font-medium text-[#FAF7F2]">
+        <span className="truncate">{contentSettings.announcementBarText}</span>
+      </div>
+    )}
+    <HeaderContent user={user} logoUrl={logoUrl} announcementBarEnabled={showAnnouncement} />
+    <div className={`header-spacer w-full${showAnnouncement ? ' has-announcement' : ''}`} aria-hidden="true" />
   </>;
 }
