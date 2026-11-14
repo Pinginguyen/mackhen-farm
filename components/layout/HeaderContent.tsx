@@ -14,7 +14,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
-    <header className="topbar site-header fixed top-0 left-0 right-0 w-full z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm transition-all duration-300 !py-2">
+    <header className="topbar site-header desktop-single-row fixed top-0 left-0 right-0 w-full z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm transition-all duration-300 !py-2">
       <Link className="brand-wrap" href="/">
         {logoUrl ? <img className="brand-logo-image" src={logoUrl} alt="Mắc Khén Farm" /> : <span className="brand-badge">M</span>}
         <span>

@@ -16120,6 +16120,10 @@ a.audit-target-chip:hover {
     color: var(--text);
   }
 
+  .mobile-search-trigger {
+    display: none;
+  }
+
   .header-desktop-auth,
   .site-header-actions > .admin-header-link {
     display: none;
@@ -16915,6 +16919,221 @@ a.audit-target-chip:hover {
   border-color: rgba(197, 168, 105, 0.46);
   background: transparent;
   color: inherit;
+}
+
+.header-spacer {
+  height: 156px;
+}
+
+@media (min-width: 1024px) {
+  .header-spacer {
+    height: 64px;
+  }
+
+  .site-header.desktop-single-row {
+    display: grid;
+    grid-template-columns: auto auto minmax(140px, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    height: 64px;
+    padding-block: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .desktop-single-row .brand-wrap {
+    grid-column: 1;
+    min-width: 0;
+  }
+
+  .desktop-single-row .main-nav {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+    font-size: 0.74rem;
+  }
+
+  .desktop-single-row .main-nav > a {
+    flex: 0 0 auto;
+  }
+
+  .desktop-single-row > .live-product-search {
+    grid-column: 3;
+    justify-self: stretch;
+    width: 100%;
+    min-width: 140px;
+    max-width: 250px;
+    margin: 0;
+  }
+
+  .desktop-single-row .site-header-actions {
+    grid-column: 4;
+    width: auto;
+    gap: 8px;
+  }
+
+  .desktop-single-row .header-desktop-auth {
+    gap: 8px;
+  }
+
+  .desktop-single-row .header-desktop-auth .cta-link {
+    min-height: 36px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+
+  .desktop-single-row .header-desktop-auth .header-login {
+    font-size: 0.78rem;
+  }
+}
+
+.home-page > section {
+  margin-top: 0;
+  padding-block: 20px;
+}
+
+.home-page {
+  padding-top: 12px;
+}
+
+.home-page > .hero {
+  min-height: 0;
+  gap: 16px;
+  padding-block: 12px;
+}
+
+.home-page .hero-copy {
+  gap: 4px;
+}
+
+.home-page .hero-copy h1 {
+  margin: 2px 0;
+  font-size: clamp(1.9rem, 2.1vw, 2.35rem);
+  line-height: 1.05;
+}
+
+.home-page .hero-title-accent {
+  font-size: 1.18rem;
+}
+
+.home-page .hero-copy p {
+  margin: 4px 0;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.home-page .hero-actions {
+  gap: 7px;
+  margin: 6px 0;
+}
+
+.home-page .hero-actions .primary-btn,
+.home-page .hero-actions .secondary-btn {
+  min-height: 36px;
+  padding: 7px 12px;
+}
+
+.home-page .hero-checklist {
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+}
+
+.home-page .hero-feature-pill {
+  gap: 5px;
+  padding: 3px 5px;
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.home-page .hero-badges .pill {
+  padding: 4px 8px;
+  font-size: 0.68rem;
+}
+
+.home-page > .hero .photo-card {
+  max-height: 285px;
+}
+
+.home-page > .hero .photo-card img {
+  height: 285px;
+  object-fit: contain;
+}
+
+.home-page > .home-marquee {
+  margin-top: 0;
+}
+
+.home-page > .catalog-section {
+  margin-top: 0;
+  padding: 18px 0 12px;
+}
+
+.home-page > .catalog-section .section-heading {
+  margin-bottom: 8px;
+}
+
+.home-page > .catalog-section .product-grid {
+  gap: 10px;
+}
+
+.home-page > .catalog-section .catalog-section-title {
+  font-size: 1.35rem;
+}
+
+.home-page > .catalog-section .product-card-image-link {
+  aspect-ratio: 16 / 9;
+}
+
+.home-page > .catalog-section .card-body {
+  gap: 4px;
+  padding: 8px 10px 10px;
+}
+
+.home-page > .catalog-section .taste-sensory-meter,
+.home-page > .catalog-section .product-card-description {
+  display: none;
+}
+
+.home-page > .catalog-section .product-card-action {
+  min-height: 36px;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.home-page > .catalog-section .artisan-quick-add {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+}
+
+@media (max-width: 1023px) {
+  .home-page > .hero .photo-card {
+    max-height: 220px;
+  }
+
+  .home-page > .hero .photo-card img {
+    height: 220px;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-page > .hero {
+    padding-block: 12px;
+  }
+
+  .home-page .hero-copy h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+  }
+
+  .home-page .hero-title-accent {
+    font-size: 1.12rem;
+  }
+
+  .home-page > .catalog-section {
+    padding-top: 14px;
+  }
 }
 
 @media (max-width: 767px) {

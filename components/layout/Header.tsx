@@ -20,6 +20,6 @@ export default async function Header() {
   }
   return <>
     <HeaderContent user={user} logoUrl={logoUrl} />
-    <div className="h-20 w-full" aria-hidden="true" />
+    <div className="header-spacer w-full" aria-hidden="true" />
   </>;
 }

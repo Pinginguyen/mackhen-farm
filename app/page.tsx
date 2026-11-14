@@ -94,6 +94,17 @@ export default async function HomePage({ searchParams }: { searchParams: { error
 
       <MarqueeBanner text={contentSettings.announcementBarText} enabled={contentSettings.announcementBarEnabled} />
 
+      <section className="catalog-section">
+        <div className="section-heading home-section-heading catalog-heading">
+          <div>
+            <h2 className="catalog-section-title"><LocalizedText text="SẢN PHẨM NỔI BẬT & COMBO" /></h2>
+          </div>
+          <Link href="/products"><LocalizedText text="Xem tất cả sản phẩm" /> <ArrowRight size={17} aria-hidden="true" /></Link>
+        </div>
+
+        <ProductCatalogFilter products={bestSellers} showFilters={false} />
+      </section>
+
       <section className="home-promo-banner-wrap">
         <div className="home-promo-banner">
           <img src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
@@ -131,17 +142,6 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       </section>
 
       <HomeTransparencyTabs />
-
-      <section className="catalog-section">
-        <div className="section-heading home-section-heading catalog-heading">
-          <div>
-            <h2 className="catalog-section-title"><LocalizedText text="SẢN PHẨM BÁN CHẠY" /></h2>
-          </div>
-          <Link href="/products"><LocalizedText text="Xem tất cả sản phẩm" /> <ArrowRight size={17} aria-hidden="true" /></Link>
-        </div>
-
-        <ProductCatalogFilter products={bestSellers} showFilters={false} />
-      </section>
 
       <section className="story-block">
         <div>
