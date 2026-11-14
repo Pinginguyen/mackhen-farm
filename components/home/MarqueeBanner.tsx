@@ -1,43 +1,18 @@
 'use client';
 
-import Link from 'next/link';
-import { useLocaleCurrency } from '@/lib/i18n-context';
-
-type MarqueeMessage = { text: string; href?: string };
-
-function MarqueeContent({ messages, duplicate = false }: { messages: MarqueeMessage[]; duplicate?: boolean }) {
+function MarqueeContent({ text, duplicate = false }: { text: string; duplicate?: boolean }) {
   return (
     <span className="marquee-content" aria-hidden={duplicate}>
-      {messages.map((message) => (
-        <span className="marquee-item text-[#FAF7F2] text-xs md:text-sm font-medium tracking-widest" key={message.text}>
+      <span className="marquee-item text-[#FAF7F2] text-xs md:text-sm font-medium tracking-widest">
           <span className="marquee-separator text-[#D4A373] text-xs mx-4" aria-hidden="true">✦</span>
-          {message.href
-            ? <Link className="transition-colors hover:text-[#D4A373] hover:underline" href={message.href} tabIndex={duplicate ? -1 : undefined}>{message.text}</Link>
-            : <span>{message.text}</span>}
-        </span>
-      ))}
+          {text}
+      </span>
     </span>
   );
 }
 
-export default function MarqueeBanner() {
-  const { currency } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
-  const messages: MarqueeMessage[] = isEN ? [
-    { text: '100% UPCYCLED SOYBEAN', href: '/truy-xuat' },
-    { text: 'WILD SICHUAN PEPPER (MẮC KHÉN)' },
-    { text: '22G HIGH PLANT PROTEIN' },
-    { text: 'FREE SHIPPING FROM 250K', href: '/khuyen-mai' },
-    { text: 'SINGAPORE EXPORT PILOT', href: '/hop-tac-b2b' },
-    { text: 'AUTHENTIC NORTHWEST FLAVOR' },
-  ] : [
-    { text: '100% NGUYÊN LIỆU UPCYCLED', href: '/truy-xuat' },
-    { text: 'MẮC KHÉN SAO KHÔ SƠN LA' },
-    { text: '22G ĐẠM THỰC VẬT / 100G' },
-    { text: 'FREESHIP TOÀN QUỐC TỪ 250K', href: '/khuyen-mai' },
-    { text: 'XUẤT KHẨU SINGAPORE PILOT', href: '/hop-tac-b2b' },
-    { text: 'ĐẬM VỊ NÚI RỪNG TÂY BẮC' },
-  ];
+export default function MarqueeBanner({ text, enabled }: { text: string; enabled: boolean }) {
+  if (!enabled || !text.trim()) return null;
 
   return (
     <div
@@ -49,9 +24,9 @@ export default function MarqueeBanner() {
       role="region"
       aria-label="Thông điệp thương hiệu Mắc Khén Farm"
     >
-      <div className="marquee-container">
-        <MarqueeContent messages={messages} />
-        <MarqueeContent messages={messages} duplicate />
+      <div className="marquee-container" aria-label={text}>
+        <MarqueeContent text={text} />
+        <MarqueeContent text={text} duplicate />
       </div>
     </div>
   );

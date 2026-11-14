@@ -17,6 +17,7 @@ import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { getSiteAsset } from '@/lib/site-assets';
 import PromoVoucherCode from '@/components/home/PromoVoucherCode';
+import { getCoreContentSettings } from '@/lib/system-settings';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
@@ -25,11 +26,12 @@ const homeRevealGroups = [
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
-  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl] = await Promise.all([
+  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, contentSettings] = await Promise.all([
     getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
     getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
     getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
     getSiteAsset('STORY_SECTION_IMAGE', '/products/xe-soi.jpg'),
+    getCoreContentSettings(),
   ]);
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
@@ -90,15 +92,15 @@ export default async function HomePage({ searchParams }: { searchParams: { error
         </div>
       </section>
 
-      <MarqueeBanner />
+      <MarqueeBanner text={contentSettings.announcementBarText} enabled={contentSettings.announcementBarEnabled} />
 
       <section className="home-promo-banner-wrap">
         <div className="home-promo-banner">
           <img src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
           <span className="home-promo-banner-copy">
             <span className="promo-deal-badge">COMBO TIẾT KIỆM</span>
-            <strong><LocalizedText text="Combo Bộ Ba Nhậu Xanh - Giảm 20%" /></strong>
-            <PromoVoucherCode />
+            <strong>{contentSettings.homePromoTitle}</strong>
+            <PromoVoucherCode code={contentSettings.homePromoVoucherCode} />
             <Link className="home-promo-cta" href="/khuyen-mai">
               <LocalizedText text="Khám phá ưu đãi ngay" /> <ArrowRight size={17} aria-hidden="true" />
             </Link>

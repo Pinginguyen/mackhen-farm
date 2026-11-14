@@ -14252,6 +14252,58 @@ body {
   min-width: 0;
 }
 
+.core-content-settings-form {
+  max-width: 860px;
+  margin: 0 0 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.core-settings-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.core-settings-group legend {
+  padding: 0 6px;
+  color: var(--forest);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.core-settings-enabled {
+  grid-column: 1 / -1;
+  display: flex !important;
+  align-items: center;
+  gap: 9px !important;
+}
+
+.core-settings-enabled input {
+  width: 18px !important;
+  min-height: 18px !important;
+  margin: 0;
+  padding: 0 !important;
+  accent-color: #166534;
+}
+
+@media (max-width: 640px) {
+  .core-content-settings-form {
+    padding: 14px;
+  }
+
+  .core-settings-group {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+}
+
 .admin-media-manager {
   display: grid;
   gap: 16px;

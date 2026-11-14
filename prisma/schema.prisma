@@ -137,7 +137,7 @@ model Product {
   @@index([upsellProductId])
 }
 
-model SystemSetting {
+model StoreProfileSettings {
   id                    String   @id @default("default")
   freeShippingThreshold Int      @default(250000)
   tasteGuaranteeText    String   @default("Bảo hiểm vị giác 100%: Ăn thử gói đầu tiên không hợp khẩu vị Tây Bắc, hoàn tiền hoặc đổi vị mới trong 24h.")
@@ -152,6 +152,16 @@ model SystemSetting {
   dppSupplyGPS          String   @default("20.738°N, 104.912°E (Sơn La)")
   dppLabResult          String   @default("Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND")
   updatedAt             DateTime @updatedAt
+
+  @@map("SystemSetting")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("SystemSettingKV")
 }
 
 model ProductVariant {

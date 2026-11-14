@@ -20,6 +20,15 @@ describe('GET /api/public/settings', () => {
       b2bCartonWeightKg: 4.2,
       dppSupplyGPS: '20.7°N, 104.9°E',
       dppLabResult: 'Salmonella: Âm tính',
+      announcementBarText: 'Freeship toàn quốc từ 250k',
+      announcementBarEnabled: true,
+      contactHotline: '0900000000',
+      contactZalo: 'https://zalo.me/0900000000',
+      businessName: 'Mắc Khén Farm',
+      businessTaxCode: '0100000000',
+      bctVerifiedUrl: 'https://online.gov.vn',
+      homePromoTitle: 'Combo ưu đãi',
+      homePromoVoucherCode: 'NHIEUXANH20',
       freeShippingThreshold: 250000,
       tasteGuaranteeText: 'Private setting',
     });
@@ -41,6 +50,15 @@ describe('GET /api/public/settings', () => {
       b2bCartonWeightKg: 4.2,
       dppSupplyGPS: '20.7°N, 104.9°E',
       dppLabResult: 'Salmonella: Âm tính',
+      announcementBarText: 'Freeship toàn quốc từ 250k',
+      announcementBarEnabled: true,
+      contactHotline: '0900000000',
+      contactZalo: 'https://zalo.me/0900000000',
+      businessName: 'Mắc Khén Farm',
+      businessTaxCode: '0100000000',
+      bctVerifiedUrl: 'https://online.gov.vn',
+      homePromoTitle: 'Combo ưu đãi',
+      homePromoVoucherCode: 'NHIEUXANH20',
     });
     expect(result.settings.tasteGuaranteeText).toBeUndefined();
   });

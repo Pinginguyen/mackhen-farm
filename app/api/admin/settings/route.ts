@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   return withDatabase(async () => {
-    const settings = await prisma.systemSetting.upsert({
+    const settings = await prisma.storeProfileSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: { id: 'default' },
@@ -85,12 +85,12 @@ export async function PATCH(request: Request) {
   if (!settings) return NextResponse.json({ error: 'Thông tin cài đặt không hợp lệ hoặc không có thay đổi.' }, { status: 400 });
 
   return withDatabase(async () => {
-    const current = await prisma.systemSetting.upsert({
+    const current = await prisma.storeProfileSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: { id: 'default' },
     });
-    const updated = await prisma.systemSetting.update({ where: { id: 'default' }, data: settings });
+    const updated = await prisma.storeProfileSettings.update({ where: { id: 'default' }, data: settings });
     revalidatePath('/', 'layout');
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',

@@ -15,7 +15,10 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
   const taxCode = settings.taxCode || '0110892644 do Sở KH&ĐT cấp ngày 15/01/2026';
   const representativeName = settings.representativeName || 'Trần Trung Châu';
   const address = settings.address || 'Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La';
-  const hotline = settings.hotline || '0762.793.244';
+  const hotline = settings.contactHotline || settings.hotline || '0762.793.244';
+  const zalo = /^https?:\/\//i.test(settings.contactZalo)
+    ? settings.contactZalo
+    : `https://zalo.me/${settings.contactZalo.replace(/\D/g, '')}`;
   const email = settings.email || 'contact@mackhenfarm.vn';
 
   if (pathname?.startsWith('/admin')) return null;
@@ -30,7 +33,7 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
         <section className="site-footer-column">
           <h2>{text('LIÊN HỆ TRỰC TIẾP')}</h2>
           <p>{text('Nhóm 3')} <span>{text('(Sáng lập & Điều hành dự án)')}</span></p>
-          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={`https://zalo.me/${hotline.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">{hotline} {text('(Bấm chat Zalo)')}</a></p>
+          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={zalo} target="_blank" rel="noopener noreferrer">{settings.contactZalo || hotline} {text('(Bấm chat Zalo)')}</a></p>
           <p>Email: <a href={`mailto:${email}`}>{email}</a></p>
           <p>{text('Địa chỉ điều hành: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.')}</p>
           <p>{text('Hỗ trợ kỹ thuật & đổi trả: 8:00 - 22:00 hàng ngày.')}</p>
@@ -54,7 +57,7 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
           <p className="leading-relaxed">{text('Công khai thông tin người bán theo Nghị định 52/2013/NĐ-CP và Nghị định 85/2021/NĐ-CP.')}</p>
           <p className="leading-relaxed">{text('Tuân thủ Nghị định 15/2018/NĐ-CP về hồ sơ tự công bố và an toàn thực phẩm.')}</p>
           <a
-            href="http://online.gov.vn"
+            href={settings.bctVerifiedUrl || 'http://online.gov.vn'}
             target="_blank"
             rel="noreferrer noopener"
             // BỔ SUNG !no-underline và hover:!bg-blue-50/50 ở đây

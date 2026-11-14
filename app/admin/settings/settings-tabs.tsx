@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { Search, Tag, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { SystemSettings } from '@/lib/system-settings';
+import type { CoreContentSettings, SystemSettings } from '@/lib/system-settings';
+import CoreContentSettingsForm from './core-content-settings-form';
 
 export type AuditEntry = {
   id: string;
@@ -83,11 +84,12 @@ function AuditTarget({ entry }: { entry: AuditEntry }) {
   return <span className="audit-target-chip" title={entry.targetId}>{entry.targetEntity} · {entry.targetId.slice(0, 12)}</span>;
 }
 
-export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings, settingsUnavailable, auditEntries, auditUnavailable, monitoring, monitoringUnavailable }: {
+export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings, contentSettings, settingsUnavailable, auditEntries, auditUnavailable, monitoring, monitoringUnavailable }: {
   defaultTab: 'general' | 'audit' | 'monitoring';
   appUrl: string;
   bank: string;
   systemSettings: SystemSettings;
+  contentSettings: CoreContentSettings;
   settingsUnavailable: boolean;
   auditEntries: AuditEntry[];
   auditUnavailable: boolean;
@@ -98,11 +100,8 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
   const [selectedAudit, setSelectedAudit] = useState<AuditEntry | null>(null);
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(String(systemSettings.freeShippingThreshold));
   const [tasteGuaranteeText, setTasteGuaranteeText] = useState(systemSettings.tasteGuaranteeText);
-  const [companyName, setCompanyName] = useState(systemSettings.companyName);
-  const [taxCode, setTaxCode] = useState(systemSettings.taxCode);
   const [representativeName, setRepresentativeName] = useState(systemSettings.representativeName);
   const [address, setAddress] = useState(systemSettings.address);
-  const [hotline, setHotline] = useState(systemSettings.hotline);
   const [email, setEmail] = useState(systemSettings.email);
   const [b2bItemsPerCarton, setB2bItemsPerCarton] = useState(String(systemSettings.b2bItemsPerCarton));
   const [b2bCartonWeightKg, setB2bCartonWeightKg] = useState(String(systemSettings.b2bCartonWeightKg));
@@ -134,7 +133,7 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
     if (!Number.isSafeInteger(threshold) || threshold < 0 || threshold > 100_000_000 || !tasteGuaranteeText.trim()
       || !Number.isSafeInteger(itemsPerCarton) || itemsPerCarton < 1 || itemsPerCarton > 100_000
       || !Number.isFinite(cartonWeightKg) || cartonWeightKg <= 0 || cartonWeightKg > 10_000
-      || !companyName.trim() || !taxCode.trim() || !representativeName.trim() || !address.trim() || !hotline.trim() || !dppSupplyGPS.trim() || !dppLabResult.trim()
+      || !representativeName.trim() || !address.trim() || !dppSupplyGPS.trim() || !dppLabResult.trim()
       || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setSettingsFeedback({ type: 'error', text: 'Vui lòng kiểm tra các trường bắt buộc, email và thông số thùng hàng.' });
       return;
@@ -148,11 +147,8 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
         body: JSON.stringify({
           freeShippingThreshold: threshold,
           tasteGuaranteeText: tasteGuaranteeText.trim(),
-          companyName: companyName.trim(),
-          taxCode: taxCode.trim(),
           representativeName: representativeName.trim(),
           address: address.trim(),
-          hotline: hotline.trim(),
           email: email.trim(),
           b2bItemsPerCarton: itemsPerCarton,
           b2bCartonWeightKg: cartonWeightKg,
@@ -164,11 +160,8 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
       if (!response.ok || !result.settings) throw new Error(result.error ?? 'Không thể lưu cài đặt.');
       setFreeShippingThreshold(String(result.settings.freeShippingThreshold));
       setTasteGuaranteeText(result.settings.tasteGuaranteeText);
-      setCompanyName(result.settings.companyName);
-      setTaxCode(result.settings.taxCode);
       setRepresentativeName(result.settings.representativeName);
       setAddress(result.settings.address);
-      setHotline(result.settings.hotline);
       setEmail(result.settings.email);
       setB2bItemsPerCarton(String(result.settings.b2bItemsPerCarton));
       setB2bCartonWeightKg(String(result.settings.b2bCartonWeightKg));
@@ -187,6 +180,7 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
       {tabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`settings-panel-${tab.id}`} className={activeTab === tab.id ? 'is-active' : ''} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
     </div>
     {activeTab === 'general' && <section id="settings-panel-general" className="admin-settings-tab-panel" role="tabpanel">
+      <CoreContentSettingsForm initialSettings={contentSettings} unavailable={settingsUnavailable} />
       <div className="settings-list"><div><span>Thanh toán VietQR / SePay</span><strong>Đang dùng QR chuyển khoản trực tiếp · SePay tự động xác nhận</strong></div><div><span>Ngân hàng VietQR</span><strong>{bank}</strong></div><div><span>URL ứng dụng</span><strong>{appUrl}</strong></div></div>
       <p className="settings-note">Thông tin nhạy cảm được quản lý qua biến môi trường và không hiển thị trong portal.</p>
       <form className="settings-cro-form" onSubmit={saveSalesSettings}>
@@ -194,12 +188,8 @@ export default function SettingsTabs({ defaultTab, appUrl, bank, systemSettings,
         {settingsUnavailable && <p className="empty-state" role="status">Không thể tải cài đặt từ cơ sở dữ liệu.</p>}
         <label className="field">Ngưỡng Miễn Phí Vận Chuyển (VNĐ)<input type="number" min={0} max={100000000} step={1000} value={freeShippingThreshold} onChange={(event) => setFreeShippingThreshold(event.target.value)} required /></label>
         <label className="field">Nội dung Cam Kết Bảo hiểm Vị giác<textarea rows={3} maxLength={2000} value={tasteGuaranteeText} onChange={(event) => setTasteGuaranteeText(event.target.value)} required /></label>
-        <div><p className="eyebrow">THÔNG TIN PHÁP LÝ · FOOTER</p><h3>Thông tin doanh nghiệp</h3></div>
-        <label className="field">Tên doanh nghiệp<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} maxLength={200} required /></label>
-        <label className="field">Mã số thuế / thông tin cấp phép<input value={taxCode} onChange={(event) => setTaxCode(event.target.value)} maxLength={200} required /></label>
         <label className="field">Người đại diện<input value={representativeName} onChange={(event) => setRepresentativeName(event.target.value)} maxLength={150} required /></label>
         <label className="field">Địa chỉ trụ sở<input value={address} onChange={(event) => setAddress(event.target.value)} maxLength={300} required /></label>
-        <label className="field">Hotline<input type="tel" value={hotline} onChange={(event) => setHotline(event.target.value)} maxLength={40} required /></label>
         <label className="field">Email liên hệ<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={254} required /></label>
         <div><p className="eyebrow">LOGISTICS · B2B</p><h3>Quy cách đóng thùng</h3></div>
         <label className="field">Số gói mỗi thùng<input type="number" min={1} max={100000} step={1} value={b2bItemsPerCarton} onChange={(event) => setB2bItemsPerCarton(event.target.value)} required /></label>
