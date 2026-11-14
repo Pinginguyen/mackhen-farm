@@ -11283,7 +11283,7 @@ body {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 12px;
+  gap: 0;
   color: #FAF7F2;
   font-size: 0.75rem;
   font-weight: 600;
@@ -11293,6 +11293,7 @@ body {
 }
 
 .marquee-separator {
+  margin-inline: 12px;
   color: #e9c46a;
   font-size: 0.65rem;
 }
@@ -17083,7 +17084,7 @@ a.audit-target-chip:hover {
 }
 
 .home-page > .catalog-section .product-card-image-link {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1.9;
 }
 
 .home-page > .catalog-section .card-body {
@@ -17102,12 +17103,6 @@ a.audit-target-chip:hover {
   font-size: 0.85rem;
 }
 
-.home-page > .catalog-section .artisan-quick-add {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0);
-}
-
 @media (max-width: 1023px) {
   .home-page > .hero .photo-card {
     max-height: 220px;
@@ -17115,6 +17110,12 @@ a.audit-target-chip:hover {
 
   .home-page > .hero .photo-card img {
     height: 220px;
+  }
+}
+
+@media (hover: none), (max-width: 767px) {
+  .home-page > .catalog-section .artisan-quick-add {
+    display: none;
   }
 }
 

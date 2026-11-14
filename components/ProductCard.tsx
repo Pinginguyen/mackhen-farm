@@ -21,7 +21,6 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   const productName = translateProductName(product.name);
   const secondImage = product.images?.find((image) => image && image !== product.image);
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
-  const proteinGrams = Number(product.protein?.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
   const proteinAmount = product.protein?.match(/\d+(?:\.\d+)?/)?.[0];
 
   async function addQuickly() {
@@ -60,11 +59,6 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
-        <div className="artisan-stamp-row" aria-label={locale === 'en' ? 'Product provenance and qualities' : 'Nguồn gốc và đặc tính sản phẩm'}>
-          {product.badgeText?.trim() && <span>{product.badgeText}</span>}
-          {proteinGrams >= 20 && <span>💪 High-Protein</span>}
-          <span>⛰ Sơn La</span>
-        </div>
         <div className="artisan-quick-macros" aria-label={locale === 'en' ? 'Product highlights' : 'Điểm nổi bật sản phẩm'}>
           {proteinAmount && <span>{proteinAmount}g Protein</span>}
           {product.category !== 'Gia vị Tây Bắc' && <><span>Không Cholesterol</span><span>Upcycled Food</span></>}
