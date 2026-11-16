@@ -9,12 +9,12 @@ import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
-export default function HeaderContent({ user, logoUrl, announcementBarEnabled }: { user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null; logoUrl: string; announcementBarEnabled: boolean }) {
+export default function HeaderContent({ user, logoUrl }: { user: { name: string; role: 'CUSTOMER' | 'ADMIN' } | null; logoUrl: string }) {
   const { locale, t } = useLocaleCurrency();
   const initials = user?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
 
   return (
-    <header style={{ top: announcementBarEnabled ? '2rem' : 0 }} className="topbar site-header desktop-single-row fixed left-0 right-0 w-full z-50 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-amber-900/10 shadow-sm transition-all duration-300 !py-2">
+    <header className="topbar site-header desktop-single-row !relative left-0 right-0 w-full z-50 !bg-[#FAF7F2] !border-b !border-stone-200 shadow-sm transition-all duration-300 !py-2">
       <Link className="brand-wrap" href="/">
         {logoUrl ? <img className="brand-logo-image" src={logoUrl} alt="Mắc Khén Farm" /> : <span className="brand-badge">M</span>}
         <span>

@@ -16922,23 +16922,7 @@ a.audit-target-chip:hover {
   color: inherit;
 }
 
-.header-spacer {
-  height: 156px;
-}
-
-.header-spacer.has-announcement {
-  height: 188px;
-}
-
 @media (min-width: 1024px) {
-  .header-spacer {
-    height: 64px;
-  }
-
-  .header-spacer.has-announcement {
-    height: 96px;
-  }
-
   .site-header.desktop-single-row {
     display: grid;
     grid-template-columns: auto auto minmax(140px, 1fr) auto;

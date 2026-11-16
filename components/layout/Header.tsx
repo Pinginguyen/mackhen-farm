@@ -23,13 +23,12 @@ export default async function Header() {
       user = null;
     }
   }
-  return <>
+  return <div className="sticky top-0 z-50 flex flex-col gap-0">
     {showAnnouncement && (
-      <div className="fixed inset-x-0 top-0 z-[60] flex h-8 items-center justify-center overflow-hidden bg-[#1B4332] px-4 text-center text-xs font-medium text-[#FAF7F2]">
+      <div className="flex h-8 shrink-0 items-center justify-center overflow-hidden bg-[#1B4332] px-4 text-center text-xs font-medium text-[#FAF7F2]">
         <span className="truncate">{contentSettings.announcementBarText}</span>
       </div>
     )}
-    <HeaderContent user={user} logoUrl={logoUrl} announcementBarEnabled={showAnnouncement} />
-    <div className={`header-spacer w-full${showAnnouncement ? ' has-announcement' : ''}`} aria-hidden="true" />
-  </>;
+    <HeaderContent user={user} logoUrl={logoUrl} />
+  </div>;
 }

@@ -10,8 +10,7 @@ import ContainerFreightCalculator from '@/components/b2b/ContainerFreightCalcula
 import { DEFAULT_SYSTEM_SETTINGS, type PublicSystemSettings } from '@/lib/system-settings';
 import { fetchPublicSiteAsset } from '@/lib/site-asset-client';
 
-const successNotice = 'Yêu cầu đã được ghi nhận. Quản lý phát triển thị trường sẽ liên hệ với bạn qua Email trong 24h.';
-const emailNotice = 'Yêu cầu đã được lưu, nhưng email thông báo quản trị chưa gửi được. Vui lòng thử lại sau.';
+const successNotice = 'Đã gửi yêu cầu hợp tác thành công! Đội ngũ phụ trách sẽ liên hệ qua email trong vòng 24 giờ.';
 
 export default function B2BPartnershipPage() {
   const { locale, currency } = useLocaleCurrency();
@@ -56,10 +55,10 @@ export default function B2BPartnershipPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(Object.fromEntries(formData.entries())),
       });
-      const result = await response.json() as { emailSent?: boolean; error?: { message?: string } };
+      const result = await response.json() as { error?: { message?: string } };
       if (!response.ok) throw new Error(isEN ? text('Không thể gửi yêu cầu. Vui lòng thử lại.') : text(result.error?.message ?? 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
       form.reset();
-      setToast(text(result.emailSent === false ? emailNotice : successNotice));
+      setToast(text(successNotice));
     } catch (error) {
       setToast(isEN ? text('Không thể gửi yêu cầu. Vui lòng thử lại.') : text(error instanceof Error ? error.message : 'Không thể gửi yêu cầu. Vui lòng thử lại.'));
     } finally {

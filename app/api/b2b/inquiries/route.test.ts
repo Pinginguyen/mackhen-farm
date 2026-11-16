@@ -39,7 +39,7 @@ describe('POST /api/b2b/inquiries', () => {
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(body).toEqual({ success: true, id: 'inquiry-1', emailSent: true });
+    expect(body).toEqual({ success: true, id: 'inquiry-1' });
     expect(createInquiry).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ companyName: inquiryPayload.companyName, email: 'jamie@example.com', phone: inquiryPayload.phone }),
       select: { id: true },
@@ -59,8 +59,8 @@ describe('POST /api/b2b/inquiries', () => {
     sendB2bInquiryEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
 
     const response = await POST(request(inquiryPayload));
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, id: 'inquiry-1', emailSent: false });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ success: true, id: 'inquiry-1' });
     expect(createInquiry).toHaveBeenCalledOnce();
   });
 });

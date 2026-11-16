@@ -55,14 +55,12 @@ export async function POST(request: Request) {
       select: { id: true },
     });
 
-    let emailSent = true;
     try {
       await sendB2bInquiryEmail({ companyName, country, contactName, email, phone: phone || null, expectedVolume, message: message || null });
-    } catch {
-      emailSent = false;
-      console.error('B2B inquiry email delivery failed.');
+    } catch (error) {
+      console.error('B2B inquiry email delivery failed.', error);
     }
 
-    return NextResponse.json({ success: true, id: inquiry.id, emailSent }, { status: emailSent ? 201 : 200 });
+    return NextResponse.json({ success: true, id: inquiry.id }, { status: 201 });
   }, 'B2B inquiry persistence failed.');
 }
