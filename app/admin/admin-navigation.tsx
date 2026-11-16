@@ -8,6 +8,7 @@ const groups = [
   { label: 'KINH DOANH', items: [
     { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/orders', label: 'Đơn hàng', icon: ClipboardList },
+    { href: '/admin/b2b', label: 'Yêu cầu B2B', icon: Users },
     { href: '/admin/affiliates', label: 'Đối tác KOC / Affiliate', icon: Handshake },
     { href: '/admin/returns', label: 'Đổi trả', icon: RotateCcw },
     { href: '/admin/reconciliation', label: 'Đối soát', icon: Wallet },

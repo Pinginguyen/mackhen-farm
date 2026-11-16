@@ -14233,9 +14233,92 @@ body {
 }
 
 .admin-settings-tabs,
-.admin-reviews-manager {
+.admin-reviews-manager,
+.admin-b2b-manager {
   display: grid;
   gap: 18px;
+}
+
+.admin-b2b-toolbar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-b2b-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 280px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.admin-b2b-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.admin-b2b-toolbar > .field {
+  min-width: 190px;
+}
+
+.admin-b2b-table {
+  min-width: 980px;
+}
+
+.admin-b2b-table select {
+  max-width: 155px;
+  min-height: 34px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.admin-b2b-message {
+  display: -webkit-box;
+  max-width: 300px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-b2b-save {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #ead1cb;
+  border-radius: 6px;
+  background: #fff7f5;
+  color: #9B2424;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-b2b-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.admin-b2b-empty {
+  padding: 28px !important;
+  text-align: center;
+  color: var(--muted) !important;
 }
 
 .admin-settings-tab-list,

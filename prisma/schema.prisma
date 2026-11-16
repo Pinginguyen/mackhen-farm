@@ -398,18 +398,21 @@ model InventoryMovement {
 
 model B2bInquiry {
   id             String   @id @default(cuid())
-  companyName    String
-  country        String
-  contactName    String
-  email          String
-  phone          String?
-  expectedVolume String
-  message        String?  @db.Text
+  companyName    String   @map("company_name")
+  country        String   @db.VarChar(80)
+  contactName    String   @map("contact_name")
+  email          String   @db.VarChar(254)
+  phone          String?  @db.VarChar(32)
+  expectedVolume String   @map("moq")
+  message        String?  @db.Text @map("notes")
+  adminNotes     String?  @db.Text @map("admin_notes")
   status         String   @default("PENDING")
-  createdAt      DateTime @default(now())
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  @@index([status, createdAt])
-  @@index([email, createdAt])
+  @@index([status, createdAt], map: "b2b_inquiries_status_created_at_idx")
+  @@index([email, createdAt], map: "b2b_inquiries_email_created_at_idx")
+  @@map("b2b_inquiries")
 }
 
 model Review {
