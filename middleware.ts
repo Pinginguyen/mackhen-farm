@@ -46,6 +46,12 @@ function rateLimitedResponse(retryAfter: number): NextResponse {
   );
 }
 
+function warnRateLimitFallback(reason: string): void {
+  if (warnedMissingRateLimitStore) return;
+  console.warn(`[RATE_LIMIT_LOCAL_FALLBACK] ${reason}`);
+  warnedMissingRateLimitStore = true;
+}
+
 async function rateLimitResponse(request: NextRequest): Promise<NextResponse | null> {
   if (request.method !== 'POST') return null;
   const rule = RATE_LIMITS[request.nextUrl.pathname];
@@ -59,23 +65,10 @@ async function rateLimitResponse(request: NextRequest): Promise<NextResponse | n
       const result = await limiter.limit(ip);
       return result.success ? null : rateLimitedResponse(Math.max(1, Math.ceil((result.reset - Date.now()) / 1000)));
     } catch (error) {
-      console.error('[RATE_LIMIT_STORE_UNAVAILABLE]', error instanceof Error ? error.name : 'UnknownError');
-      return NextResponse.json(
-        { error: { code: 'RATE_LIMIT_UNAVAILABLE', message: 'Không thể xác thực giới hạn yêu cầu. Vui lòng thử lại.' } },
-        { status: 503, headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' } },
-      );
+      warnRateLimitFallback(`Redis unavailable (${error instanceof Error ? error.name : 'UnknownError'}); using in-memory limits.`);
     }
-  }
-
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json(
-      { error: { code: 'RATE_LIMIT_UNAVAILABLE', message: 'Dịch vụ giới hạn yêu cầu chưa được cấu hình.' } },
-      { status: 503, headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' } },
-    );
-  }
-  if (!warnedMissingRateLimitStore) {
-    console.warn('[RATE_LIMIT_LOCAL_FALLBACK] Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for shared rate limiting.');
-    warnedMissingRateLimitStore = true;
+  } else {
+    warnRateLimitFallback('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not configured; using in-memory limits.');
   }
 
   const now = Date.now();
