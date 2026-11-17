@@ -28,9 +28,10 @@ export default async function HomePage() {
     getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
     getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
     getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
-    getSiteAsset('STORY_SECTION_IMAGE', '/products/xe-soi.jpg'),
+    getSiteAsset('STORY_SECTION_IMAGE', '/products/hat-doi.jpg'),
     getCoreContentSettings(),
   ]);
+  const distinctStoryImageUrl = storyImageUrl === promoBannerUrl ? '/products/hat-doi.jpg' : storyImageUrl;
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
   try {
@@ -138,7 +139,7 @@ export default async function HomePage() {
           <p className="eyebrow"><LocalizedText text="Vì sao lựa chọn Mắc Khén Farm?" /></p>
           <h2><LocalizedText text="Tận dụng trọn nguyên liệu, giữ trọn vị ngon." /></h2>
         </div>
-        <img className="story-section-image" src={storyImageUrl} alt="Câu chuyện thương hiệu Mắc Khén Farm" />
+        <img className="story-section-image" src={distinctStoryImageUrl} alt="Hạt dổi bản địa được thu hoạch thủ công tại vùng cao" />
         <div className="story-grid">
           {[
             'Mô hình Upcycled Food biến bã đậu nành sau sản xuất thành nguồn đạm thực vật cho món ăn vặt.',
