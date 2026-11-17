@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Sprout, Truck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
@@ -31,7 +31,6 @@ export default async function HomePage() {
     getSiteAsset('STORY_SECTION_IMAGE', '/products/xe-soi.jpg'),
     getCoreContentSettings(),
   ]);
-  const scarcityPercent = Math.min(100, Math.max(0, Number.parseInt(contentSettings.heroScarcityPercent, 10) || 0));
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
   try {
@@ -58,26 +57,26 @@ export default async function HomePage() {
 
       <section className="hero">
         <div className="hero-copy">
-          <div className="hero-badges">
-            <span className="pill"><Sprout className="hero-upcycled-icon" aria-hidden="true" /><LocalizedText text="Upcycled Food · Hương vị Tây Bắc" /></span>
-            <Link href="/products" className="hero-proof-badge"><Sparkles size={16} /><LocalizedText text="Gia vị Tây Bắc" /></Link>
+          <div className="home-gourmet-label">
+            <span aria-hidden="true">✦</span>
+            <LocalizedText text="100% ĐẠM THỰC VẬT • VỊ RỪNG TÂY BẮC" />
           </div>
-          <h1 className="home-luxury-title"><span className="hero-title-main"><LocalizedText text="Khô bò thực vật" /></span><span className="hero-title-accent"><LocalizedText text="High-Protein, đậm vị Tây Bắc" /></span></h1>
-          <p>
-            <LocalizedText text="Tái chế bã đậu nành thành món ăn giàu đạm, đậm vị mắc khén và hạt dổi, để nguyên liệu được sử dụng trọn vẹn hơn." />
+          <h1 className="home-gourmet-title"><LocalizedText text="Khô Bò Thực Vật" /></h1>
+          <p className="home-gourmet-subtitle"><LocalizedText text="Thớ dai đậm vị, cay tê khói củi mộc" /></p>
+          <p className="home-gourmet-description">
+            <LocalizedText text="Thức quà lai rai thượng hạng từ nguồn đạm thực vật bản địa, ủ đượm gia vị mắc khén sao giòn và hạt dổi nướng than vùng cao." />
           </p>
-          <div className="hero-actions">
-            <Link href="/products" className="primary-btn">
-              <LocalizedText text="Khám phá sản phẩm" /> <ArrowRight size={18} />
+          <div className="hero-actions home-gourmet-actions">
+            <Link href="/products" className="primary-btn home-gourmet-primary">
+              <LocalizedText text="Mua ngay mẻ sấy mới" /> <span aria-hidden="true">➔</span>
             </Link>
-            <Link href="/tra-cuu" className="secondary-btn">
-              <Truck size={17} />
-              <LocalizedText text="Theo dõi đơn hàng" />
+            <Link href="#flavor-pairing-title" className="secondary-btn home-gourmet-secondary">
+              <LocalizedText text="Khám phá gợi ý thưởng vị" />
             </Link>
           </div>
-          <div className="home-scarcity-bar" aria-label="Tình trạng mẻ sấy thủ công">
-            <div className="home-scarcity-heading"><span>{contentSettings.heroScarcityBadge}</span><strong>{scarcityPercent}%</strong></div>
-            <div className="home-scarcity-track" role="progressbar" aria-label="Tỷ lệ mẻ sấy đã bán" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scarcityPercent}><span style={{ transform: `scaleX(${scarcityPercent / 100})` }} /></div>
+          <div className="home-gourmet-batch-status" aria-label="Tình trạng mẻ sấy thủ công">
+            <span className="home-gourmet-status-dot" aria-hidden="true" />
+            <span><LocalizedText text={contentSettings.heroScarcityBadge} /></span>
           </div>
         </div>
         <div className="hero-media">
