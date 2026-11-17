@@ -119,6 +119,45 @@ function normalizeNutritionFacts(value: unknown): Prisma.InputJsonValue | null {
   return Object.fromEntries([['enabled', value.enabled], ...fields.map((field) => [field, (value[field] as string).trim()])]);
 }
 
+const sensoryFields = ['spicy', 'smoky', 'chewiness', 'crispness', 'sweetAftertaste'] as const;
+
+function isValidSensoryProfile(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (!isRecord(value)) return false;
+  return sensoryFields.every((field) => Number.isInteger(value[field]) && Number(value[field]) >= 1 && Number(value[field]) <= 5);
+}
+
+function normalizeSensoryProfile(value: unknown): Prisma.InputJsonValue | null {
+  if (!isRecord(value) || !isValidSensoryProfile(value)) return null;
+  return Object.fromEntries(sensoryFields.map((field) => [field, Number(value[field])])) as Prisma.InputJsonValue;
+}
+
+function isValidPairingGuide(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (!isRecord(value)) return false;
+  return (value.recommendedDrink === undefined || typeof value.recommendedDrink === 'string' && value.recommendedDrink.length <= 240)
+    && (value.servingTip === undefined || typeof value.servingTip === 'string' && value.servingTip.length <= 800);
+}
+
+function normalizePairingGuide(value: unknown): Prisma.InputJsonValue | null {
+  if (!isRecord(value) || !isValidPairingGuide(value)) return null;
+  const recommendedDrink = typeof value.recommendedDrink === 'string' ? value.recommendedDrink.trim() : '';
+  const servingTip = typeof value.servingTip === 'string' ? value.servingTip.trim() : '';
+  if (!recommendedDrink && !servingTip) return null;
+  return { recommendedDrink, servingTip };
+}
+
+function isValidOptionalText(value: unknown, maxLength: number): boolean {
+  return value === undefined || value === null || typeof value === 'string' && value.trim().length <= maxLength;
+}
+
+function normalizeOptionalText(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined;
+  return value.trim() || null;
+}
+
 type VariantInput = {
   id?: string;
   title: string;
@@ -227,6 +266,10 @@ export async function POST(request: Request) {
   const valueAxis1 = body.valueAxis1 === undefined ? 60 : numberValue(body.valueAxis1);
   const valueAxis2 = body.valueAxis2 === undefined ? 80 : numberValue(body.valueAxis2);
   const valueAxis3 = body.valueAxis3 === undefined ? 100 : numberValue(body.valueAxis3);
+  const sensoryProfile = body.sensoryProfile === undefined ? undefined : normalizeSensoryProfile(body.sensoryProfile);
+  const pairingGuide = body.pairingGuide === undefined ? undefined : normalizePairingGuide(body.pairingGuide);
+  const originRegion = normalizeOptionalText(body.originRegion);
+  const waxSealCode = normalizeOptionalText(body.waxSealCode);
   const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
     ? null
     : typeof body.upsellProductId === 'string' ? body.upsellProductId.trim() || undefined : undefined;
@@ -238,6 +281,8 @@ export async function POST(request: Request) {
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
     || !Number.isInteger(spiciness) || spiciness! < 1 || spiciness! > 5 || !Number.isInteger(chewiness) || chewiness! < 1 || chewiness! > 5 || !Number.isInteger(aroma) || aroma! < 1 || aroma! > 5
     || !labelAxis1 || !labelAxis2 || !labelAxis3 || !isValidAxisValue(valueAxis1) || !isValidAxisValue(valueAxis2) || !isValidAxisValue(valueAxis3)
+    || !isValidSensoryProfile(body.sensoryProfile) || !isValidPairingGuide(body.pairingGuide)
+    || !isValidOptionalText(body.originRegion, 200) || !isValidOptionalText(body.waxSealCode, 100)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
     || (body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
@@ -279,6 +324,10 @@ export async function POST(request: Request) {
         valueAxis1,
         valueAxis2,
         valueAxis3,
+        ...(sensoryProfile !== undefined ? { sensoryProfile: sensoryProfile ?? Prisma.DbNull } : {}),
+        ...(pairingGuide !== undefined ? { pairingGuide: pairingGuide ?? Prisma.DbNull } : {}),
+        ...(body.originRegion !== undefined ? { originRegion } : {}),
+        ...(body.waxSealCode !== undefined ? { waxSealCode } : {}),
         ...(upsellProductId ? { upsellProduct: { connect: { id: upsellProductId } } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         active: true,
@@ -336,6 +385,10 @@ export async function PATCH(request: Request) {
   const valueAxis1 = body.valueAxis1 === undefined ? undefined : numberValue(body.valueAxis1);
   const valueAxis2 = body.valueAxis2 === undefined ? undefined : numberValue(body.valueAxis2);
   const valueAxis3 = body.valueAxis3 === undefined ? undefined : numberValue(body.valueAxis3);
+  const sensoryProfile = body.sensoryProfile === undefined ? undefined : normalizeSensoryProfile(body.sensoryProfile);
+  const pairingGuide = body.pairingGuide === undefined ? undefined : normalizePairingGuide(body.pairingGuide);
+  const originRegion = normalizeOptionalText(body.originRegion);
+  const waxSealCode = normalizeOptionalText(body.waxSealCode);
   const upsellWasProvided = body.upsellProductId !== undefined;
   const upsellProductId = body.upsellProductId == null || body.upsellProductId === ''
     ? null
@@ -355,6 +408,8 @@ export async function PATCH(request: Request) {
     || !isValidAxisValue(valueAxis1)
     || !isValidAxisValue(valueAxis2)
     || !isValidAxisValue(valueAxis3)
+    || !isValidSensoryProfile(body.sensoryProfile) || !isValidPairingGuide(body.pairingGuide)
+    || !isValidOptionalText(body.originRegion, 200) || !isValidOptionalText(body.waxSealCode, 100)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
     || (upsellWasProvided && body.upsellProductId != null && body.upsellProductId !== '' && !upsellProductId)
     || (body.isFeatured !== undefined && typeof body.isFeatured !== 'boolean')
@@ -363,7 +418,7 @@ export async function PATCH(request: Request) {
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, labelAxis1: true, labelAxis2: true, labelAxis3: true, valueAxis1: true, valueAxis2: true, valueAxis3: true, badgeText: true, upsellProductId: true, variants: { select: { id: true } } } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, labelAxis1: true, labelAxis2: true, labelAxis3: true, valueAxis1: true, valueAxis2: true, valueAxis3: true, badgeText: true, upsellProductId: true, sensoryProfile: true, pairingGuide: true, originRegion: true, waxSealCode: true, variants: { select: { id: true } } } });
     if (!previous) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
     if (upsellProductId) {
       if (upsellProductId === productId) return NextResponse.json({ error: { message: 'Sản phẩm không thể tự gợi ý chính nó.' } }, { status: 400 });
@@ -399,6 +454,10 @@ export async function PATCH(request: Request) {
         ...(valueAxis1 !== undefined ? { valueAxis1 } : {}),
         ...(valueAxis2 !== undefined ? { valueAxis2 } : {}),
         ...(valueAxis3 !== undefined ? { valueAxis3 } : {}),
+        ...(sensoryProfile !== undefined ? { sensoryProfile: sensoryProfile ?? Prisma.DbNull } : {}),
+        ...(pairingGuide !== undefined ? { pairingGuide: pairingGuide ?? Prisma.DbNull } : {}),
+        ...(body.originRegion !== undefined ? { originRegion } : {}),
+        ...(body.waxSealCode !== undefined ? { waxSealCode } : {}),
         ...(upsellWasProvided ? { upsellProduct: upsellProductId ? { connect: { id: upsellProductId } } : { disconnect: true } } : {}),
         nutritionFacts: nutritionFacts ?? Prisma.DbNull,
         ...(typeof body.isFeatured === 'boolean' ? { isFeatured: body.isFeatured } : {}),

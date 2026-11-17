@@ -19,6 +19,7 @@ const textLimits = {
   bctVerifiedUrl: 500,
   homePromoTitle: 200,
   homePromoVoucherCode: 80,
+  heroScarcityBadge: 300,
 } as const;
 
 function isWebUrl(value: string) {
@@ -44,6 +45,12 @@ function parseContentSettings(value: unknown): Partial<CoreContentSettings> | nu
     if (input === undefined) continue;
     if (typeof input !== 'string' || !input.trim() || input.trim().length > maxLength) return null;
     settings[field] = input.trim();
+  }
+
+  if (body.heroScarcityPercent !== undefined) {
+    const percent = typeof body.heroScarcityPercent === 'string' ? body.heroScarcityPercent.trim() : '';
+    if (!/^(100|[1-9]?\d)$/.test(percent)) return null;
+    settings.heroScarcityPercent = percent;
   }
 
   if (settings.contactZalo && !isWebUrl(settings.contactZalo) && !/^[+\d\s().-]+$/.test(settings.contactZalo)) return null;

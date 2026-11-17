@@ -51,6 +51,10 @@ export default function CoreContentSettingsForm({ initialSettings, unavailable }
         <label className="field">Chữ chạy thông báo<input value={settings.announcementBarText} onChange={(event) => update('announcementBarText', event.target.value)} placeholder="MẮC KHÉN SAO KHÔ SƠN LA • 22G ĐẠM THỰC VẬT / 100G • FREESHIP TOÀN QUỐC TỪ 250K • GIAO NHANH 2H • 100% NGUYÊN LIỆU UPCYCLED" maxLength={300} required /><small>Ngăn cách các thông điệp bằng dấu • hoặc |.</small></label>
         <label className="field">Tiêu đề banner khuyến mãi<input value={settings.homePromoTitle} onChange={(event) => update('homePromoTitle', event.target.value)} maxLength={200} required /></label>
         <label className="field">Mã voucher<input value={settings.homePromoVoucherCode} onChange={(event) => update('homePromoVoucherCode', event.target.value)} maxLength={80} required /></label>
+        <label className="field">Thông báo mẻ sấy giới hạn<input value={settings.heroScarcityBadge} onChange={(event) => update('heroScarcityBadge', event.target.value)} maxLength={300} required /></label>
+        <label className="field">Tỷ lệ đã bán · {settings.heroScarcityPercent}%<input type="range" min={0} max={100} step={1} value={settings.heroScarcityPercent} onChange={(event) => update('heroScarcityPercent', event.target.value)} aria-label="Tỷ lệ phần trăm đã bán của mẻ sấy" /><output>{settings.heroScarcityPercent}%</output></label>
+        <label className="field">Thông báo mẻ sấy giới hạn<input value={settings.heroScarcityBadge} onChange={(event) => update('heroScarcityBadge', event.target.value)} maxLength={300} required /></label>
+        <label className="field">Tỷ lệ đã bán · {settings.heroScarcityPercent}%<input type="range" min={0} max={100} step={1} value={settings.heroScarcityPercent} onChange={(event) => update('heroScarcityPercent', event.target.value)} aria-label="Tỷ lệ phần trăm đã bán của mẻ sấy" /><output>{settings.heroScarcityPercent}%</output></label>
       </fieldset>
       <fieldset className="core-settings-group">
         <legend>Thông tin liên hệ &amp; Pháp lý</legend>

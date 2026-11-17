@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { normalizeNutritionFacts, type Product } from '@/lib/store-data';
+import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile, type Product } from '@/lib/store-data';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import AddToCart from './add-to-cart';
 import ProductImageGallery from './product-image-gallery';
@@ -13,6 +13,7 @@ import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import TasteGuarantee from '@/components/checkout/TasteGuarantee';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import NutriGradeBadge from '@/components/product/NutriGradeBadge';
+import ProductEditorialDetails from '@/components/product/ProductEditorialDetails';
 import { getSystemSettings } from '@/lib/system-settings';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
@@ -53,6 +54,8 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         ...databaseProduct,
         highlights: databaseProduct.highlights ?? [],
         nutritionFacts: normalizeNutritionFacts(databaseProduct.nutritionFacts),
+        sensoryProfile: normalizeSensoryProfile(databaseProduct.sensoryProfile),
+        pairingGuide: normalizePairingGuide(databaseProduct.pairingGuide),
         status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
         variants: databaseProduct.variants.map((variant) => ({
           ...variant,
@@ -176,6 +179,12 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
             <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
+              <ProductEditorialDetails
+                sensoryProfile={product.sensoryProfile}
+                pairingGuide={product.pairingGuide}
+                originRegion={product.originRegion}
+                waxSealCode={product.waxSealCode}
+              />
               {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Bảng giá trị dinh dưỡng</h2>
                 <p>{product.nutritionFacts.servingSize}</p>

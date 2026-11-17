@@ -130,6 +130,10 @@ model Product {
   upsellSources Product[]        @relation("ProductUpsell")
   highlights    String[]         @default([])
   nutritionFacts Json?
+  sensoryProfile Json?
+  pairingGuide Json?
+  originRegion String? @default("Sơn La, Tây Bắc")
+  waxSealCode String? @default("BATCH-CRAFT-2026")
   active        Boolean          @default(true)
   isFeatured    Boolean          @default(false)
   variants      ProductVariant[]

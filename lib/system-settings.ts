@@ -10,6 +10,8 @@ export type CoreContentSettings = {
   bctVerifiedUrl: string;
   homePromoTitle: string;
   homePromoVoucherCode: string;
+  heroScarcityBadge: string;
+  heroScarcityPercent: string;
 };
 
 export type SystemSettings = {
@@ -44,6 +46,8 @@ export const DEFAULT_CORE_CONTENT_SETTINGS: CoreContentSettings = {
   bctVerifiedUrl: 'http://online.gov.vn',
   homePromoTitle: 'Combo Bộ Ba Nhậu Xanh - Giảm 20%',
   homePromoVoucherCode: 'NHIEUXANH20',
+  heroScarcityBadge: 'MẺ SẤY THỦ CÔNG THÁNG NÀY: CHỈ CÒN 38 GÓI KHẢ DỤNG',
+  heroScarcityPercent: '82',
 };
 
 export const CORE_CONTENT_SETTING_KEYS: Record<keyof CoreContentSettings, string> = {
@@ -56,6 +60,8 @@ export const CORE_CONTENT_SETTING_KEYS: Record<keyof CoreContentSettings, string
   bctVerifiedUrl: 'BCT_VERIFIED_URL',
   homePromoTitle: 'HOME_PROMO_TITLE',
   homePromoVoucherCode: 'HOME_PROMO_VOUCHER_CODE',
+  heroScarcityBadge: 'HERO_SCARCITY_BADGE',
+  heroScarcityPercent: 'HERO_SCARCITY_PERCENT',
 };
 
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
@@ -96,6 +102,8 @@ export async function getCoreContentSettings(profileFallback?: Pick<SystemSettin
       bctVerifiedUrl: values.get('BCT_VERIFIED_URL') ?? DEFAULT_CORE_CONTENT_SETTINGS.bctVerifiedUrl,
       homePromoTitle: values.get('HOME_PROMO_TITLE') ?? DEFAULT_CORE_CONTENT_SETTINGS.homePromoTitle,
       homePromoVoucherCode: values.get('HOME_PROMO_VOUCHER_CODE') ?? DEFAULT_CORE_CONTENT_SETTINGS.homePromoVoucherCode,
+      heroScarcityBadge: values.get('HERO_SCARCITY_BADGE') ?? DEFAULT_CORE_CONTENT_SETTINGS.heroScarcityBadge,
+      heroScarcityPercent: values.get('HERO_SCARCITY_PERCENT') ?? DEFAULT_CORE_CONTENT_SETTINGS.heroScarcityPercent,
     };
   } catch {
     return {

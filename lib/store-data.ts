@@ -23,6 +23,37 @@ export type NutritionFacts = {
   sodium: string;
 };
 
+export type SensoryProfile = {
+  spicy: number;
+  smoky: number;
+  chewiness: number;
+  crispness: number;
+  sweetAftertaste: number;
+};
+
+export type PairingGuide = {
+  recommendedDrink: string;
+  servingTip: string;
+};
+
+export function normalizeSensoryProfile(value: unknown): SensoryProfile | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const profile = value as Record<string, unknown>;
+  const fields = ['spicy', 'smoky', 'chewiness', 'crispness', 'sweetAftertaste'] as const;
+  if (fields.some((field) => !Number.isInteger(profile[field]) || Number(profile[field]) < 1 || Number(profile[field]) > 5)) return null;
+  return Object.fromEntries(fields.map((field) => [field, Number(profile[field])])) as SensoryProfile;
+}
+
+export function normalizePairingGuide(value: unknown): PairingGuide | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const guide = value as Record<string, unknown>;
+  if ((guide.recommendedDrink !== undefined && typeof guide.recommendedDrink !== 'string')
+    || (guide.servingTip !== undefined && typeof guide.servingTip !== 'string')) return null;
+  const recommendedDrink = typeof guide.recommendedDrink === 'string' ? guide.recommendedDrink.trim() : '';
+  const servingTip = typeof guide.servingTip === 'string' ? guide.servingTip.trim() : '';
+  return recommendedDrink || servingTip ? { recommendedDrink, servingTip } : null;
+}
+
 export function normalizeNutritionFacts(value: unknown): NutritionFacts | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const facts = value as Record<string, unknown>;
@@ -73,6 +104,10 @@ export type Product = {
   valueAxis3?: number;
   upsellProductId?: string | null;
   nutritionFacts?: NutritionFacts | null;
+  sensoryProfile?: SensoryProfile | null;
+  pairingGuide?: PairingGuide | null;
+  originRegion?: string | null;
+  waxSealCode?: string | null;
   highlights?: string[];
   variants: ProductVariant[];
 };

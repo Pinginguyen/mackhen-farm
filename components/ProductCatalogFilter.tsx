@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 
 import ProductCard from '@/components/ProductCard';
-import type { NutritionFacts } from '@/lib/store-data';
+import type { NutritionFacts, PairingGuide, SensoryProfile } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
@@ -39,6 +39,10 @@ export type CatalogProduct = {
   upsellProductId?: string | null;
   isFeatured?: boolean;
   nutritionFacts?: NutritionFacts | null;
+  sensoryProfile?: SensoryProfile | null;
+  pairingGuide?: PairingGuide | null;
+  originRegion?: string | null;
+  waxSealCode?: string | null;
 };
 
 export default function ProductCatalogFilter({ products, initialQuery = '', showFilters = true }: { products: CatalogProduct[]; initialQuery?: string; showFilters?: boolean }) {

@@ -1,17 +1,15 @@
 import Link from 'next/link';
 import { ArrowRight, Flame, Sparkles, Sprout, Truck } from 'lucide-react';
 
-import Hero3DCanvasLoader from '@/components/Hero3DCanvasLoader';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
 import ScrollReveal from '@/components/ScrollReveal';
 import { prisma } from '@/lib/prisma';
-import { normalizeNutritionFacts } from '@/lib/store-data';
+import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile } from '@/lib/store-data';
 import LocalizedText from '@/components/LocalizedText';
 import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
-import ProductCylinder3DLoader from '@/components/home/ProductCylinder3DLoader';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { getSiteAsset } from '@/lib/site-assets';
@@ -33,6 +31,7 @@ export default async function HomePage() {
     getSiteAsset('STORY_SECTION_IMAGE', '/products/xe-soi.jpg'),
     getCoreContentSettings(),
   ]);
+  const scarcityPercent = Math.min(100, Math.max(0, Number.parseInt(contentSettings.heroScarcityPercent, 10) || 0));
   let products: CatalogProduct[] = [];
   let bestSellers: CatalogProduct[] = [];
   try {
@@ -41,10 +40,10 @@ export default async function HomePage() {
       prisma.product.findMany({ where: { active: true }, take: 4, orderBy: { createdAt: 'desc' } }),
     ]);
     products = databaseProducts.length
-      ? databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }))
+      ? databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }))
       : DEFAULT_PRODUCTS;
     bestSellers = databaseBestSellers.length
-      ? databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }))
+      ? databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }))
       : DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
   } catch (error) {
     console.error('[HOME_PRODUCTS_DB_ERROR]', error instanceof Error ? error.message : error);
@@ -58,15 +57,12 @@ export default async function HomePage() {
       <ForbiddenNotice />
 
       <section className="hero">
-        <div className="hero3d-layer" aria-hidden="true">
-          <Hero3DCanvasLoader />
-        </div>
         <div className="hero-copy">
           <div className="hero-badges">
             <span className="pill"><Sprout className="hero-upcycled-icon" aria-hidden="true" /><LocalizedText text="Upcycled Food · Hương vị Tây Bắc" /></span>
             <Link href="/products" className="hero-proof-badge"><Sparkles size={16} /><LocalizedText text="Gia vị Tây Bắc" /></Link>
           </div>
-          <h1><span className="hero-title-main"><LocalizedText text="Khô bò thực vật" /></span><span className="hero-title-accent"><LocalizedText text="High-Protein, đậm vị Tây Bắc" /></span></h1>
+          <h1 className="home-luxury-title"><span className="hero-title-main"><LocalizedText text="Khô bò thực vật" /></span><span className="hero-title-accent"><LocalizedText text="High-Protein, đậm vị Tây Bắc" /></span></h1>
           <p>
             <LocalizedText text="Tái chế bã đậu nành thành món ăn giàu đạm, đậm vị mắc khén và hạt dổi, để nguyên liệu được sử dụng trọn vẹn hơn." />
           </p>
@@ -78,6 +74,10 @@ export default async function HomePage() {
               <Truck size={17} />
               <LocalizedText text="Theo dõi đơn hàng" />
             </Link>
+          </div>
+          <div className="home-scarcity-bar" aria-label="Tình trạng mẻ sấy thủ công">
+            <div className="home-scarcity-heading"><span>{contentSettings.heroScarcityBadge}</span><strong>{scarcityPercent}%</strong></div>
+            <div className="home-scarcity-track" role="progressbar" aria-label="Tỷ lệ mẻ sấy đã bán" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scarcityPercent}><span style={{ transform: `scaleX(${scarcityPercent / 100})` }} /></div>
           </div>
           <ul className="trust-list hero-checklist">
             <li className="hero-feature-pill">
@@ -122,8 +122,6 @@ export default async function HomePage() {
           </span>
         </div>
       </section>
-
-      <ProductCylinder3DLoader products={products} />
 
       <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
 

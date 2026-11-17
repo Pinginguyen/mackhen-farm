@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import { DEFAULT_PRODUCTS } from '@/lib/default-products';
-import { normalizeNutritionFacts } from '@/lib/store-data';
+import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile } from '@/lib/store-data';
 import Image from 'next/image';
 
 export const revalidate = 300;
@@ -14,7 +14,7 @@ export default async function ProductsPage() {
       orderBy: { createdAt: 'desc' },
     });
     if (databaseProducts.length) {
-      products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
+      products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }));
     } else {
       console.warn('Không kết nối được DB, dùng danh sách sản phẩm mặc định');
       products = DEFAULT_PRODUCTS;

@@ -57,6 +57,8 @@ describe('/api/admin/content-settings', () => {
       bctVerifiedUrl: 'https://online.gov.vn',
       homePromoTitle: 'Combo mới',
       homePromoVoucherCode: 'COMBO20',
+      heroScarcityBadge: 'MẺ SẤY CRAFT: 38 GÓI',
+      heroScarcityPercent: '82',
     };
     settingsFindMany
       .mockResolvedValueOnce([])
@@ -69,7 +71,7 @@ describe('/api/admin/content-settings', () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
-    expect(settingsUpsert).toHaveBeenCalledTimes(9);
+    expect(settingsUpsert).toHaveBeenCalledTimes(11);
     expect(settingsUpsert).toHaveBeenCalledWith({
       where: { key: 'ANNOUNCEMENT_BAR_ENABLED' },
       update: { value: 'false' },
@@ -82,6 +84,12 @@ describe('/api/admin/content-settings', () => {
   it('rejects invalid URLs and empty required text', async () => {
     expect((await PATCH(request({ bctVerifiedUrl: 'javascript:alert(1)' }))).status).toBe(400);
     expect((await PATCH(request({ homePromoTitle: '   ' }))).status).toBe(400);
+    expect(settingsUpsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects scarcity percentages outside 0-100', async () => {
+    const response = await PATCH(request({ heroScarcityPercent: '120' }));
+    expect(response.status).toBe(400);
     expect(settingsUpsert).not.toHaveBeenCalled();
   });
 });

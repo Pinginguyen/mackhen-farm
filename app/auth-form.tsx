@@ -16,7 +16,7 @@ function getPasswordStrength(password: string): PasswordStrength {
 export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | { message?: string }>('');
   const [submitting, setSubmitting] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,9 +41,11 @@ export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
         body: JSON.stringify(Object.fromEntries(data.entries())),
         signal: controller.signal,
       });
-      const result = await response.json() as { error?: string; user?: { role?: string } };
+      const result = await response.json() as { error?: string | { message?: string }; user?: { role?: string } };
       if (!response.ok) {
-        const message = result.error ?? 'Email hoặc mật khẩu không chính xác!';
+        const message = typeof result.error === 'string'
+          ? result.error
+          : result.error?.message ?? 'Email hoặc mật khẩu không chính xác!';
         setError(message);
         toast.error(message);
         return;
@@ -94,7 +96,7 @@ export default function AuthForm({ mode }: { mode: 'register' | 'login' }) {
         </div>
       </div>
       <button className="primary-action" type="submit" disabled={submitting}>{submitting ? 'Đang xử lý...' : mode === 'register' ? 'Tạo tài khoản' : 'Đăng nhập'}</button>
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <p className="form-error" role="alert">{typeof error === 'string' ? error : (error?.message || 'Đã có lỗi xảy ra')}</p>}
     </form>
   );
 }

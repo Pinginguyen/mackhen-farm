@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { ImagePlus, Link2, PackagePlus, Pencil, Trash2, Upload, X } from 'lucide-react';
 
 import { getErrorMessage } from '@/lib/error-message';
-import type { NutritionFacts } from '@/lib/store-data';
+import type { NutritionFacts, SensoryProfile } from '@/lib/store-data';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import StockControl from './stock-control';
 
@@ -36,6 +36,12 @@ type ProductDraft = {
   valueAxis1: string;
   valueAxis2: string;
   valueAxis3: string;
+  sensoryProfileEnabled: boolean;
+  sensoryProfile: SensoryProfile;
+  recommendedDrink: string;
+  servingTip: string;
+  originRegion: string;
+  waxSealCode: string;
   upsellProductId: string;
   isFeatured: boolean;
   variants: VariantDraft[];
@@ -78,6 +84,12 @@ const emptyDraft: ProductDraft = {
   valueAxis1: '60',
   valueAxis2: '80',
   valueAxis3: '100',
+  sensoryProfileEnabled: false,
+  sensoryProfile: { spicy: 3, smoky: 3, chewiness: 3, crispness: 3, sweetAftertaste: 3 },
+  recommendedDrink: '',
+  servingTip: '',
+  originRegion: 'Sơn La, Tây Bắc',
+  waxSealCode: 'BATCH-CRAFT-2026',
   upsellProductId: '',
   isFeatured: false,
   variants: [],
@@ -178,6 +190,12 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       valueAxis1: String(product.valueAxis1 ?? 60),
       valueAxis2: String(product.valueAxis2 ?? 80),
       valueAxis3: String(product.valueAxis3 ?? 100),
+      sensoryProfileEnabled: Boolean(product.sensoryProfile),
+      sensoryProfile: product.sensoryProfile ?? { spicy: 3, smoky: 3, chewiness: 3, crispness: 3, sweetAftertaste: 3 },
+      recommendedDrink: product.pairingGuide?.recommendedDrink ?? '',
+      servingTip: product.pairingGuide?.servingTip ?? '',
+      originRegion: product.originRegion ?? '',
+      waxSealCode: product.waxSealCode ?? '',
       upsellProductId: product.upsellProductId ?? '',
       isFeatured: product.isFeatured ?? false,
       variants: (product.variants ?? []).map((variant) => ({
@@ -252,6 +270,12 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           valueAxis1: Number(draft.valueAxis1),
           valueAxis2: Number(draft.valueAxis2),
           valueAxis3: Number(draft.valueAxis3),
+          sensoryProfile: draft.sensoryProfileEnabled ? draft.sensoryProfile : null,
+          pairingGuide: draft.recommendedDrink.trim() || draft.servingTip.trim()
+            ? { recommendedDrink: draft.recommendedDrink.trim(), servingTip: draft.servingTip.trim() }
+            : null,
+          originRegion: draft.originRegion.trim() || null,
+          waxSealCode: draft.waxSealCode.trim() || null,
           upsellProductId: draft.upsellProductId || null,
           isFeatured: draft.isFeatured,
           variants: draft.variants.map((variant) => ({
@@ -466,6 +490,56 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 </div>
                 <label className="field admin-product-full-width">Chữ trên tem huy hiệu<input value={draft.badgeText} onChange={(event) => setDraft((current) => ({ ...current, badgeText: event.target.value }))} maxLength={80} placeholder="Ví dụ: OCOP 4 Sao, High-Protein, Bản Hua Tạt..." /></label>
                 <label className="field admin-product-full-width">Sản phẩm gợi ý bán kèm (Upsell)<select value={draft.upsellProductId} onChange={(event) => setDraft((current) => ({ ...current, upsellProductId: event.target.value }))}><option value="">Không gợi ý sản phẩm bán kèm</option>{products.filter((item) => item.active && item.id !== editingProduct?.id).map((item) => <option value={item.id} key={item.id}>{item.name} · {item.price.toLocaleString('vi-VN')}đ</option>)}</select></label>
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Đặc trưng cảm quan 5 giác quan</legend>
+                <label className="admin-nutrition-toggle"><input type="checkbox" checked={draft.sensoryProfileEnabled} onChange={(event) => setDraft((current) => ({ ...current, sensoryProfileEnabled: event.target.checked }))} /> Hiển thị hồ sơ cảm quan trên trang sản phẩm</label>
+                {([
+                  ['spicy', 'Cay tê Mắc Khén'],
+                  ['smoky', 'Hương khói củi'],
+                  ['chewiness', 'Độ dai thớ thịt'],
+                  ['crispness', 'Độ giòn'],
+                  ['sweetAftertaste', 'Hậu vị ngọt'],
+                ] as const).map(([field, label]) => <label className="admin-sensory-rating-row" key={field}>
+                  <span>{label}</span>
+                  <input type="range" min={1} max={5} step={1} value={draft.sensoryProfile[field]} disabled={!draft.sensoryProfileEnabled} onChange={(event) => setDraft((current) => ({ ...current, sensoryProfile: { ...current.sensoryProfile, [field]: Number(event.target.value) } }))} aria-label={`${label}, mức ${draft.sensoryProfile[field]} trên 5`} />
+                  <output>{draft.sensoryProfile[field]}/5</output>
+                </label>)}
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Nghệ thuật kết hợp ẩm thực</legend>
+                <label className="field">Đồ uống gợi ý<input value={draft.recommendedDrink} onChange={(event) => setDraft((current) => ({ ...current, recommendedDrink: event.target.value }))} maxLength={240} placeholder="Ví dụ: trà shan tuyết ấm" /></label>
+                <label className="field admin-product-full-width">Mẹo thưởng thức<textarea rows={3} value={draft.servingTip} onChange={(event) => setDraft((current) => ({ ...current, servingTip: event.target.value }))} maxLength={800} placeholder="Ví dụ: nướng nhẹ 30 giây mỗi mặt để dậy hương mắc khén" /></label>
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Con dấu niêm phong xuất xứ</legend>
+                <label className="field">Vùng thu hoạch<input value={draft.originRegion} onChange={(event) => setDraft((current) => ({ ...current, originRegion: event.target.value }))} maxLength={200} placeholder="Sơn La, Tây Bắc" /></label>
+                <label className="field">Mã con dấu<input value={draft.waxSealCode} onChange={(event) => setDraft((current) => ({ ...current, waxSealCode: event.target.value }))} maxLength={100} placeholder="BATCH-CRAFT-2026" /></label>
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Đặc trưng cảm quan 5 giác quan</legend>
+                <label className="admin-nutrition-toggle"><input type="checkbox" checked={draft.sensoryProfileEnabled} onChange={(event) => setDraft((current) => ({ ...current, sensoryProfileEnabled: event.target.checked }))} /> Hiển thị hồ sơ cảm quan trên trang sản phẩm</label>
+                {([
+                  ['spicy', 'Cay tê Mắc Khén'],
+                  ['smoky', 'Hương khói củi'],
+                  ['chewiness', 'Độ dai thớ thịt'],
+                  ['crispness', 'Độ giòn'],
+                  ['sweetAftertaste', 'Hậu vị ngọt'],
+                ] as const).map(([field, label]) => <label className="admin-sensory-rating-row" key={field}>
+                  <span>{label}</span>
+                  <input type="range" min={1} max={5} step={1} value={draft.sensoryProfile[field]} disabled={!draft.sensoryProfileEnabled} onChange={(event) => setDraft((current) => ({ ...current, sensoryProfile: { ...current.sensoryProfile, [field]: Number(event.target.value) } }))} aria-label={`${label}, mức ${draft.sensoryProfile[field]} trên 5`} />
+                  <output>{draft.sensoryProfile[field]}/5</output>
+                </label>)}
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Nghệ thuật kết hợp ẩm thực</legend>
+                <label className="field">Đồ uống gợi ý<input value={draft.recommendedDrink} onChange={(event) => setDraft((current) => ({ ...current, recommendedDrink: event.target.value }))} maxLength={240} placeholder="Ví dụ: trà shan tuyết ấm" /></label>
+                <label className="field admin-product-full-width">Mẹo thưởng thức<textarea rows={3} value={draft.servingTip} onChange={(event) => setDraft((current) => ({ ...current, servingTip: event.target.value }))} maxLength={800} placeholder="Ví dụ: nướng nhẹ 30 giây mỗi mặt để dậy hương mắc khén" /></label>
+              </fieldset>
+              <fieldset className="admin-product-variants admin-product-full-width admin-editorial-fieldset">
+                <legend>Con dấu niêm phong xuất xứ</legend>
+                <label className="field">Vùng thu hoạch<input value={draft.originRegion} onChange={(event) => setDraft((current) => ({ ...current, originRegion: event.target.value }))} maxLength={200} placeholder="Sơn La, Tây Bắc" /></label>
+                <label className="field">Mã con dấu<input value={draft.waxSealCode} onChange={(event) => setDraft((current) => ({ ...current, waxSealCode: event.target.value }))} maxLength={100} placeholder="BATCH-CRAFT-2026" /></label>
               </fieldset>
               <label className="admin-nutrition-toggle admin-product-full-width"><input type="checkbox" checked={draft.isFeatured} onChange={(event) => setDraft((current) => ({ ...current, isFeatured: event.target.checked }))} /> Hiển thị trong mục Sản phẩm bán chạy trên trang chủ</label>
               <fieldset className="admin-nutrition-fields admin-product-full-width">

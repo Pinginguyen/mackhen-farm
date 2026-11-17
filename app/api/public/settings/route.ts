@@ -10,6 +10,7 @@ export async function GET() {
     b2bItemsPerCarton, b2bCartonWeightKg, dppSupplyGPS, dppLabResult,
     announcementBarText, announcementBarEnabled, contactHotline, contactZalo,
     businessName, businessTaxCode, bctVerifiedUrl, homePromoTitle, homePromoVoucherCode,
+    heroScarcityBadge, heroScarcityPercent,
   } = settings;
 
   return NextResponse.json({ settings: {
@@ -17,6 +18,7 @@ export async function GET() {
     b2bItemsPerCarton, b2bCartonWeightKg, dppSupplyGPS, dppLabResult,
     announcementBarText, announcementBarEnabled, contactHotline, contactZalo,
     businessName, businessTaxCode, bctVerifiedUrl, homePromoTitle, homePromoVoucherCode,
+    heroScarcityBadge, heroScarcityPercent,
   } }, {
     headers: { 'Cache-Control': 'no-store, max-age=0' },
   });
