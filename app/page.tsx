@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Flame, Sparkles, Sprout, Truck } from 'lucide-react';
+import { ArrowRight, Sparkles, Sprout, Truck } from 'lucide-react';
 
 import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
 import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
@@ -79,17 +79,6 @@ export default async function HomePage() {
             <div className="home-scarcity-heading"><span>{contentSettings.heroScarcityBadge}</span><strong>{scarcityPercent}%</strong></div>
             <div className="home-scarcity-track" role="progressbar" aria-label="Tỷ lệ mẻ sấy đã bán" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scarcityPercent}><span style={{ transform: `scaleX(${scarcityPercent / 100})` }} /></div>
           </div>
-          <ul className="trust-list hero-checklist">
-            <li className="hero-feature-pill">
-              <Sprout className="w-4 h-4 text-emerald-600" aria-hidden="true" /> <LocalizedText text="Tận dụng bã đậu nành địa phương" />
-            </li>
-            <li className="hero-feature-pill">
-              <Truck className="w-4 h-4 text-emerald-600" aria-hidden="true" /> <LocalizedText text="Đóng gói sẵn sàng vận chuyển" />
-            </li>
-            <li className="hero-feature-pill">
-              <Flame className="w-4 h-4 text-amber-600" aria-hidden="true" /> <LocalizedText text="Mùi vị đặc trưng Tây Bắc" />
-            </li>
-          </ul>
         </div>
         <div className="hero-media">
           <div className="photo-card animate-float">
