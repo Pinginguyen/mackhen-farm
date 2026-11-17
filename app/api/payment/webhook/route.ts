@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCachedPaymentStatus, rememberPaidPayment } from '@/lib/payment-status-cache';
 import { writeAuditLog } from '@/lib/audit-log';
+import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,9 @@ export async function POST(request: Request) {
     }
 
     rememberPaidPayment({ orderCode, amount, sender, transactionTime });
+    if (order && order.paymentStatus !== 'PAID') {
+      await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: order.totalAmount, phone: order.phone, address: order.address });
+    }
     if (latePaymentOnCancelledOrder) {
       await writeAuditLog(request, {
         adminEmail: 'system:payment-webhook',

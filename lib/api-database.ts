@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { recordApiMetric } from '@/lib/api-metrics';
+import { reportPrismaConnectivityIssue } from '@/lib/prisma';
 
 export async function withDatabase(operation: () => Promise<NextResponse>, errorLabel?: string): Promise<NextResponse> {
   const startedAt = Date.now();
@@ -9,6 +10,7 @@ export async function withDatabase(operation: () => Promise<NextResponse>, error
     return response;
   } catch (error) {
     if (errorLabel) console.error(errorLabel, error);
+    reportPrismaConnectivityIssue(error, errorLabel);
     if (error instanceof Error && error.message === 'INSUFFICIENT_STOCK') {
       const response = NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
       recordApiMetric(response.status, Date.now() - startedAt);

@@ -38,7 +38,6 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
       window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
       window.dispatchEvent(new Event('mackhen:cart-drawer-open'));
       setQuickAdded(true);
-      toast.success(locale === 'en' ? 'Added to your cart.' : 'Đã thêm sản phẩm vào giỏ hàng.');
       window.setTimeout(() => setQuickAdded(false), 1600);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể kết nối để cập nhật giỏ hàng.');

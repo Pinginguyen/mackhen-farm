@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic';
 
 const publicAssetFallbacks = {
   B2B_HERO_BANNER: '/products/xe-soi.jpg',
+  LOGO_HEADER: '',
+  LOGO_FOOTER: '',
+  BADGE_BCT: '',
   TRACEABILITY_BANNER: '/products/soy-pulp.svg',
 } as const;
 

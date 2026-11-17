@@ -31,7 +31,7 @@ describe('POST /api/cron/cleanup-holds', () => {
     process.env.CRON_SECRET = 'test-cron-secret';
     orderFindMany.mockReset().mockResolvedValue([{
       id: 'order-1',
-      items: [{ id: 'item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ id: 'item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1' }],
     }]);
     orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     productUpdate.mockReset().mockResolvedValue({});
@@ -53,7 +53,7 @@ describe('POST /api/cron/cleanup-holds', () => {
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
     expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ type: 'RELEASE', delta: 2, idempotencyKey: 'order-item:item-1:RELEASE', productionLotId: 'lot-1' })],
+      data: [expect.objectContaining({ type: 'RELEASE', delta: 2, idempotencyKey: 'order-item:item-1:RELEASE', lotId: 'lot-1' })],
       skipDuplicates: true,
     }));
   });

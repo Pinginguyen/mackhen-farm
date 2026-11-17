@@ -6,6 +6,7 @@ import { getRequestSession } from '@/lib/auth';
 import { getCachedPaymentStatus } from '@/lib/payment-status-cache';
 import { withDatabase } from '@/lib/api-database';
 import { writeAuditLog } from '@/lib/audit-log';
+import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,6 +113,9 @@ export async function POST(request: Request) {
         }
       });
       await writeAuditLog(request, { adminEmail, action: 'RECONCILE_PAYMENT', targetEntity: 'Order', targetId: orderCode, oldValue: { paymentStatus: order.paymentStatus, reconciled: order.reconciled }, newValue: { paymentStatus: 'PAID', reconciled: true, evidence: 'verified-payment-record-or-webhook-cache' } });
+      if (order.paymentStatus !== 'PAID') {
+        await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: order.totalAmount, phone: order.phone, address: order.address });
+      }
       return NextResponse.json({ success: true, orderCode, paymentStatus: 'PAID', reconciled: true });
     }
 

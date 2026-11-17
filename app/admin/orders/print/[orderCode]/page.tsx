@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { createOrderChecksum } from '@/lib/crypto-order';
 import PrintButton from '../../print-button';
+import CreateShipmentButton from '../../create-shipment-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ function OrderBarcode({ value }: { value: string }) {
 export default async function PackingSlipPage({ params }: { params: { orderCode: string } }) {
   const order = await prisma.order.findUnique({
     where: { orderCode: params.orderCode },
-    include: { items: { include: { product: { select: { slug: true } } } } },
+    include: { items: true },
   });
   if (!order) notFound();
   const amount = `${order.totalAmount.toLocaleString('vi-VN')}đ`;
@@ -90,7 +91,10 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
       `}</style>
       <div className="packing-slip-toolbar print-hide">
         <div><p className="eyebrow">Mắc Khén Farm</p><h1>Phiếu gửi hàng</h1></div>
-        <PrintButton />
+        <div className="admin-order-toolbar-actions">
+          <CreateShipmentButton orderId={order.id} carrier={order.carrier} trackingCode={order.trackingCode} labelUrl={order.shippingLabelUrl} />
+          <PrintButton />
+        </div>
       </div>
       <section id="printable-order" aria-label={`Phiếu gửi hàng ${order.orderCode}`}>
         <div className="packing-sheet-brand">
@@ -100,10 +104,10 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
 
         <div className="packing-sheet-heading">
           <div><h1>PHIẾU ĐÓNG GÓI &amp; GIAO HÀNG (PICK &amp; PACK SLIP)</h1><p>Ngày tạo: {order.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</p></div>
-          <div className="packing-sheet-code">
+          <div className="packing-sheet-code" id="carrier-label">
             <div><small>MÃ ĐƠN</small><strong>{order.orderCode}</strong><small>{order.trackingCode ? `Mã vận đơn: ${order.trackingCode}` : 'Chưa có mã vận đơn'}</small></div>
-            <OrderBarcode value={order.orderCode} />
-            <span className="packing-barcode-label">CODE128 · MÃ VẠCH MÔ PHỎNG</span>
+            <OrderBarcode value={order.trackingCode ?? order.orderCode} />
+            <span className="packing-barcode-label">CODE128 · {order.trackingCode ? 'MÃ VẬN ĐƠN MÔ PHỎNG' : 'MÃ ĐƠN MÔ PHỎNG'}</span>
           </div>
         </div>
 
@@ -138,7 +142,7 @@ export default async function PackingSlipPage({ params }: { params: { orderCode:
             <tbody>{order.items.map((item, index) => (
               <tr key={item.id}>
                 <td>{index + 1}</td>
-                <td><strong>{item.productName}</strong><small>{item.variantLabel ?? 'Quy cách tiêu chuẩn'}</small></td>
+                <td><strong>{item.titleSnapshot}</strong><small>{item.variantNameSnapshot || 'Quy cách tiêu chuẩn'}{item.skuSnapshot ? ` · ${item.skuSnapshot}` : ''}</small></td>
                 <td>Chưa cấu hình vị trí</td>
                 <td>{item.quantity}</td>
                 <td><input className="packing-check" type="checkbox" aria-label={`Kiểm định ${item.productName}`} /></td>

@@ -33,9 +33,10 @@ describe('POST /api/admin/affiliates/[affiliateId]/payout', () => {
     }), { params: { affiliateId: 'affiliate-1' } });
 
     expect(response.status).toBe(200);
-    expect(orderFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ paymentStatus: 'PAID', affiliateCommissionPaidAt: null }) }));
+    expect(orderFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ paymentStatus: 'PAID', affiliateCommissionStatus: 'ELIGIBLE', affiliateCommissionPaidAt: null, orderStatus: { in: ['DELIVERED', 'COMPLETED'] }, returnRequests: { none: { status: { in: ['PENDING', 'REPLACEMENT_APPROVED', 'REFUND_APPROVED'] } } } }) }));
     expect(payoutCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ amount: 12000, orderCount: 1, bankAccountSnapshot: '0123456789', paymentReference: 'BANK-001' }) }));
-    expect(orderUpdateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: { affiliatePayoutId: 'payout-1' } }));
+    expect(orderUpdateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: { affiliateCommissionPaidAt: expect.any(Date), affiliateCommissionStatus: 'PAID' } }));
+    expect(orderUpdateMany).toHaveBeenNthCalledWith(3, expect.objectContaining({ data: { affiliatePayoutId: 'payout-1' } }));
   });
 
   it('does not create another payout when no commissions are due', async () => {
@@ -47,7 +48,7 @@ describe('POST /api/admin/affiliates/[affiliateId]/payout', () => {
   });
 
   it('rejects concurrent settlement when another request already claimed the orders', async () => {
-    orderUpdateMany.mockResolvedValueOnce({ count: 0 });
+    orderUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     const response = await POST(new Request('https://mackhen.example/api/admin/affiliates/affiliate-1/payout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }), { params: { affiliateId: 'affiliate-1' } });
 
     expect(response.status).toBe(409);

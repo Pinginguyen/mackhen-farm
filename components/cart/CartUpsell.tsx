@@ -32,6 +32,7 @@ export default function CartUpsell({ product, onAdded }: { product: CartUpsellPr
       const result = await response.json() as { error?: { message?: string }; cartCount?: number };
       if (!response.ok) throw new Error(result.error?.message ?? 'Không thể thêm sản phẩm vào giỏ.');
       window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
+      window.dispatchEvent(new Event('mackhen:cart-drawer-open'));
       setMessage(isEN ? 'Added to your order.' : 'Đã thêm vào đơn hàng.');
       await onAdded?.();
     } catch (error) {

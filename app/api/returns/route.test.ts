@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, sendCompensationVoucherEmail, transaction, prismaTransaction } = vi.hoisted(() => {
+const { orderFindFirst, orderFindUnique, orderUpdate, orderUpdateMany, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, sendCompensationVoucherEmail, transaction, prismaTransaction } = vi.hoisted(() => {
   const mocks = {
-    orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
+    orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
     returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(), sendCompensationVoucherEmail: vi.fn(),
   };
   const transaction = {
-    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate },
+    order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
     returnRequest: { update: mocks.returnUpdate },
     compensationVoucher: { create: mocks.compensationVoucherCreate },
     voucher: { findUnique: mocks.voucherFindUnique, findMany: mocks.voucherFindMany, findFirst: mocks.voucherFindFirst, create: mocks.voucherCreate },
@@ -21,7 +21,7 @@ const { orderFindFirst, orderFindUnique, orderUpdate, returnCreate, returnFindMa
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    order: { findFirst: orderFindFirst, findUnique: orderFindUnique, update: orderUpdate },
+    order: { findFirst: orderFindFirst, findUnique: orderFindUnique, update: orderUpdate, updateMany: orderUpdateMany },
     returnRequest: { create: returnCreate, findMany: returnFindMany, findUnique: returnFindUnique, update: returnUpdate },
     compensationVoucher: {},
     voucher: { findUnique: voucherFindUnique, findMany: voucherFindMany, findFirst: voucherFindFirst, create: voucherCreate },
@@ -54,9 +54,10 @@ function makeRequest(method: string, body?: unknown) {
 
 describe('/api/returns', () => {
   beforeEach(() => {
-    orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', phone: '0762 793 244' });
+    orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', phone: '0762 793 244' });
     orderFindUnique.mockReset().mockResolvedValue({ totalAmount: 169000, refundedAt: null });
     orderUpdate.mockReset().mockResolvedValue({});
+    orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     returnCreate.mockReset().mockResolvedValue({ id: 'return-1', status: 'PENDING' });
     returnFindMany.mockReset().mockResolvedValue([]);
     returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
@@ -80,7 +81,7 @@ describe('/api/returns', () => {
     expect(result.item.status).toBe('PENDING');
     expect(orderFindFirst).toHaveBeenCalledWith({
       where: { OR: [{ orderCode: 'MKF-123456' }, { id: 'mkf-123456' }, { numericCode: 123456 }] },
-      select: { id: true, phone: true },
+      select: { id: true, orderCode: true, phone: true },
     });
     expect(returnCreate).toHaveBeenCalledWith({ data: {
       orderId: 'order-1',
@@ -259,7 +260,7 @@ describe('/api/returns', () => {
       data: { status: 'COMPLETED', adminNote: 'Đã hoàn 65.000đ.', refundTransferReference: 'BANK-REF-123', refundCompletedBy: 'unknown-admin' },
       include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
     });
-    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { paymentStatus: 'REFUNDED', refundAmount: 169000, refundedAt: expect.any(Date) } });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { paymentStatus: 'REFUNDED', refundAmount: 169000, refundedAt: expect.any(Date), affiliateCommissionStatus: 'CANCELLED' } });
   });
 
   it.each(['REPLACEMENT_APPROVED', 'REFUND_APPROVED', 'REJECTED'] as const)(

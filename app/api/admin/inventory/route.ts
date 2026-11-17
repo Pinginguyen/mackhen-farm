@@ -18,8 +18,8 @@ export async function GET(request: Request) {
       prisma.product.findMany({
         select: {
           id: true, name: true, category: true, price: true, unit: true, stock: true, active: true, image: true,
-          variants: { select: { inventory: true } },
-          productionLots: { select: { id: true, lotCode: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
+          variants: { select: { id: true, title: true, inventory: true, sku: true } },
+          productionLots: { select: { id: true, batchCode: true, productVariantId: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
         },
         orderBy: { name: 'asc' },
       }),
@@ -56,17 +56,17 @@ export async function PATCH(request: Request) {
     if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
       return NextResponse.json({ error: { message: 'Dữ liệu yêu cầu không hợp lệ.' } }, { status: 400 });
     }
-    const body = payload as { action?: string; productId?: string; price?: number; stock?: number; stockDelta?: number; active?: boolean; lotCode?: string; mfgDate?: string; expDate?: string; receivedQty?: number; testReportUrl?: string; receivingNote?: string };
+    const body = payload as { action?: string; productId?: string; productVariantId?: unknown; price?: number; stock?: number; stockDelta?: number; active?: boolean; batchCode?: string; lotCode?: string; mfgDate?: string; expDate?: string; receivedQty?: number; testReportUrl?: string; receivingNote?: string };
     const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
     const suppliedIdempotencyKey = request.headers.get('idempotency-key')?.trim();
     const adjustmentKey = suppliedIdempotencyKey && suppliedIdempotencyKey.length <= 160 ? suppliedIdempotencyKey : randomUUID();
 
     if (body.action === 'CREATE_LOT') {
-      const lotCode = body.lotCode?.trim().toUpperCase() ?? '';
+      const batchCode = (body.batchCode ?? body.lotCode)?.trim().toUpperCase() ?? '';
       const mfgDate = typeof body.mfgDate === 'string' ? new Date(body.mfgDate) : new Date(NaN);
       const expDate = typeof body.expDate === 'string' ? new Date(body.expDate) : new Date(NaN);
       const testReportUrl = body.testReportUrl?.trim() || null;
-      if (!body.productId || !/^LOT-[A-Z0-9-]{4,60}$/.test(lotCode)
+      if (!body.productId || !/^LOT-[A-Z0-9-]{4,60}$/.test(batchCode)
         || !Number.isSafeInteger(body.receivedQty) || (body.receivedQty ?? 0) < 1
         || !Number.isFinite(mfgDate.getTime()) || !Number.isFinite(expDate.getTime()) || mfgDate > expDate || expDate <= new Date()
         || (testReportUrl !== null && (testReportUrl.length > 2048 || !/^https?:\/\//i.test(testReportUrl)))
@@ -74,42 +74,52 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: { message: 'Mã lô, số lượng, ngày sản xuất/hạn dùng hoặc hồ sơ kiểm nghiệm không hợp lệ.' } }, { status: 400 });
       }
       return withDatabase(async () => {
-        const lot = await prisma.$transaction(async (transaction) => {
+        const productVariantId = typeof body.productVariantId === 'string' && body.productVariantId.trim() ? body.productVariantId.trim() : null;
+        if (body.productVariantId != null && typeof body.productVariantId !== 'string') {
+          return NextResponse.json({ error: { message: 'Phân loại sản phẩm không hợp lệ.' } }, { status: 400 });
+        }
+        const result = await prisma.$transaction(async (transaction) => {
+          if (productVariantId) {
+            const variant = await transaction.productVariant.findFirst({ where: { id: productVariantId, productId: body.productId }, select: { id: true } });
+            if (!variant) return { error: 'VARIANT_NOT_FOUND' as const };
+          }
           const createdLot = await transaction.productionLot.create({
-            data: { lotCode, productId: body.productId!, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
+            data: { batchCode, productId: body.productId!, productVariantId, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
           });
           await recordMovement(transaction, {
             productId: body.productId!,
-            productionLotId: createdLot.id,
+            variantId: productVariantId,
+            lotId: createdLot.id,
             type: 'RECEIPT',
             delta: body.receivedQty!,
-            idempotencyKey: `production-lot:${lotCode}:RECEIPT`,
-            reference: `Lot receipt ${lotCode}`,
+            idempotencyKey: `production-lot:${batchCode}:RECEIPT`,
+            reference: `Lot receipt ${batchCode}`,
           });
-          return createdLot;
+          return { lot: createdLot };
         });
-        await writeAuditLog(request, { adminEmail, action: 'CREATE_PRODUCTION_LOT', targetEntity: 'Inventory', targetId: lot.lotCode, newValue: lot });
-        return NextResponse.json({ lot }, { status: 201 });
+        if ('error' in result) return NextResponse.json({ error: { message: 'Phân loại không thuộc sản phẩm đã chọn.' } }, { status: 400 });
+        await writeAuditLog(request, { adminEmail, action: 'CREATE_PRODUCTION_LOT', targetEntity: 'Inventory', targetId: result.lot.batchCode, newValue: result.lot });
+        return NextResponse.json({ lot: { ...result.lot, lotCode: result.lot.batchCode } }, { status: 201 });
       });
     }
 
     if (body.action === 'PAUSE_LOT') {
-      const lotCode = body.lotCode?.trim().toUpperCase() ?? '';
-      if (!/^LOT-[A-Z0-9-]{4,60}$/.test(lotCode)) return NextResponse.json({ error: { message: 'Mã lô không hợp lệ.' } }, { status: 400 });
+      const batchCode = (body.batchCode ?? body.lotCode)?.trim().toUpperCase() ?? '';
+      if (!/^LOT-[A-Z0-9-]{4,60}$/.test(batchCode)) return NextResponse.json({ error: { message: 'Mã lô không hợp lệ.' } }, { status: 400 });
       return withDatabase(async () => {
-        const lot = await prisma.productionLot.findUnique({ where: { lotCode }, include: { product: { select: { id: true, active: true } } } });
+        const lot = await prisma.productionLot.findUnique({ where: { batchCode }, include: { product: { select: { id: true, active: true } } } });
         if (!lot) return NextResponse.json({ error: { message: 'Không tìm thấy lô sản xuất.' } }, { status: 404 });
         const customers = await prisma.orderItem.findMany({
-          where: { lotCode },
+          where: { lotId: lot.id },
           select: { order: { select: { orderCode: true, customerName: true, phone: true } } },
         });
         await prisma.$transaction([
-          prisma.productionLot.update({ where: { lotCode }, data: { status: 'RECALLED' } }),
+          prisma.productionLot.update({ where: { batchCode }, data: { status: 'RECALLED' } }),
           prisma.product.update({ where: { id: lot.productId }, data: { active: false } }),
         ]);
-        await writeAuditLog(request, { adminEmail, action: 'PAUSE_LOT', targetEntity: 'Inventory', targetId: lotCode, oldValue: { status: lot.status, productActive: lot.product.active }, newValue: { status: 'RECALLED', productActive: false } });
+        await writeAuditLog(request, { adminEmail, action: 'PAUSE_LOT', targetEntity: 'Inventory', targetId: batchCode, oldValue: { status: lot.status, productActive: lot.product.active }, newValue: { status: 'RECALLED', productActive: false } });
         const uniqueCustomers = [...new Map(customers.map(({ order }) => [order.phone, order])).values()];
-        return NextResponse.json({ success: true, lotCode, affectedCustomers: uniqueCustomers });
+        return NextResponse.json({ success: true, batchCode, lotCode: batchCode, affectedCustomers: uniqueCustomers });
       });
     }
 

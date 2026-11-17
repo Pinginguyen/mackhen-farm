@@ -20,7 +20,7 @@ export async function POST(request: Request) {
         paymentStatus: 'PENDING',
         orderStatus: { in: ['PENDING', 'CONFIRMED'] },
       },
-      select: { id: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } },
+      select: { id: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true } } },
       orderBy: { holdExpiresAt: 'asc' },
       take: 500,
     });
@@ -41,20 +41,18 @@ export async function POST(request: Request) {
         if (!claimed.count) return 0;
 
         for (const item of expiredOrder.items) {
-          let productionLotId: string | null = null;
           await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
           if (item.productVariantId) {
             await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
           }
-          if (item.lotCode) {
-            const lot = await transaction.productionLot.update({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } }, select: { id: true } });
-            productionLotId = lot.id;
+          if (item.lotId) {
+            await transaction.productionLot.update({ where: { id: item.lotId }, data: { availableQty: { increment: item.quantity } } });
           }
           await recordMovement(transaction, {
             orderId: expiredOrder.id,
             productId: item.productId,
             variantId: item.productVariantId,
-            productionLotId,
+            lotId: item.lotId,
             type: 'RELEASE',
             delta: item.quantity,
             idempotencyKey: orderMovementKey(item.id, 'RELEASE'),

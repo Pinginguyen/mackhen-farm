@@ -6,6 +6,7 @@ import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { prisma } from '@/lib/prisma';
 import { calculatePercentageAmount } from '@/lib/money';
+import type { Prisma } from '@prisma/client';
 
 export async function POST(request: Request, { params }: { params: { affiliateId: string } }) {
   const denied = await requireAdmin(request);
@@ -26,16 +27,31 @@ export async function POST(request: Request, { params }: { params: { affiliateId
       const payout = await prisma.$transaction(async (transaction) => {
         const affiliate = await transaction.affiliate.findUnique({ where: { id: params.affiliateId } });
         if (!affiliate) return { error: 'NOT_FOUND' as const };
+        const now = new Date();
+        const eligibleOrderWhere: Prisma.OrderWhereInput = {
+          affiliateCode: affiliate.affiliateCode,
+          paymentStatus: 'PAID' as const,
+          orderStatus: { in: ['DELIVERED', 'COMPLETED'] },
+          returnRequests: { none: { status: { in: ['PENDING', 'REPLACEMENT_APPROVED', 'REFUND_APPROVED'] } } },
+        };
+        await transaction.order.updateMany({
+          where: {
+            ...eligibleOrderWhere,
+            affiliateCommissionStatus: 'PENDING',
+            affiliateCommissionEligibleAt: { lte: now },
+          },
+          data: { affiliateCommissionStatus: 'ELIGIBLE' },
+        });
         const orders = await transaction.order.findMany({
-          where: { affiliateCode: affiliate.affiliateCode, paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' }, affiliateCommissionPaidAt: null },
+          where: { ...eligibleOrderWhere, affiliateCommissionStatus: 'ELIGIBLE', affiliateCommissionPaidAt: null },
           select: { id: true, totalAmount: true, affiliateCommissionRate: true },
         });
         if (!orders.length) return { error: 'NOTHING_DUE' as const };
         const amount = orders.reduce((sum, order) => sum + calculatePercentageAmount(order.totalAmount, order.affiliateCommissionRate ?? affiliate.commissionRate), 0);
         const paidAt = new Date();
         const settled = await transaction.order.updateMany({
-          where: { id: { in: orders.map((order) => order.id) }, affiliateCommissionPaidAt: null },
-          data: { affiliateCommissionPaidAt: paidAt },
+          where: { id: { in: orders.map((order) => order.id) }, affiliateCommissionStatus: 'ELIGIBLE', affiliateCommissionPaidAt: null },
+          data: { affiliateCommissionPaidAt: paidAt, affiliateCommissionStatus: 'PAID' },
         });
         if (settled.count !== orders.length) throw new Error('AFFILIATE_PAYOUT_CONFLICT');
         const record = await transaction.affiliatePayout.create({

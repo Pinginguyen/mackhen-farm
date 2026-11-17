@@ -17,14 +17,15 @@ import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { getSiteAsset } from '@/lib/site-assets';
 import PromoVoucherCode from '@/components/home/PromoVoucherCode';
 import { getCoreContentSettings } from '@/lib/system-settings';
+import ForbiddenNotice from '@/components/layout/ForbiddenNotice';
 
 const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
 ];
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
-export default async function HomePage({ searchParams }: { searchParams: { error?: string } }) {
+export default async function HomePage() {
   const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, contentSettings] = await Promise.all([
     getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
     getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
@@ -39,16 +40,22 @@ export default async function HomePage({ searchParams }: { searchParams: { error
       prisma.product.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
       prisma.product.findMany({ where: { active: true }, take: 4, orderBy: { createdAt: 'desc' } }),
     ]);
-    products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
-    bestSellers = databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }));
+    products = databaseProducts.length
+      ? databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }))
+      : DEFAULT_PRODUCTS;
+    bestSellers = databaseBestSellers.length
+      ? databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts) }))
+      : DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
   } catch (error) {
     console.error('[HOME_PRODUCTS_DB_ERROR]', error instanceof Error ? error.message : error);
+    products = DEFAULT_PRODUCTS;
+    bestSellers = DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
   }
   return (
     <main className="page-shell home-page">
       <ScrollReveal groups={homeRevealGroups} />
       <HomeHeroReveal />
-      {searchParams.error === 'forbidden' && <p className="role-notice" role="alert"><LocalizedText text="Bạn không có quyền truy cập khu vực quản trị." /></p>}
+      <ForbiddenNotice />
 
       <section className="hero">
         <div className="hero3d-layer" aria-hidden="true">

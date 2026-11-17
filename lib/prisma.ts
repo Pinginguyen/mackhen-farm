@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import * as Sentry from '@sentry/nextjs';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -32,16 +33,49 @@ if (datasourceUrl) {
   const isPooler = datasourceUrl.hostname.includes('-pooler.') || datasourceUrl.searchParams.has('pgbouncer');
   if (isPooler || process.env.VERCEL) {
     datasourceUrl.searchParams.set('pgbouncer', 'true');
-    datasourceUrl.searchParams.set('connection_limit', '10');
+    datasourceUrl.searchParams.set('connection_limit', process.env.VERCEL ? '1' : '10');
     datasourceUrl.searchParams.set('pool_timeout', '10');
   }
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient(
-  {
+function createPrismaClient() {
+  const log: Prisma.LogDefinition[] = [{ emit: 'event', level: 'error' }];
+  if (process.env.NODE_ENV === 'development') {
+    log.push({ emit: 'stdout', level: 'warn' }, { emit: 'stdout', level: 'error' });
+  }
+
+  const client = new PrismaClient({
     ...(datasourceUrl ? { datasourceUrl: datasourceUrl.toString() } : {}),
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  },
-);
+    log,
+  });
+  client.$on('error', (event) => {
+    if (!/timeout|timed out|connection|pool/i.test(event.message)) return;
+    console.warn('[PRISMA_CONNECTION_WARNING]', event.message);
+    Sentry.captureMessage('Transient Prisma connection or pool timeout', {
+      level: 'warning',
+      tags: { component: 'prisma', database: 'neon' },
+      extra: { target: event.target, message: event.message },
+    });
+  });
+  return client;
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+
+export function reportPrismaConnectivityIssue(error: unknown, operation?: string) {
+  if (!(error instanceof Error)) return;
+  const code = 'code' in error ? String((error as Error & { code?: unknown }).code ?? '') : '';
+  if (!['P1001', 'P1002', 'P1008', 'P1017', 'P2024', 'P2037'].includes(code)
+    && !/connection.*(timeout|timed out|closed|refused)|pool.*(timeout|exhausted)|timed out fetching a new connection/i.test(error.message)) return;
+
+  try {
+    Sentry.captureException(error, {
+      level: 'warning',
+      tags: { component: 'prisma', operation: operation ?? 'database-query', errorCode: code || 'CONNECTION_TIMEOUT' },
+    });
+  } catch {
+    console.warn('[PRISMA_CONNECTION_WARNING]', code || error.name);
+  }
+}
 
 globalForPrisma.prisma = prisma;

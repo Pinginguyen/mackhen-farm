@@ -8,6 +8,7 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
+import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 import type { Prisma } from '@prisma/client';
 import { allowedTransitions, orderStatuses } from '@/lib/order-workflow';
 
@@ -81,13 +82,13 @@ export async function GET(request: Request) {
     const orders = await prisma.order.findMany({
       where,
       include: {
-        items: { select: { productName: true, productId: true, variantLabel: true, quantity: true, price: true, product: { select: { slug: true } } } },
+        items: { select: { titleSnapshot: true, variantNameSnapshot: true, skuSnapshot: true, quantity: true, unitPrice: true, finalPrice: true, discountAllocated: true } },
         warrantyRequest: { select: { status: true } },
         returnRequests: { select: { status: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, subtotal: order.subtotal, shippingFee: order.shippingFee, discountAmount: order.discountAmount, affiliateCode: order.affiliateCode, note: order.note, trackingCode: order.trackingCode, carrier: order.carrier, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ ...item, sku: item.product.slug })) }));
+    const items = orders.map((order) => ({ id: order.id, orderCode: order.orderCode, customer: order.customerName, phone: order.phone, address: order.address, status: order.orderStatus, paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus, total: order.totalAmount, subtotal: order.subtotal, shippingFee: order.shippingFee, discountAmount: order.discountAmount, affiliateCode: order.affiliateCode, note: order.note, trackingCode: order.trackingCode, carrier: order.carrier, shippingStatus: order.shippingStatus, shippingLabelUrl: order.shippingLabelUrl, createdAt: order.createdAt, hasOpenCase: order.warrantyRequest?.status === 'OPEN' || order.returnRequests.some((request) => request.status === 'PENDING'), items: order.items.map((item) => ({ productName: item.titleSnapshot, variantLabel: item.variantNameSnapshot, quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice, discountAllocated: item.discountAllocated, sku: item.skuSnapshot ?? '' })) }));
     if (params.get('format') === 'csv') {
       const escape = (value: string | number) => {
         const text = String(value);
@@ -141,7 +142,7 @@ export async function PATCH(request: Request) {
       trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
-      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderStatus: true, paymentStatus: true, paymentMethod: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } } });
+      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderCode: true, orderStatus: true, paymentStatus: true, paymentMethod: true, totalAmount: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, affiliateCode: true, affiliateCommissionStatus: true, affiliateCommissionEligibleAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true } } } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const targetStatus = requestedStatus ?? currentOrder.orderStatus;
       const nextStatuses: readonly string[] = allowedTransitions[currentOrder.orderStatus];
@@ -176,6 +177,10 @@ export async function PATCH(request: Request) {
       }
       const wasDelivered = ['DELIVERED', 'COMPLETED'].includes(currentOrder.orderStatus);
       const isDelivered = targetStatus === 'DELIVERED' || targetStatus === 'COMPLETED';
+      const deliveryTimestamp = isDelivered ? currentOrder.deliveredAt ?? new Date() : null;
+      const affiliateCommissionEligibleAt = deliveryTimestamp
+        ? new Date(deliveryTimestamp.getTime() + 7 * 24 * 60 * 60 * 1000)
+        : null;
       const statusChanged = targetStatus !== currentOrder.orderStatus;
       const returningInventory = statusChanged && ['RETURNED', 'CANCELLED'].includes(targetStatus);
       const preserveCarrier = targetStatus === 'CANCELLED' && statusChanged;
@@ -191,19 +196,16 @@ export async function PATCH(request: Request) {
         });
         if (claimed.count !== 1) return null;
 
-        if (statusChanged && ['CONFIRMED', 'PAID', 'CANCELLED', 'RETURNED'].includes(targetStatus)) {
-          const movementType = targetStatus === 'CANCELLED' ? 'RELEASE' : targetStatus === 'RETURNED' ? 'RETURN' : 'RESERVATION';
+        if (statusChanged && ['CANCELLED', 'RETURNED'].includes(targetStatus)) {
+          const movementType = targetStatus === 'CANCELLED' ? 'RELEASE' : 'RETURN';
           for (const item of currentOrder.items) {
-            const productionLot = item.lotCode
-              ? await transaction.productionLot.findUnique({ where: { lotCode: item.lotCode }, select: { id: true } })
-              : null;
             await recordMovement(transaction, {
               orderId: currentOrder.id,
               productId: item.productId,
               variantId: item.productVariantId,
-              productionLotId: productionLot?.id,
+              lotId: item.lotId,
               type: movementType,
-              delta: movementType === 'RESERVATION' ? -item.quantity : item.quantity,
+              delta: item.quantity,
               idempotencyKey: orderMovementKey(item.id, movementType),
               reference: `${targetStatus} ${orderCode}`,
             });
@@ -214,7 +216,7 @@ export async function PATCH(request: Request) {
           for (const item of currentOrder.items) {
             await transaction.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
             if (item.productVariantId) await transaction.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
-            if (item.lotCode) await transaction.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+            if (item.lotId) await transaction.productionLot.updateMany({ where: { id: item.lotId }, data: { availableQty: { increment: item.quantity } } });
           }
         }
 
@@ -228,11 +230,23 @@ export async function PATCH(request: Request) {
             ...(manualPayment ? { note: [currentOrder.note?.trim(), `[Thanh toán thủ công bởi ${getRequestSession(request)?.email ?? 'unknown-admin'}]: ${paymentReason}`].filter(Boolean).join('\n') } : {}),
             carrier: preserveCarrier ? currentOrder.carrier : clearCarrier ? null : normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : statusChanged ? null : currentOrder.carrier,
             trackingCode: preserveCarrier ? currentOrder.trackingCode : clearCarrier ? null : trackingCode || (body.trackingCode !== undefined ? null : statusChanged ? null : currentOrder.trackingCode),
-            deliveredAt: isDelivered ? (wasDelivered ? currentOrder.deliveredAt ?? new Date() : new Date()) : null,
+            deliveredAt: isDelivered ? deliveryTimestamp : null,
+            ...(statusChanged && ['CANCELLED', 'RETURNED'].includes(targetStatus) && currentOrder.affiliateCode
+              ? { affiliateCommissionStatus: 'CANCELLED' as const }
+              : {}),
+            ...(isDelivered && currentOrder.affiliateCode && !['CANCELLED', 'PAID'].includes(currentOrder.affiliateCommissionStatus ?? '')
+              ? {
+                affiliateCommissionStatus: currentOrder.affiliateCommissionStatus ?? 'PENDING',
+                affiliateCommissionEligibleAt: currentOrder.affiliateCommissionEligibleAt ?? affiliateCommissionEligibleAt,
+              }
+              : {}),
           },
         });
       }));
       if (!order) return NextResponse.json({ error: { message: 'Xung đột trạng thái đơn hàng.' } }, { status: 409 });
+      if (currentOrder.paymentStatus !== 'PAID' && order.paymentStatus === 'PAID') {
+        await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: currentOrder.totalAmount, phone: order.phone, address: order.address });
+      }
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
         action: statusChanged ? targetStatus === 'CANCELLED' ? 'CANCEL_ORDER' : targetStatus === 'RETURNED' ? 'RETURN_ORDER' : 'UPDATE_ORDER_STATUS' : manualPayment ? 'MANUAL_CONFIRM_PAYMENT' : updatesRecipient ? 'UPDATE_ORDER_RECIPIENT' : 'UPDATE_ORDER',

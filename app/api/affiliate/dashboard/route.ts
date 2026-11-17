@@ -30,15 +30,17 @@ export async function GET(request: Request): Promise<NextResponse> {
           orderStatus: true,
           affiliateCommissionRate: true,
           affiliateCommissionPaidAt: true,
+          affiliateCommissionStatus: true,
           affiliatePayout: { select: { paymentReference: true } },
         },
       }),
     ]);
-    const completed = orders.filter((order) => order.paymentStatus === 'PAID' && order.orderStatus !== 'CANCELLED');
+    const completed = orders.filter((order) => order.paymentStatus === 'PAID' && !['CANCELLED', 'RETURNED'].includes(order.orderStatus));
     const commissionTotal = (order: (typeof orders)[number]) => commission(order.totalAmount, order.affiliateCommissionRate ?? affiliate.commissionRate);
     const totalRevenue = completed.reduce((sum, order) => sum + order.totalAmount, 0);
-    const commissionAccrued = completed.reduce((sum, order) => sum + commissionTotal(order), 0);
-    const commissionDue = completed.reduce((sum, order) => sum + (order.affiliateCommissionPaidAt ? 0 : commissionTotal(order)), 0);
+    const commissionAccrued = completed.reduce((sum, order) => sum + (order.affiliateCommissionStatus === 'CANCELLED' ? 0 : commissionTotal(order)), 0);
+    const commissionPending = completed.reduce((sum, order) => sum + (order.affiliateCommissionStatus === 'PENDING' ? commissionTotal(order) : 0), 0);
+    const commissionDue = completed.reduce((sum, order) => sum + (order.affiliateCommissionStatus === 'ELIGIBLE' && !order.affiliateCommissionPaidAt ? commissionTotal(order) : 0), 0);
 
     return NextResponse.json({
       affiliate: { name: affiliate.user.name, email: affiliate.user.email, affiliateCode: affiliate.affiliateCode, commissionRate: affiliate.commissionRate },
@@ -46,15 +48,17 @@ export async function GET(request: Request): Promise<NextResponse> {
       completedOrders: completed.length,
       totalRevenue,
       commissionAccrued,
+      commissionPending,
       commissionDue,
       orders: orders.map((order) => {
-        const isCompleted = order.paymentStatus === 'PAID' && order.orderStatus !== 'CANCELLED';
+        const isCompleted = order.paymentStatus === 'PAID' && !['CANCELLED', 'RETURNED'].includes(order.orderStatus);
+        const commissionCancelled = order.affiliateCommissionStatus === 'CANCELLED' || order.paymentStatus === 'REFUNDED' || ['CANCELLED', 'RETURNED'].includes(order.orderStatus);
         return {
           orderCode: order.orderCode,
           createdAt: order.createdAt,
           totalAmount: order.totalAmount,
-          commission: isCompleted ? commissionTotal(order) : 0,
-          commissionStatus: !isCompleted ? 'Chờ thanh toán đơn' : order.affiliateCommissionPaidAt ? 'Đã chi trả' : 'Chờ đối soát',
+          commission: isCompleted && order.affiliateCommissionStatus !== 'CANCELLED' ? commissionTotal(order) : 0,
+          commissionStatus: commissionCancelled ? 'Đã hủy do đổi trả' : !isCompleted ? 'Chờ thanh toán đơn' : order.affiliateCommissionPaidAt ? 'Đã chi trả' : order.affiliateCommissionStatus === 'ELIGIBLE' ? 'Đủ điều kiện đối soát' : 'Đang giữ 7 ngày',
           paymentReference: order.affiliatePayout?.paymentReference ?? null,
         };
       }),

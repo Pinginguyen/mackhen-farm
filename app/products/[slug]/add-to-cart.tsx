@@ -148,7 +148,6 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
       else {
         window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: result.cartCount } }));
         window.dispatchEvent(new Event('mackhen:cart-drawer-open'));
-        toast.success('🎉 Đã thêm sản phẩm vào giỏ hàng!', { duration: 2500 });
         setIsAdded(true);
         window.setTimeout(() => setIsAdded(false), 1500);
         if (origin) animateFlyToCart(image, origin);

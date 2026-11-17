@@ -36,8 +36,8 @@ describe('/api/admin/affiliates', () => {
     userFindUnique.mockReset().mockResolvedValue(null);
     userCreate.mockReset().mockResolvedValue({ id: 'user-1', name: 'Tu Trinh', email: 'tu@example.com' });
     orderFindMany.mockReset().mockResolvedValue([
-      { affiliateCode: 'KOC_TAYBAC', totalAmount: 1000, affiliateCommissionRate: 12, affiliateCommissionPaidAt: null },
-      { affiliateCode: 'KOC_TAYBAC', totalAmount: 2000, affiliateCommissionRate: 10, affiliateCommissionPaidAt: new Date() },
+      { affiliateCode: 'KOC_TAYBAC', totalAmount: 1000, affiliateCommissionRate: 12, affiliateCommissionPaidAt: null, affiliateCommissionStatus: 'ELIGIBLE' },
+      { affiliateCode: 'KOC_TAYBAC', totalAmount: 2000, affiliateCommissionRate: 10, affiliateCommissionPaidAt: new Date(), affiliateCommissionStatus: 'PAID' },
     ]);
     clickGroupBy.mockReset().mockResolvedValue([{ affiliateId: 'affiliate-1', _count: { _all: 9 } }]);
     requireAdmin.mockReset().mockResolvedValue(null);
@@ -51,7 +51,7 @@ describe('/api/admin/affiliates', () => {
     expect(response.status).toBe(200);
     expect(result.items[0]).toMatchObject({
       affiliateCode: 'KOC_TAYBAC', totalClicks: 9, completedOrders: 2, revenue: 3000,
-      commission: 320, commissionDue: 120, commissionDueOrders: 1,
+      commission: 320, commissionDue: 120, commissionDueOrders: 1, commissionPending: 0,
     });
   });
 

@@ -6,7 +6,8 @@ import { AlertTriangle, PauseCircle, Plus, RefreshCw } from 'lucide-react';
 
 type Lot = {
   id: string;
-  lotCode: string;
+  batchCode: string;
+  productVariantId: string | null;
   mfgDate: string;
   expDate: string;
   receivedQty: number;
@@ -16,13 +17,15 @@ type Lot = {
   receivingNote: string | null;
 };
 
-type InventoryItem = { id: string; name: string; stock: number; committed: number; available: number; status: string; active: boolean; productionLots: Lot[] };
+type InventoryVariant = { id: string; title: string; inventory: number; sku: string | null };
+type InventoryItem = { id: string; name: string; stock: number; committed: number; available: number; status: string; active: boolean; variants: InventoryVariant[]; productionLots: Lot[] };
 
 const statusLabels: Record<string, string> = { ACTIVE: 'Đang hoạt động', LOW_STOCK: 'Sắp hết', RECALLED: 'Đã tạm dừng', EXPIRED: 'Hết hạn' };
 
 export default function InventoryManager({ initialInventory }: { initialInventory: InventoryItem[] }) {
   const router = useRouter();
   const [productId, setProductId] = useState(initialInventory[0]?.id ?? '');
+  const [productVariantId, setProductVariantId] = useState(initialInventory[0]?.variants[0]?.id ?? '');
   const [lotCode, setLotCode] = useState('');
   const [mfgDate, setMfgDate] = useState('');
   const [expDate, setExpDate] = useState('');
@@ -33,6 +36,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [affectedCustomers, setAffectedCustomers] = useState<{ orderCode: string; customerName: string; phone: string }[]>([]);
+  const selectedProduct = initialInventory.find((item) => item.id === productId);
 
   async function createLot(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +48,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
       const response = await fetch('/api/admin/inventory', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'CREATE_LOT', productId, lotCode, mfgDate, expDate, receivedQty, testReportUrl, receivingNote }),
+        body: JSON.stringify({ action: 'CREATE_LOT', productId, productVariantId: productVariantId || null, batchCode: lotCode, mfgDate, expDate, receivedQty, testReportUrl, receivingNote }),
       });
       const result = await response.json() as { error?: { message?: string } };
       if (!response.ok) throw new Error(result.error?.message ?? 'Không thể tạo lô sản xuất.');
@@ -69,7 +73,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
       const response = await fetch('/api/admin/inventory', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'PAUSE_LOT', lotCode: code }),
+        body: JSON.stringify({ action: 'PAUSE_LOT', batchCode: code }),
       });
       const result = await response.json() as { error?: { message?: string }; affectedCustomers?: { orderCode: string; customerName: string; phone: string }[] };
       if (!response.ok) throw new Error(result.error?.message ?? 'Không thể tạm dừng lô.');
@@ -88,7 +92,8 @@ export default function InventoryManager({ initialInventory }: { initialInventor
       <section className="admin-panel" aria-labelledby="inventory-create-lot-title">
         <header><div><p className="eyebrow">Truy xuất nguồn gốc</p><h3 id="inventory-create-lot-title">Nhập lô sản xuất</h3></div><Plus size={18} aria-hidden="true" /></header>
         <form className="admin-lot-form" onSubmit={createLot}>
-          <label>Sản phẩm<select required value={productId} onChange={(event) => setProductId(event.target.value)}>{initialInventory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label>Sản phẩm<select required value={productId} onChange={(event) => { const nextProduct = initialInventory.find((item) => item.id === event.target.value); setProductId(event.target.value); setProductVariantId(nextProduct?.variants[0]?.id ?? ''); }}>{initialInventory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          {selectedProduct?.variants.length ? <label>Phân loại<select required value={productVariantId} onChange={(event) => setProductVariantId(event.target.value)}>{selectedProduct.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.title}{variant.sku ? ` · ${variant.sku}` : ''} · tồn {variant.inventory}</option>)}</select></label> : null}
           <label>Mã lô<input required value={lotCode} onChange={(event) => setLotCode(event.target.value)} placeholder="LOT-MKF-2026-001" maxLength={64} /></label>
           <label>Ngày sản xuất<input required type="date" value={mfgDate} onChange={(event) => setMfgDate(event.target.value)} /></label>
           <label>Hạn sử dụng<input required type="date" value={expDate} onChange={(event) => setExpDate(event.target.value)} /></label>
@@ -117,9 +122,9 @@ export default function InventoryManager({ initialInventory }: { initialInventor
             <td><strong className={item.available < 0 ? 'inventory-critical' : item.available < 20 ? 'inventory-atp-warning' : ''}>{item.available}</strong>{item.available < 20 && <span className={item.available < 0 ? 'inventory-critical' : 'inventory-atp-warning'}><AlertTriangle size={13} /> {item.available < 0 ? 'Vượt tồn' : 'Cần tái đặt hàng'}</span>}</td>
             <td>{item.active ? 'Đang bán' : 'Đã ẩn'}</td>
             <td><div className="admin-lot-list">{item.productionLots.length ? item.productionLots.map((lot) => <div className="admin-lot-row" key={lot.id}>
-              <span><strong>{lot.lotCode}</strong><small>{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
+              <span><strong>{lot.batchCode}</strong><small>{lot.productVariantId ? `${item.variants.find((variant) => variant.id === lot.productVariantId)?.title ?? 'Variant'} · ` : ''}{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
               <span className={`admin-lot-status ${lot.status.toLowerCase()}`}>{statusLabels[lot.status] ?? lot.status}</span>
-              {lot.status !== 'RECALLED' && lot.status !== 'EXPIRED' && <button type="button" className="admin-lot-pause" disabled={busy} onClick={() => void pauseLot(lot.lotCode)} title="Tạm dừng lô và ẩn sản phẩm"><PauseCircle size={15} /> Tạm dừng lô</button>}
+              {lot.status !== 'RECALLED' && lot.status !== 'EXPIRED' && <button type="button" className="admin-lot-pause" disabled={busy} onClick={() => void pauseLot(lot.batchCode)} title="Tạm dừng lô và ẩn sản phẩm"><PauseCircle size={15} /> Tạm dừng lô</button>}
             </div>) : <span>Chưa khai báo lô</span>}</div></td>
           </tr>)}
           {!initialInventory.length && <tr><td colSpan={6}>Chưa có dữ liệu tồn kho.</td></tr>}</tbody>

@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
+import { notifyCustomerCase } from '@/lib/services/telegram-notifier';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
           ...(numericCode !== null && Number.isSafeInteger(numericCode) ? [{ numericCode }] : []),
         ],
       },
-      select: { id: true, phone: true },
+      select: { id: true, orderCode: true, phone: true },
     });
     if (!order || normalizePhone(order.phone) !== customerPhone) {
       return NextResponse.json({ error: 'Không tìm thấy đơn hàng phù hợp.' }, { status: 404 });
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
     const item = await prisma.returnRequest.create({
       data: { orderId: order.id, customerPhone, issueType, description, imageUrl, refundBankName, refundAccountNumber, refundAccountHolder },
     });
+    await notifyCustomerCase({ kind: 'Đổi trả', orderCode: order.orderCode, phone: customerPhone, description: `${issueType}: ${description}` });
     return NextResponse.json({ item }, { status: 201 });
   }, 'Return request creation failed');
 }
@@ -324,7 +326,7 @@ export async function PATCH(request: Request) {
           });
           await transaction.order.update({
             where: { id: current.orderId },
-            data: { paymentStatus: 'REFUNDED', refundAmount: order.totalAmount, refundedAt: order.refundedAt ?? new Date() },
+            data: { paymentStatus: 'REFUNDED', refundAmount: order.totalAmount, refundedAt: order.refundedAt ?? new Date(), affiliateCommissionStatus: 'CANCELLED' },
           });
           return updatedReturn;
         })
@@ -338,6 +340,12 @@ export async function PATCH(request: Request) {
         },
           include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
       });
+    if (['REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REFUNDED', 'COMPLETED'].includes(status)) {
+      await prisma.order.updateMany({
+        where: { id: current.orderId, affiliateCommissionStatus: { in: ['PENDING', 'ELIGIBLE'] } },
+        data: { affiliateCommissionStatus: 'CANCELLED' },
+      });
+    }
     const issuedVoucher = getIssuedVoucher(Reflect.get(item, 'issuedVoucher'));
     if (refundCompleted) revalidateTag('admin-dashboard');
     await writeAuditLog(request, {

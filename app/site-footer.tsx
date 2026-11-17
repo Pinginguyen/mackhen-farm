@@ -7,7 +7,7 @@ import { translateContent } from '@/lib/translations';
 import SoundEffect from '@/components/common/SoundEffect';
 import type { PublicSystemSettings } from '@/lib/system-settings';
 
-export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { settings: PublicSystemSettings; footerLogoUrl: string; bctBadgeUrl: string }) {
+export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { settings: Partial<PublicSystemSettings>; footerLogoUrl: string; bctBadgeUrl: string }) {
   const pathname = usePathname();
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
@@ -16,9 +16,10 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
   const representativeName = settings.representativeName || 'Trần Trung Châu';
   const address = settings.address || 'Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La';
   const hotline = settings.contactHotline || settings.hotline || '0762.793.244';
-  const zalo = /^https?:\/\//i.test(settings.contactZalo)
-    ? settings.contactZalo
-    : `https://zalo.me/${settings.contactZalo.replace(/\D/g, '')}`;
+  const contactZalo = settings.contactZalo ?? '';
+  const zalo = /^https?:\/\//i.test(contactZalo)
+    ? contactZalo
+    : `https://zalo.me/${contactZalo.replace(/\D/g, '')}`;
   const email = settings.email || 'contact@mackhenfarm.vn';
 
   if (pathname?.startsWith('/admin')) return null;
@@ -33,7 +34,7 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
         <section className="site-footer-column">
           <h2>{text('LIÊN HỆ TRỰC TIẾP')}</h2>
           <p>{text('Nhóm 3')} <span>{text('(Sáng lập & Điều hành dự án)')}</span></p>
-          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={zalo} target="_blank" rel="noopener noreferrer">{settings.contactZalo || hotline} {text('(Bấm chat Zalo)')}</a></p>
+          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={zalo} target="_blank" rel="noopener noreferrer">{contactZalo || hotline} {text('(Bấm chat Zalo)')}</a></p>
           <p>Email: <a href={`mailto:${email}`}>{email}</a></p>
           <p>{text('Địa chỉ điều hành: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.')}</p>
           <p>{text('Hỗ trợ kỹ thuật & đổi trả: 8:00 - 22:00 hàng ngày.')}</p>

@@ -13,9 +13,9 @@ export async function GET(request: Request) {
 
   return withDatabase(async () => {
     const lot = await prisma.productionLot.findUnique({
-      where: { lotCode },
+      where: { batchCode: lotCode },
       select: {
-        lotCode: true,
+        batchCode: true,
         mfgDate: true,
         expDate: true,
         receivedQty: true,
@@ -27,6 +27,6 @@ export async function GET(request: Request) {
       },
     });
     if (!lot) return NextResponse.json({ error: { message: 'Không tìm thấy thông tin cho mã lô này.' } }, { status: 404 });
-    return NextResponse.json({ lot }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+    return NextResponse.json({ lot: { ...lot, lotCode: lot.batchCode } }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   }, 'Public lot traceability lookup failed.');
 }

@@ -17,13 +17,13 @@ export async function GET(request: Request) {
           { customer: { is: { email: session.email } } },
         ],
       },
-      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { productName: true, quantity: true, price: true, product: { select: { slug: true } } } } },
+      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { titleSnapshot: true, skuSnapshot: true, quantity: true, unitPrice: true, finalPrice: true, product: { select: { slug: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
     return NextResponse.json({ items: orders.map((order) => ({
       ...order,
-      items: order.items.map(({ product, ...item }) => ({ ...item, productSlug: product.slug })),
+      items: order.items.map((item) => ({ productName: item.titleSnapshot, productSlug: item.product.slug, skuSnapshot: item.skuSnapshot, quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice })),
     })) });
   } catch (error) {
     console.error('Account orders lookup failed:', error);

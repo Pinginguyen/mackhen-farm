@@ -48,7 +48,13 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
   const [query, setQuery] = useState(initialQuery);
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
-  useEffect(() => setQuery(initialQuery), [initialQuery]);
+  useEffect(() => {
+    setQuery(initialQuery);
+    if (showFilters && !initialQuery) {
+      const searchQuery = new URLSearchParams(window.location.search).get('search');
+      if (searchQuery) setQuery(searchQuery);
+    }
+  }, [initialQuery, showFilters]);
   const plantProducts = products.filter((product) => product.category !== 'Gia vị Tây Bắc');
   const spiceProducts = products.filter((product) => product.category === 'Gia vị Tây Bắc');
   const categoryProducts = filter === 'PLANT' ? plantProducts : filter === 'SPICE' ? spiceProducts : products;

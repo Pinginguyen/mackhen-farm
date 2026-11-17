@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, cartItemDeleteMany, productionLotFindFirst, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
-    orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(),
+    orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), orderUpdate: vi.fn(), orderItemCreateMany: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(), productionLotFindMany: vi.fn(),
     userUpdate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
     movementCreateMany: vi.fn(), movementFindUnique: vi.fn(),
@@ -17,8 +17,9 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
     productVariant: { updateMany: mocks.productVariantUpdateMany },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
     user: { update: mocks.userUpdate },
-    order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate },
-    productionLot: { findFirst: mocks.productionLotFindFirst, updateMany: mocks.productionLotUpdateMany },
+    order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate, update: mocks.orderUpdate },
+    orderItem: { createMany: mocks.orderItemCreateMany },
+    productionLot: { findFirst: mocks.productionLotFindFirst, findMany: mocks.productionLotFindMany, updateMany: mocks.productionLotUpdateMany },
     inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
@@ -28,6 +29,7 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
+vi.mock('@/lib/system-settings', () => ({ getSystemSettings: async () => ({ freeShippingThreshold: 500000 }) }));
 
 import { SESSION_COOKIE, createSessionToken } from '@/lib/auth';
 import { POST } from './route';
@@ -54,6 +56,7 @@ describe('POST /api/orders checkout', () => {
     orderCount.mockReset().mockResolvedValue(0);
     orderFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindFirst.mockReset().mockResolvedValue(null);
+    productionLotFindMany.mockReset().mockResolvedValue([{ id: 'lot-default', batchCode: 'LOT-MKF-2026-001', availableQty: 100, expDate: new Date('2027-01-01T00:00:00.000Z') }]);
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
     compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
@@ -66,7 +69,9 @@ describe('POST /api/orders checkout', () => {
     affiliateFindUnique.mockReset().mockResolvedValue(null);
     userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
     orderFindMany.mockReset().mockResolvedValue([]);
-    orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000, items: [{ id: 'order-item-1', productId: 'spice-1', productVariantId: null, quantity: 1, lotCode: null }] });
+    orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
+    orderUpdate.mockReset().mockResolvedValue({ id: 'order-1' });
+    orderItemCreateMany.mockReset().mockResolvedValue({ count: 1 });
     movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
     movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
     cartItemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
@@ -123,9 +128,10 @@ describe('POST /api/orders checkout', () => {
       data: expect.objectContaining({ customerName: 'Buyer', phone: '0762793244', address: 'Lai Chau', subtotal: 169000, shippingFee: 35000, grossAmount: 169000, netAmount: 204000, affiliateCode: 'KOC_TAYBAC', affiliateCommissionRate: 12 }),
     }));
     expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ orderId: 'order-1', productId: 'spice-1', type: 'RESERVATION', delta: -1, idempotencyKey: 'order-item:order-item-1:RESERVATION' })],
+      data: [expect.objectContaining({ orderId: 'order-1', productId: 'spice-1', lotId: 'lot-default', type: 'ALLOCATION', delta: -1, idempotencyKey: 'allocation:order-1:cart-item-1:lot-default' })],
       skipDuplicates: true,
     }));
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ orderId: 'order-1', lotId: 'lot-default', lotCode: 'LOT-MKF-2026-001', quantity: 1 })] });
   });
 
   it('rejects malformed affiliate codes before creating an order', async () => {
@@ -174,6 +180,26 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(201);
     expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ voucherCode: 'BANMOI', discountAmount: 25000, totalAmount: 179000 }) }));
     expect(voucherUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'voucher-ban-moi', isActive: true }), data: { usedCount: { increment: 1 } } }));
+  });
+
+  it('rolls back checkout when the voucher usage-limit compare-and-swap loses a race', async () => {
+    voucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-limited', code: 'LIMITED', discountType: 'FIXED', value: 10000,
+      maxDiscount: null, minSpend: 0, expiresAt: null, isActive: true, usageLimit: 1,
+      freeShipping: false, firstOrderOnly: false,
+    });
+    voucherUpdateMany.mockResolvedValueOnce({ count: 0 });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'LIMITED' }),
+    }));
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.message).toContain('vừa được sử dụng hết');
+    expect(voucherFindUnique).toHaveBeenCalledWith(expect.objectContaining({ select: expect.not.objectContaining({ usedCount: true }) }));
+    expect(voucherUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ usedCount: { lt: 1 } }) }));
+    expect(orderCreate).not.toHaveBeenCalled();
   });
 
   it('deactivates a voucher immediately after its final allowed use', async () => {
@@ -295,9 +321,8 @@ describe('POST /api/orders checkout', () => {
     }));
 
     expect(response.status).toBe(201);
-    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ subtotal: 300000, shippingFee: 0, discountAmount: 0, totalAmount: 300000 }),
-    }));
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ subtotal: 300000, shippingFee: 35000, discountAmount: 35000, totalAmount: 300000 }) }));
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ unitPrice: 300000, discountAllocated: 0, finalPrice: 300000 })] });
   });
 
   it('attaches the authenticated account id to the created order', async () => {
@@ -334,7 +359,7 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('reserves an active production lot and records its code on the order line', async () => {
-    productionLotFindFirst.mockResolvedValueOnce({ id: 'lot-1', lotCode: 'LOT-MKF-2026-001' });
+    productionLotFindMany.mockResolvedValueOnce([{ id: 'lot-1', batchCode: 'LOT-MKF-2026-001', availableQty: 4, expDate: new Date('2027-01-01T00:00:00.000Z') }]);
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
@@ -343,12 +368,34 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(productionLotUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'lot-1', availableQty: { gte: 1 } },
+      where: { id: 'lot-1', status: 'ACTIVE', expDate: { gt: expect.any(Date) }, availableQty: { gte: 1 } },
       data: { availableQty: { decrement: 1 } },
     });
-    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ lotCode: 'LOT-MKF-2026-001', items: { create: [expect.objectContaining({ lotCode: 'LOT-MKF-2026-001' })] } }),
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ lotId: 'lot-1', lotCode: 'LOT-MKF-2026-001' })] });
+    expect(orderUpdate).toHaveBeenCalledWith({ where: { id: 'order-1' }, data: { lotCode: 'LOT-MKF-2026-001' } });
+  });
+
+  it('splits a cart line across FEFO lots and persists each allocation on its order item', async () => {
+    cartFindUnique.mockResolvedValueOnce({ items: [{
+      id: 'cart-item-split', productId: 'spice-1', productVariantId: null, quantity: 3, unitPrice: 169000,
+      product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 5 }, variant: null,
+    }] });
+    productionLotFindMany.mockResolvedValueOnce([
+      { id: 'lot-soon', batchCode: 'LOT-SOON', availableQty: 1, expDate: new Date('2027-01-01T00:00:00.000Z') },
+      { id: 'lot-later', batchCode: 'LOT-LATER', availableQty: 2, expDate: new Date('2027-02-01T00:00:00.000Z') },
+    ]);
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
     }));
+
+    expect(response.status).toBe(201);
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [
+      expect.objectContaining({ lotId: 'lot-soon', lotCode: 'LOT-SOON', quantity: 1, finalPrice: 169000 }),
+      expect.objectContaining({ lotId: 'lot-later', lotCode: 'LOT-LATER', quantity: 2, finalPrice: 338000 }),
+    ] });
+    expect(movementCreateMany).toHaveBeenCalledTimes(2);
   });
 
   it('atomically rejects a variant checkout when conditional inventory decrement fails', async () => {
@@ -375,16 +422,16 @@ describe('POST /api/orders checkout', () => {
   });
 
   it('does not sell untraceably when active lots cannot cover the requested quantity', async () => {
-    productionLotFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'lot-1' });
+    productionLotFindMany.mockResolvedValueOnce([]);
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
       body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect((await response.json()).error.code).toBe('INSUFFICIENT_STOCK');
-    expect(orderCreate).not.toHaveBeenCalled();
+    expect(orderItemCreateMany).not.toHaveBeenCalled();
   });
 
   it('returns the cached order for a repeated idempotency key without reserving stock again', async () => {
@@ -543,9 +590,47 @@ describe('POST /api/orders checkout', () => {
     }));
 
     expect(response.status).toBe(201);
-    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ subtotal: 169000, shippingFee: 35000, totalAmount: 204000, items: { create: [expect.objectContaining({ price: 169000, lineTotal: 169000, productName: 'Hạt Dổi' })] } }),
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ subtotal: 169000, shippingFee: 35000, totalAmount: 204000 }) }));
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ unitPrice: 169000, discountAllocated: 0, finalPrice: 169000, titleSnapshot: 'Hạt Dổi', variantNameSnapshot: '', skuSnapshot: 'hat-doi-rung-nep-thuong-hang', lineTotal: 169000 })] });
+  });
+
+  it('allocates voucher cents exactly across immutable item snapshots', async () => {
+    voucherFindUnique.mockResolvedValueOnce({
+      id: 'voucher-one-cent', code: 'ONECENT', discountType: 'FIXED', value: 1,
+      maxDiscount: null, minSpend: 0, expiresAt: null, isActive: true,
+      freeShipping: false, firstOrderOnly: false,
+    });
+    cartFindUnique.mockResolvedValueOnce({ items: ['a', 'b', 'c'].map((suffix) => ({
+      id: `cart-${suffix}`, productId: `product-${suffix}`, productVariantId: null, quantity: 1, unitPrice: 1,
+      product: { id: `product-${suffix}`, name: `Product ${suffix}`, slug: `product-${suffix}`, price: 1, stock: 5 }, variant: null,
+    })) });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', voucherCode: 'ONECENT' }),
     }));
+
+    expect(response.status).toBe(201);
+    const createdItems = orderItemCreateMany.mock.calls.flatMap((call) => call[0].data);
+    expect(createdItems.map((item: { discountAllocated: number; finalPrice: number }) => item.discountAllocated)).toEqual([1, 0, 0]);
+    expect(createdItems.map((item: { finalPrice: number }) => item.finalPrice)).toEqual([0, 1, 1]);
+  });
+
+  it('records an order but suppresses commission attribution for the affiliate owner', async () => {
+    vi.stubEnv('AUTH_SECRET', 'test-secret-with-at-least-32-characters');
+    const ownerToken = createSessionToken({ userId: 'affiliate-owner', name: 'KOC', email: 'koc@example.com', role: 'AFFILIATE' });
+    affiliateFindUnique.mockResolvedValueOnce({
+      userId: 'affiliate-owner', affiliateCode: 'KOC_TAYBAC', commissionRate: 12, active: true,
+      user: { phone: '0762793244', signupIpHash: null },
+    });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `bohoch_cart=cart-1; ${SESSION_COOKIE}=${ownerToken}` },
+      body: JSON.stringify({ customer: { name: 'KOC', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD', affiliateCode: 'KOC_TAYBAC' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ affiliateCode: null, affiliateCommissionRate: null, affiliateCommissionStatus: null }) }));
   });
 
   it('rejects malformed phone values before opening a transaction', async () => {
@@ -563,7 +648,7 @@ describe('POST /api/orders checkout', () => {
     orderFindMany.mockResolvedValueOnce([{
       id: 'order-previous', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000,
       customerName: 'A', address: 'Lai Chau', paymentMethod: 'COD', discountAmount: 0,
-      items: [{ productId: 'spice-1', productVariantId: null, quantity: 1, price: 169000 }],
+      items: [{ productId: 'spice-1', productVariantId: null, quantity: 1, unitPrice: 169000 }],
     }]);
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',

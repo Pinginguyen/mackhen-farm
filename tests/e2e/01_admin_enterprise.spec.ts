@@ -50,7 +50,7 @@ async function createOrderFixture(overrides: { paymentMethod?: 'COD' | 'VIETQR';
       subtotal: overrides.totalAmount ?? product!.price,
       shippingFee: 0,
       totalAmount: overrides.totalAmount ?? product!.price,
-      items: { create: [{ productId: product!.id, productName: product!.name, quantity: 1, price: product!.price, lineTotal: product!.price }] },
+      items: { create: [{ productId: product!.id, productName: product!.name, titleSnapshot: product!.name, variantNameSnapshot: '', skuSnapshot: product!.id, quantity: 1, unitPrice: product!.price, discountAllocated: 0, finalPrice: product!.price, lineTotal: product!.price }] },
     },
     select: { id: true, orderCode: true, numericCode: true },
   });

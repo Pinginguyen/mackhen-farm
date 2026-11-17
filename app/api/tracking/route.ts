@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     return withDatabase(async () => {
       const order = await prisma.order.findUnique({
         where: { orderCode },
-        include: { items: { select: { productId: true, productName: true, quantity: true, price: true, product: { select: { slug: true, weight: true } }, variant: { select: { weight: true } } } }, warrantyRequest: { select: { reason: true, status: true, createdAt: true } } },
+        include: { items: { select: { productId: true, titleSnapshot: true, skuSnapshot: true, quantity: true, unitPrice: true, finalPrice: true, discountAllocated: true, product: { select: { slug: true, weight: true } }, variant: { select: { weight: true } } } }, warrantyRequest: { select: { reason: true, status: true, createdAt: true } } },
       });
       const items = order && normalizeVietnamesePhone(order.phone) === phone ? [{
         orderCode: order.orderCode,
@@ -58,10 +58,13 @@ export async function POST(request: Request) {
         warrantyRequest: order.warrantyRequest,
         items: order.items.map((item) => ({
           productId: item.productId,
-          productName: item.productName,
+          productName: item.titleSnapshot,
           productSlug: item.product.slug,
+          skuSnapshot: item.skuSnapshot,
           quantity: item.quantity,
-          price: item.price,
+          price: item.unitPrice,
+          finalPrice: item.finalPrice,
+          discountAllocated: item.discountAllocated,
           weightGrams: parsePackageWeightGrams(item.variant?.weight) ?? parsePackageWeightGrams(item.product.weight),
         })),
         maskedPhone: maskPhone(order.phone),

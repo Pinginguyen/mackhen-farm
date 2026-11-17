@@ -23,6 +23,7 @@ enum OrderStatus {
 
 enum InventoryMovementType {
   RECEIPT
+  ALLOCATION
   RESERVATION
   RELEASE
   SHIPMENT
@@ -35,6 +36,13 @@ enum PaymentStatus {
   PAID
   REFUNDED
   FAILED
+  CANCELLED
+}
+
+enum AffiliateCommissionStatus {
+  PENDING
+  ELIGIBLE
+  PAID
   CANCELLED
 }
 
@@ -68,6 +76,7 @@ model User {
   password  String
   phone     String?
   address   String?
+  signupIpHash String?
   role      UserRole @default(CUSTOMER)
   orders    Order[]
   affiliate Affiliate?
@@ -176,6 +185,7 @@ model ProductVariant {
   product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems     CartItem[]
   orderItems    OrderItem[]
+  productionLots ProductionLot[]
   inventoryMovements InventoryMovement[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -185,22 +195,26 @@ model ProductVariant {
 }
 
 model ProductionLot {
-  id            String   @id @default(cuid())
-  lotCode       String   @unique
-  productId     String
-  mfgDate       DateTime
-  expDate       DateTime
-  receivedQty   Int
-  availableQty  Int
-  status        String   @default("ACTIVE")
-  testReportUrl String?
-  receivingNote String?
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  id              String           @id @default(cuid())
+  batchCode       String           @unique @map("lotCode")
+  productId       String
+  productVariantId String?
+  mfgDate         DateTime
+  expDate         DateTime
+  receivedQty     Int
+  availableQty    Int
+  status          String           @default("ACTIVE")
+  testReportUrl   String?
+  receivingNote   String?
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant         ProductVariant?  @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  orderItems      OrderItem[]
   inventoryMovements InventoryMovement[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@index([productId, status, expDate])
+  @@index([productVariantId, status, expDate])
 }
 model Cart {
   id        String     @id
@@ -322,6 +336,8 @@ model Order {
   affiliateCommissionRate Int?
   affiliateCommissionPaidAt DateTime?
   affiliatePayoutId String?
+  affiliateCommissionStatus AffiliateCommissionStatus?
+  affiliateCommissionEligibleAt DateTime?
   totalAmount   Int                  @map("total")
   idempotencyKey String?              @unique
   checkoutFingerprint String?
@@ -332,6 +348,8 @@ model Order {
   holdExpiresAt DateTime?
   note          String?
   trackingCode  String?
+  shippingStatus String?
+  shippingLabelUrl String?
   deliveredAt   DateTime?
   carrier       ShippingCarrier?
   customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -363,13 +381,20 @@ model OrderItem {
   productVariantId String?
   productName      String
   variantLabel     String?
+  titleSnapshot       String  @default("")
+  variantNameSnapshot String  @default("")
+  skuSnapshot      String?
   quantity         Int
-  price            Int             @map("unitPrice")
+  unitPrice        Int
+  discountAllocated Int            @default(0)
+  finalPrice            Int      @default(0)
   lineTotal        Int
   lotCode          String?
+  lotId            String?
   order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant          ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  lot              ProductionLot?  @relation(fields: [lotId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
 }
@@ -379,7 +404,7 @@ model InventoryMovement {
   idempotencyKey   String?               @unique
   productId        String
   productVariantId String?
-  productionLotId  String?
+  lotId            String?               @map("productionLotId")
   orderId          String?
   type             InventoryMovementType
   delta            Int
@@ -387,12 +412,12 @@ model InventoryMovement {
   createdAt        DateTime              @default(now())
   product          Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
   productVariant   ProductVariant?       @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
-  productionLot    ProductionLot?        @relation(fields: [productionLotId], references: [id], onDelete: SetNull)
+  productionLot    ProductionLot?        @relation(fields: [lotId], references: [id], onDelete: SetNull)
   order            Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([productId, createdAt])
   @@index([productVariantId, createdAt])
-  @@index([productionLotId, createdAt])
+  @@index([lotId, createdAt], map: "InventoryMovement_productionLotId_createdAt_idx")
   @@index([orderId, createdAt])
 }
 

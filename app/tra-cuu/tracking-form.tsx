@@ -10,7 +10,7 @@ import { translateContent, translateProductName } from '@/lib/translations';
 import { calculateEsgImpact } from '@/lib/esg-impact';
 import WarrantyRequest from './warranty-request';
 
-type TrackedItem = { productId: string; productName: string; productSlug?: string; quantity: number; price: number; weightGrams?: number | null };
+type TrackedItem = { productId: string; productName: string; productSlug?: string; skuSnapshot?: string | null; quantity: number; price: number; finalPrice?: number; discountAllocated?: number; weightGrams?: number | null };
 type TrackingTimelineItem = { label: string };
 
 type TrackedOrder = {
@@ -339,8 +339,8 @@ export default function TrackingForm() {
             <div className="tracking-items">
               {orderItems.map((item) => (
                 <div key={`${order.orderCode}-${item.productId}`}>
-                  <span>{translateProductName(item.productName, isEN ? 'en' : 'vi')} × {item.quantity} · {text('Đơn giá')} {formatCurrency(item.price)}</span>
-                  <strong>{formatCurrency(item.price * item.quantity)}</strong>
+                  <span>{translateProductName(item.productName, isEN ? 'en' : 'vi')} × {item.quantity} · {text('Đơn giá')} {formatCurrency(item.price)}{item.skuSnapshot ? ` · ${item.skuSnapshot}` : ''}{Boolean(item.discountAllocated) && <small> · {text('Giảm')} {formatCurrency(item.discountAllocated!)}</small>}</span>
+                  <strong>{formatCurrency(item.finalPrice ?? item.price * item.quantity)}</strong>
                   {delivered && item.productSlug && order.phone && <Link
                     className="tracking-review-action"
                     href={`/products/${encodeURIComponent(item.productSlug)}?${new URLSearchParams({ review: '1', orderCode: order.orderCode, phone: order.phone }).toString()}#product-reviews-title`}

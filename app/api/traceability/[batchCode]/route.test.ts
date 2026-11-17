@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { lotFindUnique } = vi.hoisted(() => ({ lotFindUnique: vi.fn() }));
+
+vi.mock('@/lib/prisma', () => ({ prisma: { productionLot: { findUnique: lotFindUnique } } }));
 
 vi.mock('@/lib/system-settings', () => ({
   getSystemSettings: vi.fn().mockResolvedValue({
@@ -10,45 +14,53 @@ vi.mock('@/lib/system-settings', () => ({
 import { GET } from './route';
 
 describe('GET /api/traceability/[batchCode]', () => {
-  it('normalizes the batch code and returns traceability details', async () => {
+  beforeEach(() => {
+    lotFindUnique.mockReset().mockResolvedValue({
+      batchCode: 'LOT-MKF-2026-001',
+      mfgDate: new Date('2026-10-10T00:00:00.000Z'),
+      expDate: new Date('2027-10-10T00:00:00.000Z'),
+      receivedQty: 40,
+      availableQty: 21,
+      status: 'ACTIVE',
+      testReportUrl: 'https://example.test/coa.pdf',
+      receivingNote: 'Lô sản xuất tháng 10',
+      product: { name: 'Khô thực vật', slug: 'kho-thuc-vat', unit: '150g', ingredients: 'Đậu nành' },
+      variant: { title: 'Túi 150g', weight: '150g' },
+    });
+  });
+
+  it('normalizes the batch code and returns persisted traceability details', async () => {
     const response = await GET(new Request('https://mackhen.example/api/traceability/batch-kb-2026-01'), {
-      params: { batchCode: 'batch-kb-2026-01' },
+      params: { batchCode: 'lot-mkf-2026-001' },
     });
     const result = await response.json();
 
     expect(response.status).toBe(200);
     expect(result.success).toBe(true);
-    expect(result.data.batchCode).toBe('BATCH-KB-2026-01');
-    expect(result.data.steps).toHaveLength(4);
+    expect(result.data.batchCode).toBe('LOT-MKF-2026-001');
+    expect(result.data.productName).toBe('Khô thực vật');
+    expect(result.data.receivedQty).toBe(40);
+    expect(result.data.testReportUrl).toBe('https://example.test/coa.pdf');
     expect(result.data.dppSupplyGPS).toBe('20.738°N, 104.912°E (Sơn La)');
     expect(result.data.dppLabResult).toContain('Salmonella: Âm tính');
+    expect(lotFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { batchCode: 'LOT-MKF-2026-001' } }));
   });
 
-  it('returns all four published cham cheo production steps', async () => {
-    const response = await GET(new Request('https://mackhen.example/api/traceability/BATCH-CC-2026-02'), {
-      params: { batchCode: 'BATCH-CC-2026-02' },
-    });
-    const result = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(result.data.steps).toHaveLength(4);
-    expect(result.data.steps.map((step: { detail: string }) => step.detail)).toEqual([
-      'Ớt thóc tươi, tỏi nếp Điện Biên thu mua từ nông hộ Mường Phăng; Hạt mắc khén & hạt dổi rừng rang thơm từ HTX Bản Lướt, Sơn La; Muối hầm sạch.',
-      'Nướng thơm tỏi ớt trên than củi, giã nhuyễn thủ công cùng hạt mắc khén và rau mùi tàu theo công thức truyền thống dân tộc Thái.',
-      'Ủ cân bằng vị cay nồng tê nhẹ trong 24 giờ, chiết rót tự động vào hũ nắp nhôm 250g, dán màng seal nhiệt ngăn oxy hóa.',
-      'Đạt chuẩn an toàn sinh học QCVN 8-2:2011/BYT. Không phẩm màu, không chất bảo quản nhân tạo. Phiếu kiểm nghiệm vi sinh số 28/ATTP-MKF.',
-    ]);
-  });
-
-  it('returns the requested not-found response for an unknown batch', async () => {
-    const response = await GET(new Request('https://mackhen.example/api/traceability/unknown'), {
-      params: { batchCode: 'unknown' },
+  it('returns a not-found response for an unknown batch', async () => {
+    lotFindUnique.mockResolvedValueOnce(null);
+    const response = await GET(new Request('https://mackhen.example/api/traceability/LOT-MKF-2026-404'), {
+      params: { batchCode: 'LOT-MKF-2026-404' },
     });
 
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({
-      success: false,
-      error: 'Mã lô không tồn tại hoặc chưa được phát hành trên hệ thống.',
+  });
+
+  it('rejects malformed batch codes without querying the database', async () => {
+    const response = await GET(new Request('https://mackhen.example/api/traceability/bad'), {
+      params: { batchCode: 'bad' },
     });
+
+    expect(response.status).toBe(400);
+    expect(lotFindUnique).not.toHaveBeenCalled();
   });
 });

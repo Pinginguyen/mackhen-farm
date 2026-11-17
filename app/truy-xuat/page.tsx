@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Cog, Flame, FlaskConical, Leaf, LoaderCircle, MapPin, Search, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, FlaskConical, Leaf, LoaderCircle, MapPin, Search } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
 import { fetchPublicSiteAsset } from '@/lib/site-asset-client';
@@ -13,22 +13,15 @@ type TraceabilityData = {
   expiryDate: string;
   packaging?: string;
   ingredients?: string;
+  status: string;
+  receivedQty: number;
+  testReportUrl: string | null;
+  receivingNote: string | null;
   dppSupplyGPS?: string;
   dppLabResult?: string;
-  steps: { label: string; detail: string }[];
 };
 
 type TraceabilityResponse = { success: boolean; data?: TraceabilityData; error?: string };
-
-const quickSearches = ['BATCH-KB-2026-01', 'BATCH-CC-2026-02'];
-const stepIcons = [Leaf, Cog, Flame, ShieldCheck];
-const englishStepLabels = ['Raw Materials', 'Processing', 'Dehydration & Packaging', 'Quality Inspection'];
-const timelineStepAnimations = [
-  'animate-in fade-in slide-in-from-bottom-6 duration-500 fill-mode-both',
-  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-150 fill-mode-both',
-  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-300 fill-mode-both',
-  'animate-in fade-in slide-in-from-bottom-6 duration-500 delay-500 fill-mode-both',
-];
 
 export default function TraceabilityPage() {
   const { locale, currency } = useLocaleCurrency();
@@ -104,10 +97,6 @@ export default function TraceabilityPage() {
           <label className="traceability-search-box" htmlFor="batch-code"><Search size={19} aria-hidden="true" /><input id="batch-code" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('Nhập mã lô in trên bao bì (ví dụ: BATCH-KB-2026-01)...')} /></label>
           <button className="micro-tactile" type="submit" disabled={loading}>{loading ? <><LoaderCircle size={16} className="traceability-spinner" aria-hidden="true" /> {text('Đang tra cứu...')}</> : text('Tra cứu')}</button>
         </form>
-        <div className="traceability-samples" aria-label={text('Mã lô tra cứu nhanh')}>
-          <span>{text('TRA CỨU NHANH')}</span>
-          {quickSearches.map((batchCode) => <button className="micro-tactile micro-tactile--small" key={batchCode} type="button" disabled={loading} onClick={() => void searchBatch(batchCode)}>{batchCode}</button>)}
-        </div>
         {error && <p className="traceability-api-message is-error" role="alert">{error}</p>}
       </section>
 
@@ -123,9 +112,13 @@ export default function TraceabilityPage() {
               <dl className="traceability-product-facts">
                 <div><dt>{text('Ngày sản xuất')}</dt><dd>{batch.manufacturingDate}</dd></div>
                 <div><dt>{text('Hạn sử dụng')}</dt><dd>{batch.expiryDate}</dd></div>
+                <div><dt>{text('Trạng thái lô')}</dt><dd>{text(batch.status)}</dd></div>
+                <div><dt>{text('Số lượng nhập')}</dt><dd>{batch.receivedQty.toLocaleString('vi-VN')}</dd></div>
                 {batch.packaging && <div><dt>{text('Quy cách')}</dt><dd>{text(batch.packaging)}</dd></div>}
                 {batch.ingredients && <div><dt>{text('Thành phần')}</dt><dd>{text(batch.ingredients)}</dd></div>}
+                {batch.receivingNote && <div><dt>{text('Ghi chú lô')}</dt><dd>{batch.receivingNote}</dd></div>}
               </dl>
+              {batch.testReportUrl && <a className="secondary-action" href={batch.testReportUrl} target="_blank" rel="noreferrer">{text('Xem phiếu kiểm nghiệm của lô')}</a>}
             </section>
             <section className="dpp-passport" aria-labelledby="dpp-passport-title">
               <header className="dpp-passport-heading"><div><p className="traceability-kicker">DIGITAL PRODUCT PASSPORT</p><h3 id="dpp-passport-title">{isEN ? 'Upcycled food supply passport' : 'Hộ chiếu số chuỗi cung ứng Upcycled Food'}</h3></div><span>{batch.batchCode}</span></header>
@@ -142,18 +135,6 @@ export default function TraceabilityPage() {
                 <tr><td>{batch.dppLabResult ?? 'Salmonella: Âm tính | E.Coli: < 10 CFU/g | Aflatoxin: ND'}</td></tr>
               </tbody></table></div>
             </section>
-            <div className="traceability-timeline-wrap">
-              <span className="traceability-timeline-line animate-in fade-in duration-500 fill-mode-both" aria-hidden="true" />
-              <ol className="traceability-timeline">
-                {batch.steps.map((step, index) => {
-                  const StepIcon = stepIcons[index];
-                  return <li className={`traceability-step ${timelineStepAnimations[index] ?? ''}`} key={step.label}>
-                    <div className="traceability-step-marker"><StepIcon size={20} aria-hidden="true" /><span>{String(index + 1).padStart(2, '0')}</span></div>
-                    <div className="traceability-step-content"><p className="traceability-step-date">{isEN ? 'STAGE' : 'CÔNG ĐOẠN'} {String(index + 1).padStart(2, '0')}</p><h3>{isEN ? englishStepLabels[index] ?? text(step.label) : step.label}</h3><p>{text(step.detail)}</p></div>
-                  </li>;
-                })}
-              </ol>
-            </div>
           </> : <p className="traceability-empty-state">{text('Nhập mã lô in trên bao bì để xem hồ sơ truy xuất.')}</p>}
         </div>
       </section>

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextResponse } from 'next/server';
 
-const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, orderItemGroupBy, productionLotFindUnique, productionLotCreate, productionLotUpdate, movementCreateMany, movementFindUnique, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
+const { productFindUnique, productFindMany, productUpdate, variantFindFirst, variantUpdateMany, orderItemGroupBy, productionLotFindUnique, productionLotCreate, productionLotUpdate, movementCreateMany, movementFindUnique, orderItemFindMany, requireAdmin, transaction } = vi.hoisted(() => {
   const mocks = {
   productFindUnique: vi.fn(),
   productFindMany: vi.fn(),
   productUpdate: vi.fn(),
+  variantFindFirst: vi.fn(),
   orderItemGroupBy: vi.fn(),
   variantUpdateMany: vi.fn(),
   productionLotFindUnique: vi.fn(),
@@ -18,7 +19,7 @@ const { productFindUnique, productFindMany, productUpdate, variantUpdateMany, or
   };
   const tx = {
     product: { findUnique: mocks.productFindUnique, update: mocks.productUpdate },
-    productVariant: { updateMany: mocks.variantUpdateMany },
+    productVariant: { findFirst: mocks.variantFindFirst, updateMany: mocks.variantUpdateMany },
     productionLot: { create: mocks.productionLotCreate, update: mocks.productionLotUpdate },
     inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
   };
@@ -42,8 +43,9 @@ describe('PATCH /api/admin/inventory', () => {
     productFindUnique.mockReset();
     productUpdate.mockReset();
     variantUpdateMany.mockReset();
+    variantFindFirst.mockReset().mockResolvedValue({ id: 'variant-1' });
     productionLotFindUnique.mockReset();
-    productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-1', lotCode: 'LOT-MKF-2026-001' });
+    productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-1', batchCode: 'LOT-MKF-2026-001' });
     productionLotUpdate.mockReset().mockResolvedValue({});
     movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
     movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
@@ -130,12 +132,24 @@ describe('PATCH /api/admin/inventory', () => {
     }));
 
     expect(response.status).toBe(201);
-    expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ lotCode: 'LOT-MKF-2026-001', receivedQty: 40, availableQty: 40 }) }));
-    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'RECEIPT', delta: 40, productionLotId: 'lot-1' })] }));
+    expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ batchCode: 'LOT-MKF-2026-001', productVariantId: null, receivedQty: 40, availableQty: 40 }) }));
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'RECEIPT', delta: 40, lotId: 'lot-1' })] }));
+  });
+
+  it('associates a received lot with its selected product variant', async () => {
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/inventory', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'CREATE_LOT', productId: 'product-1', productVariantId: 'variant-1', batchCode: 'LOT-MKF-2026-002', mfgDate: '2026-10-01', expDate: '2027-10-01', receivedQty: 24 }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(variantFindFirst).toHaveBeenCalledWith({ where: { id: 'variant-1', productId: 'product-1' }, select: { id: true } });
+    expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ productVariantId: 'variant-1', batchCode: 'LOT-MKF-2026-002' }) }));
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ productVariantId: 'variant-1', lotId: 'lot-1', type: 'RECEIPT' })] }));
   });
 
   it('pauses a lot, hides its product, and returns customers for outreach', async () => {
-    productionLotFindUnique.mockResolvedValue({ lotCode: 'LOT-MKF-2026-001', status: 'ACTIVE', productId: 'product-1', product: { id: 'product-1', active: true } });
+    productionLotFindUnique.mockResolvedValue({ batchCode: 'LOT-MKF-2026-001', id: 'lot-1', status: 'ACTIVE', productId: 'product-1', product: { id: 'product-1', active: true } });
     orderItemFindMany.mockResolvedValue([{ order: { orderCode: 'MKF-123456', customerName: 'Buyer', phone: '0762793244' } }]);
     const response = await PATCH(new Request('https://mackhen.example/api/admin/inventory', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
@@ -143,7 +157,7 @@ describe('PATCH /api/admin/inventory', () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(productionLotUpdate).toHaveBeenCalledWith({ where: { lotCode: 'LOT-MKF-2026-001' }, data: { status: 'RECALLED' } });
+    expect(productionLotUpdate).toHaveBeenCalledWith({ where: { batchCode: 'LOT-MKF-2026-001' }, data: { status: 'RECALLED' } });
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { active: false } });
     expect((await response.json()).affectedCustomers).toHaveLength(1);
   });

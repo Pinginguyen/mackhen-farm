@@ -134,6 +134,26 @@ describe('/api/admin/orders', () => {
     }));
   });
 
+  it('starts the seven-day affiliate hold from the delivered timestamp', async () => {
+    orderFindUnique.mockResolvedValueOnce({
+      id: 'order-affiliate', orderCode: 'MKF-100001', orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR',
+      carrier: 'GHTK', trackingCode: 'GHTK123', deliveredAt: null, updatedAt: new Date(), affiliateCode: 'KOC_TEST',
+      affiliateCommissionStatus: 'PENDING', affiliateCommissionEligibleAt: null, phone: '0762793244', address: 'Son La', items: [],
+    });
+    orderUpdate.mockResolvedValueOnce({ orderCode: 'MKF-100001', orderStatus: 'DELIVERED', paymentStatus: 'PAID', phone: '0762793244', address: 'Son La' });
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'DELIVERED' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const updateData = orderUpdate.mock.calls[0][0].data;
+    expect(updateData.affiliateCommissionStatus).toBe('PENDING');
+    expect(updateData.affiliateCommissionEligibleAt.getTime()).toBe(updateData.deliveredAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  });
+
   it('lets an admin manually mark a VietQR order as paid', async () => {
     orderFindUnique.mockResolvedValueOnce({ orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
@@ -289,7 +309,7 @@ describe('/api/admin/orders', () => {
   it('restocks product, variant, and production lot once when an order is returned', async () => {
     orderFindUnique.mockResolvedValueOnce({
       id: 'order-1', orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
-      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1' }],
     });
     const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
@@ -303,15 +323,15 @@ describe('/api/admin/orders', () => {
     });
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
-    expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
+    expect(lotUpdateMany).toHaveBeenCalledWith({ where: { id: 'lot-1' }, data: { availableQty: { increment: 2 } } });
     expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ type: 'RETURN', delta: 2, idempotencyKey: 'order-item:order-item-1:RETURN' })],
+      data: [expect.objectContaining({ type: 'RETURN', lotId: 'lot-1', delta: 2, idempotencyKey: 'order-item:order-item-1:RETURN' })],
       skipDuplicates: true,
     }));
 
     orderFindUnique.mockResolvedValueOnce({
       orderStatus: 'RETURNED', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: null, trackingCode: null, deliveredAt: null,
-      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1' }],
     });
     await PATCH(new Request('https://mackhen.example/api/admin/orders', {
       method: 'PATCH', headers: { 'content-type': 'application/json' },
@@ -323,7 +343,7 @@ describe('/api/admin/orders', () => {
   it('does not restock when a concurrent return request loses the status claim', async () => {
     orderFindUnique.mockResolvedValueOnce({
       orderStatus: 'SHIPPING', paymentStatus: 'PAID', paymentMethod: 'VIETQR', carrier: 'SPX', trackingCode: 'SPX12345', deliveredAt: null,
-      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1' }],
     });
     orderUpdateMany.mockResolvedValueOnce({ count: 0 });
 
@@ -352,7 +372,7 @@ describe('/api/admin/orders', () => {
     orderFindUnique.mockResolvedValueOnce({
       id: 'order-1', orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null,
       phone: '0762793244', address: 'Lai Chau', note: null,
-      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotCode: 'LOT-1' }],
+      items: [{ id: 'order-item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1' }],
     });
     orderUpdate.mockResolvedValueOnce({ orderCode: 'MKF-100001', orderStatus: 'CANCELLED', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
 
@@ -366,9 +386,9 @@ describe('/api/admin/orders', () => {
     expect(prisma.$transaction).toHaveBeenCalledOnce();
     expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
     expect(variantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
-    expect(lotUpdateMany).toHaveBeenCalledWith({ where: { lotCode: 'LOT-1' }, data: { availableQty: { increment: 2 } } });
+    expect(lotUpdateMany).toHaveBeenCalledWith({ where: { id: 'lot-1' }, data: { availableQty: { increment: 2 } } });
     expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ type: 'RELEASE', delta: 2, idempotencyKey: 'order-item:order-item-1:RELEASE' })],
+      data: [expect.objectContaining({ type: 'RELEASE', lotId: 'lot-1', delta: 2, idempotencyKey: 'order-item:order-item-1:RELEASE' })],
       skipDuplicates: true,
     }));
   });

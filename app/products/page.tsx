@@ -4,9 +4,9 @@ import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { normalizeNutritionFacts } from '@/lib/store-data';
 import Image from 'next/image';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 300;
 
-export default async function ProductsPage({ searchParams }: { searchParams?: { search?: string } }) {
+export default async function ProductsPage() {
   let products: CatalogProduct[];
   try {
     const databaseProducts = await prisma.product.findMany({
@@ -55,7 +55,7 @@ export default async function ProductsPage({ searchParams }: { searchParams?: { 
             <h2 id="products-catalog-title">Khám phá sản phẩm Tây Bắc</h2>
           </div>
         </header>
-        <ProductCatalogFilter products={products} initialQuery={searchParams?.search ?? ''} />
+        <ProductCatalogFilter products={products} />
       </section>
     </main>
   );

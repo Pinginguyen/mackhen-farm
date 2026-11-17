@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
+import { notifyCustomerCase } from '@/lib/services/telegram-notifier';
 
 const warrantyReasons = ['Hở túi', 'Ỉu mốc', 'Đổi khẩu vị'] as const;
 const WARRANTY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
 
     try {
       const warrantyRequest = await prisma.warrantyRequest.create({ data: { orderId: order.id, reason: body.reason! } });
+      await notifyCustomerCase({ kind: 'Bảo hành', orderCode: order.orderCode, phone: order.phone, description: body.reason! });
       return NextResponse.json({ request: warrantyRequest, message: 'Đã ghi nhận yêu cầu. Xưởng sẽ liên hệ và xử lý trong 24 giờ.' }, { status: 201 });
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {

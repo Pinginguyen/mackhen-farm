@@ -11,6 +11,7 @@ type AffiliateDashboardData = {
   completedOrders: number;
   totalRevenue: number;
   commissionAccrued: number;
+  commissionPending: number;
   commissionDue: number;
   updatedAt: string;
   orders: { orderCode: string; createdAt: string; totalAmount: number; commission: number; commissionStatus: string; paymentReference: string | null }[];
@@ -65,6 +66,7 @@ export default function AffiliateDashboard({ initialAffiliate }: { initialAffili
     completedOrders: 0,
     totalRevenue: 0,
     commissionAccrued: 0,
+    commissionPending: 0,
     commissionDue: 0,
     updatedAt: '',
     orders: [],
@@ -89,7 +91,7 @@ export default function AffiliateDashboard({ initialAffiliate }: { initialAffili
         <article><span><MousePointerClick size={17} />Tổng lượt click vào link</span><strong>{metrics.totalClicks.toLocaleString('vi-VN')}</strong></article>
         <article><span><PackageCheck size={17} />Tổng đơn hàng hoàn tất</span><strong>{metrics.completedOrders.toLocaleString('vi-VN')}</strong></article>
         <article><span><ExternalLink size={17} />Tổng doanh thu tạo ra</span><strong>{formatCurrency(metrics.totalRevenue)}</strong></article>
-        <article><span><Wallet size={17} />Hoa hồng tích lũy (VNĐ)</span><strong>{formatCurrency(metrics.commissionAccrued)}</strong><small>Còn chờ chi trả: {formatCurrency(metrics.commissionDue)}</small></article>
+        <article><span><Wallet size={17} />Hoa hồng tích lũy (VNĐ)</span><strong>{formatCurrency(metrics.commissionAccrued)}</strong><small>Đang giữ 7 ngày: {formatCurrency(metrics.commissionPending)}</small><small>Đủ điều kiện, chờ chi trả: {formatCurrency(metrics.commissionDue)}</small></article>
       </section>
 
       <section className="affiliate-history-panel">
@@ -107,7 +109,7 @@ export default function AffiliateDashboard({ initialAffiliate }: { initialAffili
           </tbody>
         </table></div>
       </section>
-      <footer className="affiliate-portal-footer">Hoa hồng được xác lập sau khi đơn thanh toán thành công và được đối soát bởi Mắc Khén Farm.</footer>
+      <footer className="affiliate-portal-footer">Hoa hồng chỉ đủ điều kiện đối soát sau khi đơn đã giao thành công 7 ngày và không có yêu cầu đổi trả đang xử lý.</footer>
     </main>
   );
 }

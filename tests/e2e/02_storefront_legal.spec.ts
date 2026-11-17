@@ -47,11 +47,11 @@ async function cleanupOrder(order: CreatedOrder | undefined): Promise<void> {
   if (!order) return;
   await prisma.$transaction(async (tx) => {
     const owner = await tx.order.findUnique({ where: { id: order.id }, select: { customerId: true } });
-    const items = await tx.orderItem.findMany({ where: { orderId: order.id }, select: { productId: true, productVariantId: true, quantity: true, lotCode: true } });
+    const items = await tx.orderItem.findMany({ where: { orderId: order.id }, select: { productId: true, productVariantId: true, quantity: true, lotId: true } });
     for (const item of items) {
       await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
       if (item.productVariantId) await tx.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
-      if (item.lotCode) await tx.productionLot.updateMany({ where: { lotCode: item.lotCode }, data: { availableQty: { increment: item.quantity } } });
+      if (item.lotId) await tx.productionLot.updateMany({ where: { id: item.lotId }, data: { availableQty: { increment: item.quantity } } });
     }
     await tx.order.delete({ where: { id: order.id } });
     if (owner?.customerId) await tx.customer.deleteMany({ where: { id: owner.customerId, orders: { none: {} } } });
@@ -64,7 +64,7 @@ async function createDeliveredReviewOrder(product: Product): Promise<CreatedOrde
     data: {
       orderCode: `MKF-${code}`, customerName: `Review QA ${token()}`, phone: '0762793244', address: 'Local review fixture',
       orderStatus: 'DELIVERED', paymentMethod: 'COD', paymentStatus: 'PAID', subtotal: product.price, shippingFee: 0,
-      totalAmount: product.price, items: { create: [{ productId: product.id, productName: product.name, quantity: 1, price: product.price, lineTotal: product.price }] },
+      totalAmount: product.price, items: { create: [{ productId: product.id, productName: product.name, titleSnapshot: product.name, variantNameSnapshot: '', skuSnapshot: product.slug, quantity: 1, unitPrice: product.price, discountAllocated: 0, finalPrice: product.price, lineTotal: product.price }] },
     },
     select: { id: true, orderCode: true, numericCode: true },
   });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
+import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,8 +71,11 @@ export async function POST(request: Request) {
       where: { orderCode },
       select: {
         id: true,
+        orderCode: true,
         numericCode: true,
         totalAmount: true,
+        phone: true,
+        address: true,
         paymentMethod: true,
         paymentStatus: true,
         orderStatus: true,
@@ -119,6 +123,9 @@ export async function POST(request: Request) {
     } catch (error) {
       if (isUniqueConstraintError(error)) return NextResponse.json({ success: true });
       throw error;
+    }
+    if (order.paymentStatus !== 'PAID') {
+      await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: order.totalAmount, phone: order.phone, address: order.address });
     }
   } catch (error) {
     console.error('SePay payment webhook failed:', error instanceof Error ? error.name : 'UnknownError');

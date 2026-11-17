@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDatabase } from '@/lib/api-database';
 import { sendB2bInquiryEmail } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
+import { notifyB2bLead } from '@/lib/services/telegram-notifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error('B2B inquiry email delivery failed.', error);
     }
+    await notifyB2bLead({ companyName, country, contactName, email, phone: phone || null, expectedVolume });
 
     return NextResponse.json({ success: true, id: inquiry.id }, { status: 201 });
   }, 'B2B inquiry persistence failed.');

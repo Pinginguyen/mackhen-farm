@@ -8,6 +8,7 @@ import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { prisma } from '@/lib/prisma';
 import { calculatePercentageAmount } from '@/lib/money';
+import { normalizeAffiliatePhone } from '@/lib/affiliate-fraud';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,26 +29,27 @@ export async function GET(request: Request) {
 
     const [orders, clickCounts] = await Promise.all([
       prisma.order.findMany({
-        where: { affiliateCode: { in: affiliates.map((affiliate) => affiliate.affiliateCode) }, paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' } },
-        select: { affiliateCode: true, totalAmount: true, affiliateCommissionRate: true, affiliateCommissionPaidAt: true },
+        where: { affiliateCode: { in: affiliates.map((affiliate) => affiliate.affiliateCode) }, paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] } },
+        select: { affiliateCode: true, totalAmount: true, affiliateCommissionRate: true, affiliateCommissionPaidAt: true, affiliateCommissionStatus: true },
       }),
       prisma.affiliateClick.groupBy({ by: ['affiliateId'], _count: { _all: true } }),
     ]);
     const clicksByAffiliate = new Map(clickCounts.map((item) => [item.affiliateId, item._count._all]));
-    const summaries = new Map<string, { revenue: number; completedOrders: number; commission: number; commissionDue: number; commissionDueOrders: number }>();
+    const summaries = new Map<string, { revenue: number; completedOrders: number; commission: number; commissionDue: number; commissionDueOrders: number; commissionPending: number }>();
     for (const order of orders) {
       if (!order.affiliateCode) continue;
-      const current = summaries.get(order.affiliateCode) ?? { revenue: 0, completedOrders: 0, commission: 0, commissionDue: 0, commissionDueOrders: 0 };
+      const current = summaries.get(order.affiliateCode) ?? { revenue: 0, completedOrders: 0, commission: 0, commissionDue: 0, commissionDueOrders: 0, commissionPending: 0 };
       const affiliate = affiliates.find((item) => item.affiliateCode === order.affiliateCode);
       const rate = order.affiliateCommissionRate ?? affiliate?.commissionRate ?? 10;
       const commission = commissionFor(order.totalAmount, rate);
       current.revenue += order.totalAmount;
       current.completedOrders += 1;
-      current.commission += commission;
-      if (!order.affiliateCommissionPaidAt) {
+      if (order.affiliateCommissionStatus !== 'CANCELLED') current.commission += commission;
+      if (order.affiliateCommissionStatus === 'ELIGIBLE' && !order.affiliateCommissionPaidAt) {
         current.commissionDue += commission;
         current.commissionDueOrders += 1;
       }
+      if (order.affiliateCommissionStatus === 'PENDING' && !order.affiliateCommissionPaidAt) current.commissionPending += commission;
       summaries.set(order.affiliateCode, current);
     }
 
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
       bankAccount: affiliate.bankAccount,
       active: affiliate.active,
       totalClicks: clicksByAffiliate.get(affiliate.id) ?? 0,
-      ...(summaries.get(affiliate.affiliateCode) ?? { revenue: 0, completedOrders: 0, commission: 0, commissionDue: 0, commissionDueOrders: 0 }),
+      ...(summaries.get(affiliate.affiliateCode) ?? { revenue: 0, completedOrders: 0, commission: 0, commissionDue: 0, commissionDueOrders: 0, commissionPending: 0 }),
     })) });
   });
 }
@@ -75,15 +77,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { message: 'Dữ liệu đối tác không hợp lệ.' } }, { status: 400 });
   }
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return NextResponse.json({ error: { message: 'Dữ liệu đối tác không hợp lệ.' } }, { status: 400 });
-  const body = payload as { name?: unknown; email?: unknown; password?: unknown; affiliateCode?: unknown; commissionRate?: unknown; bankAccount?: unknown };
+  const body = payload as { name?: unknown; email?: unknown; password?: unknown; phone?: unknown; affiliateCode?: unknown; commissionRate?: unknown; bankAccount?: unknown };
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
+  const phoneInput = typeof body.phone === 'string' ? body.phone.trim() : '';
+  const phone = phoneInput ? normalizeAffiliatePhone(phoneInput) : null;
   const affiliateCode = normalizeAffiliateCode(body.affiliateCode);
   const commissionRate = body.commissionRate;
   const bankAccount = typeof body.bankAccount === 'string' ? body.bankAccount.trim() : '';
   if (!name || name.length > 100 || !/^\S+@\S+\.\S+$/.test(email) || password.trim().length < 6 || password.length > 128 || !affiliateCode
     || !Number.isInteger(commissionRate) || Number(commissionRate) < 10 || Number(commissionRate) > 15
+    || (phoneInput && !phone)
     || !/^[\d\s-]{4,34}$/.test(bankAccount)) {
     return NextResponse.json({ error: { message: 'Vui lòng kiểm tra tên, email, mật khẩu tối thiểu 6 ký tự, mã ref, tỷ lệ 10–15% và số tài khoản ngân hàng.' } }, { status: 400 });
   }
@@ -93,7 +98,7 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(async (transaction) => {
       if (await transaction.user.findUnique({ where: { email }, select: { id: true } })) return { conflict: 'EMAIL' as const };
       if (await transaction.affiliate.findUnique({ where: { affiliateCode }, select: { id: true } })) return { conflict: 'CODE' as const };
-      const user = await transaction.user.create({ data: { name, email, password: passwordHash, role: 'AFFILIATE' }, select: { id: true, name: true, email: true } });
+      const user = await transaction.user.create({ data: { name, email, phone, password: passwordHash, role: 'AFFILIATE' }, select: { id: true, name: true, email: true } });
       const affiliate = await transaction.affiliate.create({ data: { userId: user.id, affiliateCode, commissionRate: Number(commissionRate), bankAccount }, select: { id: true, affiliateCode: true, commissionRate: true, active: true } });
       return { user, affiliate };
     });

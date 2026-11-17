@@ -32,7 +32,7 @@ export default async function VietQrOrderPage({
 
   if (!/^MKF-\d{6}$/.test(orderCode)) notFound();
 
-  let order: Awaited<ReturnType<typeof prisma.order.findUnique>> & { items?: { productId: string; productName: string; variantLabel: string | null; quantity: number; price: number }[] } | null = null;
+  let order: Awaited<ReturnType<typeof prisma.order.findUnique>> & { items?: { productId: string; titleSnapshot: string; variantNameSnapshot: string; quantity: number; unitPrice: number }[] } | null = null;
   let payment: { id: string; createdAt: Date; status: string } | null = null;
   let paymentAvailable = false;
   let invalidPaymentMethod = false;
@@ -42,7 +42,7 @@ export default async function VietQrOrderPage({
       where: { orderCode },
       include: {
         payments: { orderBy: { createdAt: 'desc' }, take: 1 },
-        items: { select: { productId: true, productName: true, variantLabel: true, quantity: true, price: true } },
+        items: { select: { productId: true, titleSnapshot: true, variantNameSnapshot: true, quantity: true, unitPrice: true } },
       },
     });
 
@@ -68,7 +68,7 @@ export default async function VietQrOrderPage({
   const paymentCreatedAt = payment?.createdAt ?? new Date();
   const expiresAt = new Date(paymentCreatedAt.getTime() + 15 * 60 * 1000).toISOString();
   const isLocalOnly = !order || !paymentAvailable;
-  const items = order?.items ?? [];
+  const items = order?.items?.map((item) => ({ productId: item.productId, productName: item.titleSnapshot, variantLabel: item.variantNameSnapshot, quantity: item.quantity, price: item.unitPrice })) ?? [];
 
   return (
     <main className="page-shell">

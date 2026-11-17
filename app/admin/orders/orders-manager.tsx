@@ -6,6 +6,7 @@ import { Download, FileText, Pencil, Printer, Search, X, Zap } from 'lucide-reac
 import { formatCurrency } from '@/lib/store-data';
 import { getAllowedNextStatuses } from '@/lib/order-workflow';
 import { calculatePercentageAmount } from '@/lib/money';
+import CreateShipmentButton from './create-shipment-button';
 
 export type AdminOrder = {
   id: string;
@@ -24,9 +25,11 @@ export type AdminOrder = {
   note: string | null;
   trackingCode: string | null;
   carrier: string | null;
+  shippingStatus?: string | null;
+  shippingLabelUrl?: string | null;
   hasOpenCase?: boolean;
   createdAt: string;
-  items: { productName: string; sku: string; variantLabel?: string | null; quantity: number; price?: number }[];
+  items: { productName: string; sku: string; variantLabel?: string | null; quantity: number; price?: number; finalPrice?: number; discountAllocated?: number }[];
 };
 
 const statusOptions = [
@@ -348,7 +351,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                 <ul>{order.items.map((item, index) => <li key={`${order.id}-${index}`}>
                   <span className="admin-order-item-name"><strong>{item.productName}</strong><small>{item.sku}{item.variantLabel ? ` · ${item.variantLabel}` : ''}</small></span>
                   <span className="admin-order-item-quantity">×{item.quantity}</span>
-                  {item.price != null && <span className="admin-order-item-price">{formatCurrency(item.price * item.quantity)}</span>}
+                  {(item.finalPrice != null || item.price != null) && <span className="admin-order-item-price">{formatCurrency(item.finalPrice ?? item.price! * item.quantity)}{Boolean(item.discountAllocated) && <small>Giảm {formatCurrency(item.discountAllocated!)}</small>}</span>}
                 </li>)}</ul>
               </section>
             </div>
@@ -378,6 +381,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
               <div className="admin-order-toolbar-action-row flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
                 <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">
                   <Link className="admin-order-print-button border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
+                  <CreateShipmentButton orderId={order.id} carrier={order.carrier} trackingCode={order.trackingCode} labelUrl={order.shippingLabelUrl ?? null} onCreated={(shipment) => setOrderList((current) => current.map((item) => item.id === order.id ? { ...item, carrier: shipment.carrier, trackingCode: shipment.trackingCode, shippingStatus: shipment.shippingStatus, shippingLabelUrl: shipment.labelUrl } : item))} />
                   {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PENDING' && ['PENDING', 'CONFIRMED'].includes(order.status) && <button type="button" className="admin-order-simulate-button bg-purple-600 hover:bg-purple-700 text-white font-medium px-3.5 py-1.5 rounded-lg text-sm shadow-sm transition active:scale-95" onClick={() => void simulateSepayPayment(order)} disabled={pending === order.orderCode}><Zap size={16} /> {pending === order.orderCode ? 'Đang giả lập...' : 'Giả lập Quét VietQR (Demo)'}</button>}
                 </div>
                 <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">

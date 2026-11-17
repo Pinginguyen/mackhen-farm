@@ -11,7 +11,8 @@ import { writeAuditLog } from '@/lib/audit-log';
 import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import { calculatePercentageAmount } from '@/lib/money';
 import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
-import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
+import { allocateStockFEFO } from '@/lib/services/inventory-ledger';
+import { getClientIpHash, isSelfReferral } from '@/lib/affiliate-fraud';
 
 type CheckoutItemSnapshot = {
   id?: string;
@@ -49,6 +50,28 @@ type CreatedOrder = {
   duplicate?: boolean;
 };
 type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY'; message?: string };
+
+type PricedCheckoutItem = { quantity: number; unitPrice: number };
+
+function allocateItemDiscount(items: PricedCheckoutItem[], discount: number, subtotal: number): number[] {
+  const itemDiscount = Math.min(Math.max(0, discount), subtotal);
+  if (!itemDiscount || !subtotal) return items.map(() => 0);
+
+  const allocations = items.map((item, index) => {
+    const lineTotal = item.quantity * item.unitPrice;
+    const exactShare = itemDiscount * lineTotal / subtotal;
+    const baseAmount = Math.floor(exactShare);
+    return { index, amount: baseAmount, remainder: exactShare - baseAmount };
+  });
+  let remaining = itemDiscount - allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+  const remainderOrder = [...allocations].sort((left, right) => right.remainder - left.remainder || left.index - right.index);
+  for (const allocation of remainderOrder) {
+    if (remaining <= 0) break;
+    allocations[allocation.index].amount += 1;
+    remaining -= 1;
+  }
+  return allocations.map((allocation) => allocation.amount);
+}
 
 const CHECKOUT_RATE_LIMIT = 3;
 const CHECKOUT_RATE_WINDOW_MS = 10_000;
@@ -177,6 +200,7 @@ export async function POST(request: Request) {
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
+  const buyerIpHash = getClientIpHash(request);
   if (isManagedVoucher && !session) {
     return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
   }
@@ -231,7 +255,10 @@ export async function POST(request: Request) {
         }));
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
         const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug), settings.freeShippingThreshold);
-        const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({ where: { code: voucherCode } }) : null;
+        const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({
+          where: { code: voucherCode },
+          select: { id: true, code: true, discountType: true, value: true, maxDiscount: true, minSpend: true, expiresAt: true, isActive: true, usageLimit: true, freeShipping: true, firstOrderOnly: true },
+        }) : null;
         if (isManagedVoucher && !managedVoucher) return { rejected: 'INVALID_VOUCHER' as const };
         const voucherValidationError = managedVoucher ? getManagedVoucherValidationError(managedVoucher, subtotal) : null;
 
@@ -278,7 +305,7 @@ export async function POST(request: Request) {
 
         const recentOrders = idempotencyKey ? [] : await transaction.order.findMany({
           where: { phone, createdAt: { gte: new Date(Date.now() - 3_000) } },
-          include: { items: { select: { productId: true, productVariantId: true, quantity: true, price: true } } },
+          include: { items: { select: { productId: true, productVariantId: true, quantity: true, unitPrice: true } } },
           orderBy: { createdAt: 'desc' },
         });
         const duplicate = recentOrders.find((recentOrder) => {
@@ -286,7 +313,7 @@ export async function POST(request: Request) {
           const previous = recentOrder.items.map((item) => ({
             key: `${item.productId}:${item.productVariantId ?? ''}`,
             quantity: item.quantity,
-            price: item.price,
+            price: item.unitPrice,
           })).sort((left, right) => left.key.localeCompare(right.key));
           const current = currentItems.map((item) => ({ key: `${item.productId}:${item.variantId ?? ''}`, quantity: item.quantity, price: item.price }))
             .sort((left, right) => left.key.localeCompare(right.key));
@@ -308,7 +335,7 @@ export async function POST(request: Request) {
             where: { id: managedVoucher.id, isActive: true, ...(managedVoucher.expiresAt ? { expiresAt: { gt: now } } : {}), ...(managedVoucher.usageLimit != null ? { usedCount: { lt: managedVoucher.usageLimit } } : {}) },
             data: { usedCount: { increment: 1 } },
           });
-          if (!claimedVoucher.count) return { rejected: 'INVALID_VOUCHER' as const };
+          if (!claimedVoucher.count) throw new Error('VOUCHER_CLAIM_RACE');
           if (managedVoucher.usageLimit != null) {
             const updatedVoucher = await transaction.voucher.findUnique({ where: { id: managedVoucher.id }, select: { usedCount: true, usageLimit: true } });
             if (updatedVoucher?.usageLimit != null && updatedVoucher.usedCount >= updatedVoucher.usageLimit) {
@@ -317,35 +344,12 @@ export async function POST(request: Request) {
           }
         }
 
-        const reservedLotCodes = new Map<string, string>();
-        const reservedLotIds = new Map<string, string>();
         for (const item of cart.items) {
           const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
           if (item.variant) {
             const variantStock = await transaction.productVariant.updateMany({ where: { id: item.variant.id, inventory: { gte: item.quantity } }, data: { inventory: { decrement: item.quantity } } });
             if (!variantStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
-          }
-          const lot = await transaction.productionLot.findFirst({
-            where: { productId: item.productId, status: 'ACTIVE', availableQty: { gte: item.quantity }, expDate: { gt: new Date() } },
-            orderBy: [{ expDate: 'asc' }, { mfgDate: 'asc' }],
-            select: { id: true, lotCode: true },
-          });
-          if (!lot) {
-            const trackedLot = await transaction.productionLot.findFirst({
-              where: { productId: item.productId, status: 'ACTIVE', expDate: { gt: new Date() } },
-              select: { id: true },
-            });
-            if (trackedLot) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
-          }
-          if (lot) {
-            const lotStock = await transaction.productionLot.updateMany({
-              where: { id: lot.id, availableQty: { gte: item.quantity } },
-              data: { availableQty: { decrement: item.quantity } },
-            });
-            if (!lotStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
-            reservedLotCodes.set(item.id, lot.lotCode);
-            reservedLotIds.set(lot.lotCode, lot.id);
           }
         }
 
@@ -354,9 +358,16 @@ export async function POST(request: Request) {
           ? await transaction.customer.upsert({ where: { email }, create: { name, email, phone, address }, update: { name, phone, address } })
           : await transaction.customer.create({ data: { name, phone, address } });
         const affiliate = affiliateCode
-          ? await transaction.affiliate.findUnique({ where: { affiliateCode }, select: { affiliateCode: true, commissionRate: true, active: true } })
+          ? await transaction.affiliate.findUnique({ where: { affiliateCode }, select: { userId: true, affiliateCode: true, commissionRate: true, active: true, user: { select: { phone: true, signupIpHash: true } } } })
           : null;
-        const attributedAffiliate = affiliate?.active ? affiliate : null;
+        const attributedAffiliate = affiliate?.active && !isSelfReferral({
+          buyerUserId: session?.userId ?? null,
+          buyerPhone: phone,
+          buyerIpHash,
+          affiliateUserId: affiliate.userId,
+          affiliatePhone: affiliate.user?.phone ?? null,
+          affiliateIpHash: affiliate.user?.signupIpHash ?? null,
+        }) ? affiliate : null;
         const numericCode = randomInt(100000, 1000000);
         const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
 
@@ -378,6 +389,7 @@ export async function POST(request: Request) {
             voucherCode: voucherCode || null,
             affiliateCode: attributedAffiliate?.affiliateCode ?? null,
             affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
+            affiliateCommissionStatus: attributedAffiliate ? 'PENDING' : null,
             totalAmount,
             idempotencyKey: idempotencyKey || undefined,
             checkoutFingerprint,
@@ -385,27 +397,52 @@ export async function POST(request: Request) {
             netAmount: totalAmount,
             reconciled: false,
             holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
-            lotCode: [...reservedLotCodes.values()][0] ?? null,
+            lotCode: null,
             note: typeof body.note === 'string' ? body.note.trim() || null : null,
-            items: { create: cart.items.map((item) => {
-              const price = item.variant?.price ?? item.product.price;
-              return { productId: item.productId, productVariantId: item.productVariantId, productName: item.product.name, variantLabel: item.variant?.title, quantity: item.quantity, price, lineTotal: item.quantity * price, lotCode: reservedLotCodes.get(item.id) };
-            }) },
           },
-          include: { items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotCode: true } } },
         });
-        for (const item of order.items) {
-          await recordMovement(transaction, {
+        const pricedItems = cart.items.map((item) => ({ item, unitPrice: item.variant?.price ?? item.product.price }));
+        const itemDiscounts = allocateItemDiscount(
+          pricedItems.map(({ item, unitPrice }) => ({ quantity: item.quantity, unitPrice })),
+          managedVoucher?.freeShipping ? 0 : discount,
+          subtotal,
+        );
+        let firstBatchCode: string | null = null;
+        for (let itemIndex = 0; itemIndex < pricedItems.length; itemIndex += 1) {
+          const { item, unitPrice } = pricedItems[itemIndex];
+          const allocations = await allocateStockFEFO(transaction, item.productVariantId, item.quantity, {
+            productId: item.productId,
+            productName: item.product.name,
+            orderId: order.id,
+            cartItemId: item.id,
+          });
+          const lineTotal = item.quantity * unitPrice;
+          const lineDiscounts = allocateItemDiscount(
+            allocations.map((allocation) => ({ quantity: allocation.quantity, unitPrice })),
+            itemDiscounts[itemIndex],
+            lineTotal,
+          );
+          const orderItems = allocations.map((allocation, allocationIndex) => ({
             orderId: order.id,
             productId: item.productId,
-            variantId: item.productVariantId,
-            productionLotId: item.lotCode ? reservedLotIds.get(item.lotCode) : null,
-            type: 'RESERVATION',
-            delta: -item.quantity,
-            idempotencyKey: orderMovementKey(item.id, 'RESERVATION'),
-            reference: `Checkout ${order.orderCode}`,
-          });
+            productVariantId: item.productVariantId,
+            productName: item.product.name,
+            variantLabel: item.variant?.title,
+            titleSnapshot: item.product.name,
+            variantNameSnapshot: item.variant?.title ?? '',
+            skuSnapshot: item.variant?.sku ?? item.product.slug,
+            quantity: allocation.quantity,
+            unitPrice,
+            discountAllocated: lineDiscounts[allocationIndex],
+            finalPrice: allocation.quantity * unitPrice - lineDiscounts[allocationIndex],
+            lineTotal: allocation.quantity * unitPrice,
+            lotId: allocation.lotId,
+            lotCode: allocation.batchCode,
+          }));
+          await transaction.orderItem.createMany({ data: orderItems });
+          firstBatchCode ??= allocations[0]?.batchCode ?? null;
         }
+        if (firstBatchCode) await transaction.order.update({ where: { id: order.id }, data: { lotCode: firstBatchCode } });
         return order;
       }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {
@@ -461,6 +498,13 @@ export async function POST(request: Request) {
       if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
         const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
         return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 400 });
+      }
+      if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK_LOT:')) {
+        const productName = error.message.slice('INSUFFICIENT_STOCK_LOT:'.length);
+        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Các lô còn hạn của ${productName} không đủ số lượng. Vui lòng liên hệ cửa hàng.` } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message === 'VOUCHER_CLAIM_RACE') {
+        return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá vừa được sử dụng hết. Vui lòng chọn mã khác.' } }, { status: 409 });
       }
       const databaseUnavailable = error instanceof Error && (
         error.name.startsWith('PrismaClient')

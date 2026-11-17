@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { ADMIN_EMAIL, createSessionToken, getAuthSecret, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth';
+import { getClientIpHash } from '@/lib/affiliate-fraud';
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const user = await prisma.user.create({
-      data: { name, email, password: await hash(password, 12), phone: body.phone?.trim() || null },
+      data: { name, email, password: await hash(password, 12), phone: body.phone?.trim() || null, signupIpHash: getClientIpHash(request) },
       select: { id: true, name: true, email: true, role: true },
     });
     const token = createSessionToken({ userId: user.id, name: user.name, email: user.email, role: user.role });

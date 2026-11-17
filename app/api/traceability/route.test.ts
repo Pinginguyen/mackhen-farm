@@ -11,7 +11,7 @@ describe('GET /api/traceability', () => {
 
   it('normalizes the batch code and returns only public traceability fields', async () => {
     const lot = {
-      lotCode: 'LOT-MKF-2026-001',
+      batchCode: 'LOT-MKF-2026-001',
       mfgDate: new Date('2026-10-01T00:00:00.000Z'),
       expDate: new Date('2027-10-01T00:00:00.000Z'),
       receivedQty: 500,
@@ -27,8 +27,8 @@ describe('GET /api/traceability', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('no-store');
-    expect(findLot).toHaveBeenCalledWith(expect.objectContaining({ where: { lotCode: 'LOT-MKF-2026-001' } }));
-    expect(await response.json()).toEqual({ lot: { ...lot, mfgDate: lot.mfgDate.toISOString(), expDate: lot.expDate.toISOString() } });
+    expect(findLot).toHaveBeenCalledWith(expect.objectContaining({ where: { batchCode: 'LOT-MKF-2026-001' } }));
+    expect(await response.json()).toEqual({ lot: { ...lot, lotCode: lot.batchCode, mfgDate: lot.mfgDate.toISOString(), expDate: lot.expDate.toISOString() } });
   });
 
   it('returns 404 when a valid lot code is not found', async () => {
