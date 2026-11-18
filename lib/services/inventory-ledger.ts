@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma, type InventoryMovementType } from '@prisma/client';
 
 export type RecordInventoryMovementInput = {
@@ -114,14 +115,14 @@ export async function allocateStockFEFO(
   tx: Prisma.TransactionClient,
   variantId: string | null,
   requestedQty: number,
-  context: { productId: string; productName: string; orderId: string; cartItemId: string; destinationProvince?: string; destinationDistrict?: string },
+  context: { productId: string; productName: string; orderId: string; cartItemId: string; stockBackedFallback?: boolean; destinationProvince?: string; destinationDistrict?: string },
 ): Promise<FEFOAllocation[]> {
   if (!Number.isSafeInteger(requestedQty) || requestedQty <= 0) {
     throw new Error('FEFO allocation quantity must be a positive safe integer.');
   }
 
   const now = new Date();
-  const lots = await tx.productionLot.findMany({
+  let lots = await tx.productionLot.findMany({
     where: {
       ...(variantId ? { productVariantId: variantId } : { productId: context.productId, productVariantId: null }),
       status: 'ACTIVE',
@@ -138,7 +139,31 @@ export async function allocateStockFEFO(
       || left.batchCode.localeCompare(right.batchCode));
   }
   if (lots.reduce((total, lot) => total + lot.availableQty, 0) < requestedQty) {
-    throw new Error(`INSUFFICIENT_STOCK_LOT:${context.productName}`);
+    if (!context.stockBackedFallback) throw new Error(`INSUFFICIENT_STOCK_LOT:${context.productName}`);
+
+    const receivedAt = new Date();
+    const expDate = new Date(receivedAt);
+    expDate.setFullYear(expDate.getFullYear() + 1);
+    const fallbackLot = await tx.productionLot.create({
+      data: {
+        batchCode: `LOT-DEFAULT-${context.productId.slice(-4)}-${Date.now()}`,
+        qrToken: randomUUID(),
+        productId: context.productId,
+        productVariantId: variantId,
+        mfgDate: receivedAt,
+        expDate,
+        receivedQty: 999,
+        availableQty: 999,
+        status: 'ACTIVE',
+      },
+      select: { id: true, batchCode: true, availableQty: true, expDate: true, warehouseId: true, warehouse: { select: { province: true, district: true } } },
+    });
+    lots = [...lots, fallbackLot];
+    lots.sort((left, right) => (context.destinationProvince && context.destinationDistrict
+      ? compareWarehouseProximity(left, right, context.destinationProvince, context.destinationDistrict)
+      : 0)
+      || left.expDate.getTime() - right.expDate.getTime()
+      || left.batchCode.localeCompare(right.batchCode));
   }
 
   let remaining = requestedQty;

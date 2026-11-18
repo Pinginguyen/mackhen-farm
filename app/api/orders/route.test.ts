@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userFindUnique, userUpdate, userUpdateMany, pointHistoryCreate, calculateRealtimeShippingRate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, cartUpdate, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userFindUnique, userUpdate, userUpdateMany, pointHistoryCreate, calculateRealtimeShippingRate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotCreate, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
+    cartFindUnique: vi.fn(), cartUpdate: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), orderUpdate: vi.fn(), orderItemCreateMany: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(), productionLotFindMany: vi.fn(),
     userFindUnique: vi.fn(), userUpdate: vi.fn(), userUpdateMany: vi.fn(), pointHistoryCreate: vi.fn(), calculateRealtimeShippingRate: vi.fn(),
-    productionLotUpdateMany: vi.fn(),
+    productionLotCreate: vi.fn(), productionLotUpdateMany: vi.fn(),
     movementCreateMany: vi.fn(), movementFindUnique: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
     voucherFindUnique: vi.fn(), voucherUpdateMany: vi.fn(),
     affiliateFindUnique: vi.fn(),
   };
   const tx = {
-    cart: { findUnique: mocks.cartFindUnique },
+    cart: { findUnique: mocks.cartFindUnique, update: mocks.cartUpdate },
     product: { updateMany: mocks.productUpdateMany },
     productVariant: { updateMany: mocks.productVariantUpdateMany },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
@@ -20,7 +20,7 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
     pointHistory: { create: mocks.pointHistoryCreate },
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate, update: mocks.orderUpdate },
     orderItem: { createMany: mocks.orderItemCreateMany },
-    productionLot: { findFirst: mocks.productionLotFindFirst, findMany: mocks.productionLotFindMany, updateMany: mocks.productionLotUpdateMany },
+    productionLot: { findFirst: mocks.productionLotFindFirst, findMany: mocks.productionLotFindMany, create: mocks.productionLotCreate, updateMany: mocks.productionLotUpdateMany },
     inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
     compensationVoucher: { findUnique: mocks.compensationVoucherFindUnique, updateMany: mocks.compensationVoucherUpdateMany },
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
@@ -29,7 +29,7 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
   return { ...mocks, transaction: tx, prisma: { cart: { findUnique: mocks.cartFindUnique }, order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
-vi.mock('@/lib/prisma', () => ({ prisma }));
+vi.mock('@/lib/prisma', () => ({ prisma, reportPrismaConnectivityIssue: vi.fn() }));
 vi.mock('@/lib/system-settings', () => ({ getSystemSettings: async () => ({ freeShippingThreshold: 500000 }) }));
 vi.mock('@/lib/services/shipping-carrier', () => ({ calculateRealtimeShippingRate }));
 
@@ -50,6 +50,7 @@ describe('POST /api/orders checkout', () => {
         product: { id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000, stock: 5 }, variant: null,
       }],
     });
+    cartUpdate.mockReset().mockResolvedValue({ id: 'cart-1' });
     productUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     productVariantUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     customerUpsert.mockReset().mockResolvedValue({ id: 'customer-1' });
@@ -59,6 +60,7 @@ describe('POST /api/orders checkout', () => {
     orderFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindMany.mockReset().mockResolvedValue([{ id: 'lot-default', batchCode: 'LOT-MKF-2026-001', availableQty: 100, expDate: new Date('2027-01-01T00:00:00.000Z') }]);
+    productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-generated', batchCode: 'LOT-DEFAULT-ice-123', availableQty: 999, expDate: new Date('2027-11-18T00:00:00.000Z'), warehouseId: null, warehouse: null });
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
     compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
@@ -462,7 +464,7 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).not.toHaveBeenCalled();
   });
 
-  it('does not sell untraceably when active lots cannot cover the requested quantity', async () => {
+  it('creates a default lot and completes checkout when aggregate stock exists but active lots are missing', async () => {
     productionLotFindMany.mockResolvedValueOnce([]);
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
@@ -470,9 +472,11 @@ describe('POST /api/orders checkout', () => {
       body: JSON.stringify({ customer: { name: 'Buyer', phone: '0762793244' }, delivery: { address: 'Lai Chau' }, paymentMethod: 'COD' }),
     }));
 
-    expect(response.status).toBe(409);
-    expect((await response.json()).error.code).toBe('INSUFFICIENT_STOCK');
-    expect(orderItemCreateMany).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ productId: 'spice-1', productVariantId: null, receivedQty: 999, availableQty: 999, status: 'ACTIVE' }),
+    }));
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ lotId: 'lot-generated', lotCode: 'LOT-DEFAULT-ice-123', quantity: 1 })] });
   });
 
   it('returns the cached order for a repeated idempotency key without reserving stock again', async () => {

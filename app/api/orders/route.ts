@@ -557,6 +557,7 @@ export async function POST(request: Request) {
             productName: item.product.name,
             orderId: order.id,
             cartItemId: item.id,
+            stockBackedFallback: true,
             destinationProvince: province,
             destinationDistrict: district,
           });

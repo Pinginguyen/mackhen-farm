@@ -2,15 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { allocateStockFEFO, recordMovement } from './inventory-ledger';
 import type { Prisma } from '@prisma/client';
 
-const { createMany, findUnique, lotFindMany, lotUpdateMany } = vi.hoisted(() => ({
+const { createMany, findUnique, lotFindMany, lotCreate, lotUpdateMany } = vi.hoisted(() => ({
   createMany: vi.fn(),
   findUnique: vi.fn(),
   lotFindMany: vi.fn(),
+  lotCreate: vi.fn(),
   lotUpdateMany: vi.fn(),
 }));
 const tx = {
   inventoryMovement: { createMany, findUnique },
-  productionLot: { findMany: lotFindMany, updateMany: lotUpdateMany },
+  productionLot: { findMany: lotFindMany, create: lotCreate, updateMany: lotUpdateMany },
 } as unknown as Prisma.TransactionClient;
 
 describe('recordMovement', () => {
@@ -18,6 +19,7 @@ describe('recordMovement', () => {
     createMany.mockReset().mockResolvedValue({ count: 1 });
     findUnique.mockReset().mockResolvedValue({ id: 'movement-1', idempotencyKey: 'order-item:item-1:RESERVATION' });
     lotFindMany.mockReset().mockResolvedValue([]);
+    lotCreate.mockReset();
     lotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   });
 
@@ -100,5 +102,34 @@ describe('recordMovement', () => {
     expect(lotFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ productId: 'product-1', productVariantId: null }) }));
     expect(lotUpdateMany).not.toHaveBeenCalled();
     expect(createMany).not.toHaveBeenCalled();
+  });
+
+  it('creates and allocates a default lot when checkout has already confirmed aggregate stock', async () => {
+    const expiry = new Date();
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    lotCreate.mockResolvedValueOnce({
+      id: 'lot-default', batchCode: 'LOT-DEFAULT-duct-1795000000000', availableQty: 999,
+      expDate: expiry, warehouseId: null, warehouse: null,
+    });
+
+    const allocations = await allocateStockFEFO(tx, null, 2, {
+      orderId: 'order-1', productId: 'product', productName: 'Hạt dổi', cartItemId: 'cart-item-1', stockBackedFallback: true,
+    });
+
+    expect(lotCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        batchCode: expect.stringMatching(/^LOT-DEFAULT-duct-\d+$/),
+        qrToken: expect.any(String),
+        productId: 'product',
+        receivedQty: 999,
+        availableQty: 999,
+        status: 'ACTIVE',
+      }),
+    }));
+    expect(allocations).toMatchObject([{ lotId: 'lot-default', quantity: 2 }]);
+    expect(lotUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'lot-default', availableQty: { gte: 2 } }),
+      data: { availableQty: { decrement: 2 } },
+    }));
   });
 });
