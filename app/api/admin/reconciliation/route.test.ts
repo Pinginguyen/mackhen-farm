@@ -115,4 +115,15 @@ describe('POST /api/admin/reconciliation', () => {
     expect(paymentCreate).toHaveBeenCalledWith({ data: { orderId: 'order-1', orderCode: 111111, status: 'PAID', amount: 169000, externalId: 'SP-1' } });
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'MANUALLY_MATCH_BANK_TRANSFER', targetEntity: 'BankTransfer' }));
   });
+
+  it('refuses to mark an order paid when a manually matched transfer has a different amount', async () => {
+    bankTransferFindUnique.mockResolvedValueOnce({ id: 'transfer-1', transactionId: 'SP-1', orderCode: null, amount: 100000, status: 'MISMATCH', mismatchReason: 'amount', orderId: 'order-1' });
+
+    const response = await post({ action: 'MATCH_TRANSFER', orderCode: 'MKF-111111', bankTransferId: 'transfer-1', reason: 'Đã kiểm tra sao kê ngân hàng.' });
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error.message).toContain('không khớp tổng đơn');
+    expect(bankTransferUpdateMany).not.toHaveBeenCalled();
+    expect(orderUpdate).not.toHaveBeenCalled();
+  });
 });

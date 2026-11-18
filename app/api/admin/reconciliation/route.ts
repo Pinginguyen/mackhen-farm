@@ -116,6 +116,9 @@ export async function POST(request: Request) {
         select: { id: true, orderCode: true, numericCode: true, orderStatus: true, paymentStatus: true, reconciled: true, totalAmount: true, phone: true, address: true },
       });
       if (!matchedOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng cần khớp.' } }, { status: 404 });
+      if (transfer.amount !== matchedOrder.totalAmount) {
+        return NextResponse.json({ error: { message: 'Số tiền giao dịch không khớp tổng đơn; không thể xác nhận đơn đã thanh toán.' } }, { status: 409 });
+      }
       if (matchedOrder.orderStatus === 'CANCELLED' || matchedOrder.paymentStatus === 'PAID' && matchedOrder.reconciled) {
         return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc đã đối soát; không thể gán giao dịch này.' } }, { status: 409 });
       }
