@@ -168,6 +168,56 @@ test('03 One-use voucher race allows only one concurrent checkout to consume it'
   }
 });
 
+test('04 Concurrent purchases cannot oversell the last unit or consume a one-use voucher twice', async ({ page }) => {
+  requireLocalMutations();
+  await loginAdmin(page.request);
+  const product = await getProduct();
+  const originalStock = product.stock;
+  const key = token();
+  const email = `pw-stock-voucher-race-${key.toLowerCase()}@example.invalid`;
+  const password = `Pw-${token()}-a9`;
+  const user = await prisma.user.create({ data: { name: 'Playwright Stock Voucher Race', email, password: await hash(password, 10), role: 'CUSTOMER' }, select: { id: true } });
+  const voucherCode = `PW-RACE-${key}`;
+  const voucher = await prisma.voucher.create({ data: { code: voucherCode, discountType: 'FIXED', value: 1000, minSpend: 0, usageLimit: 1, expiresAt: new Date(Date.now() + 86_400_000) } });
+  const contexts: APIRequestContext[] = [];
+  let stockLimited = false;
+
+  try {
+    const changed = await prisma.product.updateMany({ where: { id: product.id, stock: originalStock }, data: { stock: 1 } });
+    expect(changed.count).toBe(1);
+    stockLimited = true;
+
+    contexts.push(await newCustomerContext(email, password));
+    contexts.push(await newCustomerContext(email, password));
+    const responses = await Promise.all(contexts.map((context, index) =>
+      addCartAndCheckout(context, product, `PW-STOCK-VOUCHER-${index}-${key}`, 'COD', voucherCode),
+    ));
+
+    expect(responses.filter((response) => [200, 201].includes(response.status()))).toHaveLength(1);
+    for (const response of responses) expect([200, 201, 400, 409].includes(response.status())).toBe(true);
+
+    const persisted = await prisma.order.findMany({ where: { voucherCode }, select: { id: true, orderCode: true, numericCode: true } });
+    expect(persisted).toHaveLength(1);
+    const remaining = await prisma.product.findUniqueOrThrow({ where: { id: product.id }, select: { stock: true } });
+    expect(remaining.stock).toBe(0);
+    const consumed = await prisma.voucher.findUniqueOrThrow({ where: { id: voucher.id }, select: { usedCount: true, isActive: true } });
+    expect(consumed.usedCount).toBe(1);
+    expect(consumed.isActive).toBe(false);
+  } finally {
+    const persistedOrders = await prisma.order.findMany({ where: { voucherCode }, select: { id: true, orderCode: true, numericCode: true } });
+    for (const order of persistedOrders) await cleanupOrder(order);
+    for (const context of contexts) {
+      const state = await context.storageState();
+      const cartId = state.cookies.find((cookie) => cookie.name === 'bohoch_cart')?.value;
+      if (cartId) await prisma.cart.deleteMany({ where: { id: decodeURIComponent(cartId) } });
+      await context.dispose();
+    }
+    await prisma.voucher.deleteMany({ where: { id: voucher.id } });
+    await prisma.user.deleteMany({ where: { id: user.id } });
+    if (stockLimited) await prisma.product.update({ where: { id: product.id }, data: { stock: originalStock } });
+  }
+});
+
 test('04a SePay rejects a missing authorization header and an invalid signature', async ({ page }) => {
   const webhook = absolute('/api/payment/sepay/webhook');
   const missing = await page.request.post(webhook, { data: { content: 'MKF-000000', transferAmount: 120000 } });

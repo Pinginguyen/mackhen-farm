@@ -23,12 +23,17 @@ export function getApiMetrics() {
   const total = recent.length;
   const errors500 = recent.filter((metric) => metric.status === 500).length;
   const errors504 = recent.filter((metric) => metric.status === 504).length;
+  const errors4xx = recent.filter((metric) => metric.status >= 400 && metric.status < 500).length;
+  const errors5xx = recent.filter((metric) => metric.status >= 500).length;
   return {
     sampleCount: total,
     averageLatencyMs: total ? Math.round(recent.reduce((sum, metric) => sum + metric.durationMs, 0) / total) : null,
+    totalErrors: errors4xx + errors5xx,
+    errors4xx,
+    errors5xx,
     errors500,
     errors504,
-    errorRate5xxPercent: total ? Number((recent.filter((metric) => metric.status >= 500).length / total * 100).toFixed(2)) : null,
+    errorRate5xxPercent: total ? Number((errors5xx / total * 100).toFixed(2)) : null,
     windowMinutes: 15,
   };
 }
