@@ -12,12 +12,20 @@ vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<R
 
 import { GET } from './route';
 
+function sessionEvents(eventType: string, count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    eventType,
+    sessionId: `${eventType}-${index}`,
+    _count: { _all: index ? 1 : 3 },
+  }));
+}
+
 describe('GET /api/admin/reports/funnel', () => {
   beforeEach(() => {
     funnelEventGroupBy.mockReset().mockResolvedValue([
-      { eventType: 'PRODUCT_VIEW', _count: { _all: 1000 } },
-      { eventType: 'ADD_TO_CART', _count: { _all: 120 } },
-      { eventType: 'CHECKOUT_START', _count: { _all: 50 } },
+      ...sessionEvents('PRODUCT_VIEW', 1000),
+      ...sessionEvents('ADD_TO_CART', 120),
+      ...sessionEvents('CHECKOUT_START', 50),
     ]);
     orderCount.mockReset().mockResolvedValue(20);
     requireAdmin.mockReset().mockResolvedValue(null);
@@ -42,7 +50,7 @@ describe('GET /api/admin/reports/funnel', () => {
       usingFallback: false,
     });
     expect(funnelEventGroupBy).toHaveBeenCalledWith(expect.objectContaining({
-      by: ['eventType'],
+      by: ['eventType', 'sessionId'],
       where: { createdAt: { gte: expect.any(Date) } },
       _count: { _all: true },
     }));
@@ -51,7 +59,7 @@ describe('GET /api/admin/reports/funnel', () => {
     }));
   });
 
-  it('returns estimated funnel counts when no traffic events have been recorded', async () => {
+  it('returns zero event counts instead of estimated traffic when no events have been recorded', async () => {
     funnelEventGroupBy.mockResolvedValueOnce([]);
     orderCount.mockResolvedValueOnce(4);
 
@@ -60,9 +68,9 @@ describe('GET /api/admin/reports/funnel', () => {
 
     expect(response.status).toBe(200);
     expect(result).toMatchObject({
-      views: 120,
-      cartAdds: 35,
-      checkouts: 12,
+      views: 0,
+      cartAdds: 0,
+      checkouts: 0,
       completed: 4,
       usingFallback: true,
     });
@@ -76,7 +84,7 @@ describe('GET /api/admin/reports/funnel', () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
-    expect(result).toMatchObject({ views: 250, cartAdds: 60, checkouts: 20, completed: 10, usingFallback: true });
+    expect(result).toMatchObject({ views: 0, cartAdds: 0, checkouts: 0, completed: 10, usingFallback: true, eventDataUnavailable: true });
   });
 
   it('returns the admin guard response without querying funnel data', async () => {

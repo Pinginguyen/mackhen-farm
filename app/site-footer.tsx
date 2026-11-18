@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
-import SoundEffect from '@/components/common/SoundEffect';
 import type { PublicSystemSettings } from '@/lib/system-settings';
 
 export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { settings: Partial<PublicSystemSettings>; footerLogoUrl: string; bctBadgeUrl: string }) {
@@ -81,7 +80,6 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
         </section>
       </div>
       <div className="site-footer-bottom">{text('© 2026 Mắc Khén Farm. Dự án bài tập lớn Thương mại điện tử - ĐH Giao thông Vận tải (UTH).')}</div>
-      <div className="site-footer-sound-control"><SoundEffect /></div>
     </footer>
   );
 }

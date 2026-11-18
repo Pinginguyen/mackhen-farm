@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const periodStart = new Date(updatedAt.getTime() - FUNNEL_PERIOD_DAYS * 24 * 60 * 60 * 1000);
     const [eventsResult, ordersResult] = await Promise.allSettled([
       prisma.funnelEvent.groupBy({
-        by: ['eventType'],
+        by: ['eventType', 'sessionId'],
         where: { createdAt: { gte: periodStart } },
         _count: { _all: true },
       }),
@@ -34,12 +34,13 @@ export async function GET(request: Request) {
     ]);
     const eventCounts = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
     const totalOrders = ordersResult.status === 'fulfilled' ? ordersResult.value : 0;
-    const counts = new Map(eventCounts.map((event) => [event.eventType, event._count._all]));
+    const counts = new Map<string, number>();
+    for (const event of eventCounts) counts.set(event.eventType, (counts.get(event.eventType) ?? 0) + 1);
     const hasTrafficEvents = eventCounts.some((event) => event._count._all > 0);
     const usingFallback = eventsResult.status === 'rejected' || !hasTrafficEvents;
-    const views = usingFallback ? Math.max(120, totalOrders * 25) : counts.get('PRODUCT_VIEW') ?? 0;
-    const cartAdds = usingFallback ? Math.max(35, totalOrders * 6) : counts.get('ADD_TO_CART') ?? 0;
-    const checkouts = usingFallback ? Math.max(12, totalOrders * 2) : counts.get('CHECKOUT_START') ?? 0;
+    const views = counts.get('PRODUCT_VIEW') ?? 0;
+    const cartAdds = counts.get('ADD_TO_CART') ?? 0;
+    const checkouts = counts.get('CHECKOUT_START') ?? 0;
     const completed = totalOrders;
     const cartRate = conversionRate(cartAdds, views);
     const checkoutRate = conversionRate(completed, checkouts);
@@ -60,6 +61,7 @@ export async function GET(request: Request) {
       overallRate,
       checkoutDropOffRate,
       usingFallback,
+      eventDataUnavailable: eventsResult.status === 'rejected',
       productViews: views,
       addToCart: cartAdds,
       checkoutStarts: checkouts,

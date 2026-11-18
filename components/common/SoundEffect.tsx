@@ -19,13 +19,13 @@ export function playClickSound() {
     const gain = audioContext.createGain();
     const start = audioContext.currentTime;
     oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(800, start);
-    gain.gain.setValueAtTime(0.055, start);
-    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.015);
+    oscillator.frequency.setValueAtTime(620, start);
+    gain.gain.setValueAtTime(0.025, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.04);
     oscillator.connect(gain);
     gain.connect(audioContext.destination);
     oscillator.start(start);
-    oscillator.stop(start + 0.015);
+    oscillator.stop(start + 0.04);
   } catch {
     return;
   }

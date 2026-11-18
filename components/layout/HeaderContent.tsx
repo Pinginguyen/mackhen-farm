@@ -7,6 +7,7 @@ import LogoutButton from '@/app/logout-button';
 import LiveProductSearch from './LiveProductSearch';
 import CartLink from './CartLink';
 import LocaleCurrencySwitcher from './LocaleCurrencySwitcher';
+import SoundEffect from '@/components/common/SoundEffect';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
@@ -64,6 +65,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
       <div className="site-header-actions !gap-2.5">
         <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
         <CartLink />
+        <SoundEffect />
         <LocaleCurrencySwitcher />
         {!activeUser ? (
           <>

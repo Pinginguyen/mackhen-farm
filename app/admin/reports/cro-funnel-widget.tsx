@@ -17,6 +17,7 @@ type FunnelMetrics = {
   overallRate: number | null;
   checkoutDropOffRate: number | null;
   usingFallback: boolean;
+  eventDataUnavailable?: boolean;
 };
 
 function formatRate(rate: number | null): string {
@@ -43,28 +44,15 @@ export default function CroFunnelWidget() {
         if (active) {
           setMetrics(data);
           setUpdatedAt(new Date(data.updatedAt).toLocaleTimeString('vi-VN'));
-          setNotice(data.usingFallback ? 'Chưa có lượt truy cập được ghi nhận; đang hiển thị ước tính dựa trên số đơn.' : '');
+            setNotice(data.eventDataUnavailable
+              ? 'Không thể đọc bảng sự kiện FunnelEvent; các lượt event đang hiển thị bằng 0.'
+              : data.usingFallback
+                ? 'Chưa ghi nhận sự kiện phễu trong 30 ngày; các lượt thanh toán lấy từ đơn hàng đã trả.'
+                : '');
         }
       } catch {
         if (active) {
-          const now = new Date();
-          setMetrics({
-            periodDays: 30,
-            periodStart: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            updatedAt: now.toISOString(),
-            views: 120,
-            cartAdds: 35,
-            checkouts: 12,
-            completed: 0,
-            cartRate: 29.17,
-            cartToCheckoutRate: 34.29,
-            checkoutRate: 0,
-            overallRate: 0,
-            checkoutDropOffRate: 100,
-            usingFallback: true,
-          });
-          setUpdatedAt(now.toLocaleTimeString('vi-VN'));
-          setNotice('Tạm thời không kết nối được báo cáo; đang hiển thị số liệu ước tính.');
+          setNotice('Tạm thời không kết nối được dữ liệu phễu.');
         }
       } finally {
         inFlight = false;
@@ -73,7 +61,7 @@ export default function CroFunnelWidget() {
     }
 
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 30_000);
+      const interval = window.setInterval(() => void refresh(), 15_000);
     window.addEventListener('focus', refresh);
     return () => {
       active = false;
@@ -103,7 +91,7 @@ export default function CroFunnelWidget() {
       <p className="cro-funnel-benchmark">Chuẩn ngành TMĐT FMCG: CR dao động 2.0% - 4.0% (Theo Slide 6.10 giáo trình TMĐT UTH)</p>
 
       {notice && <p className="cro-funnel-empty" role="status">{notice}</p>}
-      {loading && !metrics ? <p className="cro-funnel-empty" role="status">Đang tải dữ liệu chuyển đổi...</p> : metrics && <>
+      {loading && !metrics ? <p className="cro-funnel-empty" role="status">Đang tải dữ liệu chuyển đổi...</p> : !metrics ? <p className="cro-funnel-error" role="status">{notice || 'Chưa thể tải dữ liệu phễu chuyển đổi.'}</p> : <>
         <div className="cro-funnel-stages" aria-label="Bốn tầng phễu chuyển đổi">
           {stages.map((stage, index) => {
             const base = metrics.views;
