@@ -4,7 +4,7 @@ import { Redis } from '@upstash/redis';
 
 const rateLimitBuckets = new Map<string, number[]>();
 const RATE_LIMITS: Record<string, { limit: number; windowMs: number }> = {
-  '/api/checkout': { limit: 3, windowMs: 10_000 },
+  '/api/checkout': { limit: 10, windowMs: 10_000 },
   '/api/orders': { limit: 3, windowMs: 10_000 },
   '/api/auth/login': { limit: 10, windowMs: 60_000 },
   '/api/marketing/subscribe': { limit: 5, windowMs: 60_000 },

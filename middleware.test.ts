@@ -103,9 +103,9 @@ describe('RBAC middleware', () => {
       'x-forwarded-for': '203.0.113.250',
     }, 'POST');
 
-    expect((await middleware(request())).status).not.toBe(429);
-    expect((await middleware(request())).status).not.toBe(429);
-    expect((await middleware(request())).status).not.toBe(429);
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      expect((await middleware(request())).status).not.toBe(429);
+    }
     const response = await middleware(request());
 
     expect(response.status).toBe(429);
