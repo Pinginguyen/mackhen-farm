@@ -11,6 +11,7 @@ import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledge
 import { pushOrderToCarrierShipment } from '@/lib/services/shipping-carrier';
 import { awardOrderLoyaltyPoints } from '@/lib/loyalty';
 import { awardReferralPoints } from '@/lib/referral';
+import { creditOrderCashback } from '@/lib/wallet';
 import { sendOrderConfirmationIfNeeded, sendShippingUpdateIfNeeded } from '@/lib/order-email-notifications';
 import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 import type { Prisma, ShippingCarrier } from '@prisma/client';
@@ -75,7 +76,7 @@ export async function GET(request: Request) {
       { returnRequests: { some: { status: 'PENDING' } } },
     ] });
     else if (status && ['PROCESSING', 'HANDED_OFF', 'IN_TRANSIT', 'SHIPPING', 'RETURNED', 'CANCELLED'].includes(status)) filters.push({ orderStatus: status as (typeof statuses)[number] });
-    if (paymentMethod === 'COD' || paymentMethod === 'VIETQR' || paymentMethod === 'MOMO') where.paymentMethod = paymentMethod;
+    if (paymentMethod === 'COD' || paymentMethod === 'VIETQR' || paymentMethod === 'MOMO' || paymentMethod === 'WALLET') where.paymentMethod = paymentMethod;
     if (from || to) {
       where.createdAt = {
         ...(from ? { gte: new Date(`${from}T00:00:00.000Z`) } : {}),
@@ -251,6 +252,7 @@ export async function PATCH(request: Request) {
         if (isDelivered && !wasDelivered) {
           await awardOrderLoyaltyPoints(transaction, { userId: currentOrder.userId, orderId: currentOrder.id, amountVnd: currentOrder.totalAmount });
           await awardReferralPoints(transaction, { orderId: currentOrder.id, orderCode: currentOrder.orderCode, referrerUserId: currentOrder.referredByUserId });
+          await creditOrderCashback(transaction, { userId: currentOrder.userId, orderId: currentOrder.id, orderCode: currentOrder.orderCode, orderAmount: currentOrder.totalAmount });
         }
         return updatedOrder;
       }));

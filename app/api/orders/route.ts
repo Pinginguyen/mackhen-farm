@@ -15,6 +15,7 @@ import { allocateStockFEFO } from '@/lib/services/inventory-ledger';
 import { calculateRealtimeShippingRate } from '@/lib/services/shipping-carrier';
 import { getClientIpHash, isSelfReferral } from '@/lib/affiliate-fraud';
 import { normalizeCustomerReferralCode } from '@/lib/referral';
+import { debitWalletForOrder } from '@/lib/wallet';
 import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
 import { getEffectivePrice } from '@/lib/pricing';
 
@@ -41,6 +42,7 @@ type CheckoutBody = {
   referralCode?: unknown;
   buyNow?: boolean;
   useLoyaltyPoints?: unknown;
+  useWalletBalance?: unknown;
   items?: unknown;
   price?: unknown;
   totalAmount?: unknown;
@@ -53,6 +55,8 @@ type CreatedOrder = {
   numericCode: number;
   orderStatus: string;
   totalAmount: number;
+  walletAmountSpent: number;
+  paymentMethod: 'COD' | 'VIETQR' | 'MOMO' | 'WALLET';
   duplicate?: boolean;
 };
 type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY' | 'LOYALTY_LOGIN_REQUIRED' | 'INVALID_REFERRAL_CODE'; message?: string };
@@ -162,8 +166,8 @@ function sameCartContents(
   });
 }
 
-function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO', orderCode: string, amount: number): string {
-  if (method === 'COD') return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
+function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO' | 'WALLET', orderCode: string, amount: number): string {
+  if (method === 'COD' || method === 'WALLET' || amount <= 0) return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
   if (method === 'MOMO') return `/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`;
   return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
 }
@@ -226,6 +230,7 @@ export async function POST(request: Request) {
   const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
   if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR'].includes(paymentMethod)
     || (body.useLoyaltyPoints !== undefined && typeof body.useLoyaltyPoints !== 'boolean')
+    || (body.useWalletBalance !== undefined && typeof body.useWalletBalance !== 'boolean')
     || Boolean(province) !== Boolean(district) || province.length > 100 || district.length > 100) {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
   }
@@ -243,6 +248,9 @@ export async function POST(request: Request) {
   if (body.useLoyaltyPoints === true && !session) {
     return NextResponse.json({ error: { code: 'LOYALTY_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập để sử dụng điểm thưởng.' } }, { status: 401 });
   }
+  if (body.useWalletBalance === true && !session) {
+    return NextResponse.json({ error: { code: 'WALLET_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập để sử dụng số dư ví nội bộ.' } }, { status: 401 });
+  }
   const buyerIpHash = getClientIpHash(request);
   if (isManagedVoucher && !session) {
     return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
@@ -254,7 +262,7 @@ export async function POST(request: Request) {
     if (idempotencyKey) {
       const existingOrder = await prisma.order.findUnique({
         where: { idempotencyKey },
-        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
       });
       if (existingOrder) {
         if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
@@ -266,8 +274,9 @@ export async function POST(request: Request) {
           status: existingOrder.orderStatus.toLowerCase(),
           total: existingOrder.totalAmount,
           totalAmount: existingOrder.totalAmount,
+          paymentMethod: existingOrder.paymentMethod,
           duplicate: true,
-          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
+          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount - existingOrder.walletAmountSpent),
         }, { status: 200 });
         setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
         if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
@@ -362,6 +371,12 @@ export async function POST(request: Request) {
           discount += loyaltyPointsSpent * 100;
         }
         const totalAmount = subtotal + shipping - discount;
+        let walletAmountSpent = 0;
+        if (body.useWalletBalance === true && session) {
+          const wallet = await transaction.wallet.findUnique({ where: { userId: session.userId }, select: { balance: true } });
+          walletAmountSpent = Math.min(wallet?.balance ?? 0, totalAmount);
+        }
+        const amountDue = totalAmount - walletAmountSpent;
 
         if (!sameCartContents(body.items, currentItems)) {
           console.warn('Checkout quantity or cart state mismatch rejected.');
@@ -371,7 +386,7 @@ export async function POST(request: Request) {
         checkoutFingerprint = createCheckoutFingerprint(session?.userId ?? `guest:${phone}`, currentItems, totalAmount);
         const fingerprintDuplicate = await transaction.order.findFirst({
           where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
-          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
         });
         if (fingerprintDuplicate) return { ...fingerprintDuplicate, duplicate: true };
 
@@ -481,13 +496,14 @@ export async function POST(request: Request) {
             customerName: name,
             phone,
             address,
-            paymentMethod: paymentMethod as 'COD' | 'VIETQR',
-            paymentStatus: 'PENDING',
-            orderStatus: 'PENDING',
+            paymentMethod: amountDue === 0 ? 'WALLET' : paymentMethod as 'COD' | 'VIETQR',
+            paymentStatus: amountDue === 0 ? 'PAID' : 'PENDING',
+            orderStatus: amountDue === 0 ? 'PAID' : 'PENDING',
             subtotal,
             shippingFee: shipping,
             discountAmount: discount,
             loyaltyPointsSpent,
+            walletAmountSpent,
             voucherCode: voucherCode || null,
             affiliateCode: attributedAffiliate?.affiliateCode ?? null,
             affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
@@ -497,12 +513,16 @@ export async function POST(request: Request) {
             checkoutFingerprint,
             grossAmount: subtotal,
             netAmount: totalAmount,
-            reconciled: false,
-            holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
+            reconciled: amountDue === 0,
+            holdExpiresAt: amountDue === 0 ? null : new Date(Date.now() + 15 * 60 * 1000),
             lotCode: null,
             note: typeof body.note === 'string' ? body.note.trim() || null : null,
           },
         });
+        if (walletAmountSpent > 0 && session) {
+          const debited = await debitWalletForOrder(transaction, { userId: session.userId, orderId: order.id, amount: walletAmountSpent });
+          if (!debited) throw new Error('WALLET_BALANCE_CHANGED');
+        }
         if (loyaltyPointsSpent > 0 && session) {
           const pointsClaim = await transaction.user.updateMany({
             where: { id: session.userId, loyaltyPoints: { gte: loyaltyPointsSpent } },
@@ -580,7 +600,7 @@ export async function POST(request: Request) {
       if (checkoutFingerprint && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
         const fingerprintDuplicate = await prisma.order.findFirst({
           where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
-          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
         });
         if (fingerprintDuplicate && normalizeVietnamesePhone(fingerprintDuplicate.phone) === phone) {
           const response = NextResponse.json({
@@ -591,8 +611,9 @@ export async function POST(request: Request) {
             status: fingerprintDuplicate.orderStatus.toLowerCase(),
             total: fingerprintDuplicate.totalAmount,
             totalAmount: fingerprintDuplicate.totalAmount,
+            paymentMethod: fingerprintDuplicate.paymentMethod,
             duplicate: true,
-            redirectUrl: buildPaymentRedirect(fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.totalAmount),
+            redirectUrl: buildPaymentRedirect(fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.totalAmount - fingerprintDuplicate.walletAmountSpent),
           }, { status: 200 });
           setPaymentVerificationCookie(response, fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.phone);
           if (body.buyNow === true && fingerprintDuplicate.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
@@ -602,7 +623,7 @@ export async function POST(request: Request) {
       if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
         const existingOrder = await prisma.order.findUnique({
           where: { idempotencyKey },
-          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, paymentMethod: true, phone: true },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
         });
         if (existingOrder) {
           if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
@@ -614,8 +635,9 @@ export async function POST(request: Request) {
             status: existingOrder.orderStatus.toLowerCase(),
             total: existingOrder.totalAmount,
             totalAmount: existingOrder.totalAmount,
+            paymentMethod: existingOrder.paymentMethod,
             duplicate: true,
-            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount),
+            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount - existingOrder.walletAmountSpent),
           }, { status: 200 });
           setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
           if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
@@ -631,6 +653,9 @@ export async function POST(request: Request) {
       }
       if (error instanceof Error && error.message === 'LOYALTY_BALANCE_CHANGED') {
         return NextResponse.json({ error: { code: 'LOYALTY_BALANCE_CHANGED', message: 'Số điểm vừa thay đổi. Vui lòng tải lại trang thanh toán.' } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message === 'WALLET_BALANCE_CHANGED') {
+        return NextResponse.json({ error: { code: 'WALLET_BALANCE_CHANGED', message: 'Số dư ví vừa thay đổi. Vui lòng tải lại trang thanh toán.' } }, { status: 409 });
       }
       if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK_LOT:')) {
         const productName = error.message.slice('INSUFFICIENT_STOCK_LOT:'.length);
@@ -702,7 +727,7 @@ export async function POST(request: Request) {
     }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
     const postCommitTasks: Promise<unknown>[] = [];
-    if (paymentMethod === 'COD') postCommitTasks.push(
+    if (order.paymentMethod === 'COD' || order.paymentMethod === 'WALLET') postCommitTasks.push(
       prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } }).catch((error) => {
         console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
       }),
@@ -724,11 +749,12 @@ export async function POST(request: Request) {
       status: order.orderStatus.toLowerCase(),
       total: order.totalAmount,
       totalAmount: order.totalAmount,
-      redirectUrl: buildPaymentRedirect(paymentMethod as 'COD' | 'VIETQR', order.orderCode, order.totalAmount),
+      paymentMethod: order.paymentMethod,
+      redirectUrl: buildPaymentRedirect(order.paymentMethod, order.orderCode, order.totalAmount - order.walletAmountSpent),
       ...(order.duplicate ? { duplicate: true } : {}),
     }, { status: order.duplicate ? 200 : 201 });
     setPaymentVerificationCookie(response, paymentMethod, order.orderCode, phone);
-    if (body.buyNow === true && paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+    if (body.buyNow === true && ['COD', 'WALLET'].includes(order.paymentMethod)) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
     return response;
   }, 'Lỗi đặt hàng:');
 }

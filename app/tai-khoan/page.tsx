@@ -21,6 +21,13 @@ export default async function CustomerAccountPage({ searchParams }: { searchPara
     take: 30,
   });
 
+  const reviewRewards = await prisma.review.findMany({
+    where: { status: 'APPROVED', rewardVoucherCode: { not: null }, order: { is: { userId: session.userId } } },
+    select: { id: true, rewardVoucherCode: true, createdAt: true, product: { select: { name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
     const orders = await prisma.order.findMany({
       where: {
         OR: [
@@ -34,5 +41,5 @@ export default async function CustomerAccountPage({ searchParams }: { searchPara
       take: 50,
     });
 
-  return <main className="page-shell"><AccountDashboard profile={user} pointHistory={pointHistory.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() }))} orders={orders.map((order) => ({ ...order, items: order.items.map((item) => ({ productName: item.titleSnapshot, productSlug: item.skuSnapshot ?? '', quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice })), createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
+  return <main className="page-shell"><AccountDashboard profile={user} pointHistory={pointHistory.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() }))} reviewRewards={reviewRewards.map((reward) => ({ ...reward, createdAt: reward.createdAt.toISOString() }))} orders={orders.map((order) => ({ ...order, items: order.items.map((item) => ({ productName: item.titleSnapshot, productSlug: item.skuSnapshot ?? '', quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice })), createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
 }

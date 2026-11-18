@@ -5,8 +5,11 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function GET(_request: Request, { params }: { params: { batchCode: string } }) {
-  const batchCode = params.batchCode?.trim().toUpperCase() ?? '';
-  if (!/^LOT-[A-Z0-9-]{4,60}$/.test(batchCode)) {
+  const identifier = params.batchCode?.trim() ?? '';
+  const batchCode = identifier.toUpperCase();
+  const isBatchCode = /^LOT-[A-Z0-9-]{4,60}$/.test(batchCode);
+  const isQrToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
+  if (!isBatchCode && !isQrToken) {
     return NextResponse.json(
       { success: false, error: 'Mã lô không tồn tại hoặc chưa được phát hành trên hệ thống.' },
       { status: 400 },
@@ -15,9 +18,9 @@ export async function GET(_request: Request, { params }: { params: { batchCode: 
 
   try {
     const lot = await prisma.productionLot.findUnique({
-      where: { batchCode },
+      where: isQrToken ? { qrToken: identifier } : { batchCode },
       include: {
-        product: { select: { name: true, slug: true, unit: true, ingredients: true } },
+        product: { select: { name: true, slug: true, unit: true, ingredients: true, originRegion: true } },
         variant: { select: { title: true, weight: true } },
       },
     });
@@ -33,7 +36,9 @@ export async function GET(_request: Request, { params }: { params: { batchCode: 
       success: true,
       data: {
         batchCode: lot.batchCode,
+        qrToken: lot.qrToken,
         productName: lot.product.name,
+        originRegion: lot.product.originRegion ?? 'Sơn La, Tây Bắc',
         manufacturingDate: lot.mfgDate.toISOString().slice(0, 10),
         expiryDate: lot.expDate.toISOString().slice(0, 10),
         packaging: lot.variant?.weight ?? lot.product.unit ?? undefined,

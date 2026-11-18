@@ -51,6 +51,7 @@ export async function POST(request: Request) {
         shippingFee: order.shippingFee,
         discountAmount: order.discountAmount,
         totalAmount: order.totalAmount,
+        walletAmountSpent: order.walletAmountSpent,
         trackingCode: order.trackingCode,
         carrier: order.carrier,
         createdAt: order.createdAt,

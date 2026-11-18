@@ -7,7 +7,7 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   return withDatabase(async () => {
   const product = await prisma.product.findUnique({
     where: { slug: params.slug },
-    include: { variants: true, reviews: { orderBy: { createdAt: 'desc' }, take: 20 } },
+    include: { variants: true, reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20 } },
   });
 
   if (!product || !product.active) {

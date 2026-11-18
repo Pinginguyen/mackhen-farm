@@ -9,6 +9,9 @@ export type AdminReview = {
   customerName: string;
   rating: number;
   comment: string;
+  images: string[];
+  status: string;
+  rewardVoucherCode: string | null;
   riskTag: string | null;
   createdAt: string;
   adminReply: string | null;
@@ -30,6 +33,7 @@ export default function ReviewsManager({ initialReviews }: { initialReviews: Adm
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const visibleReviews = reviews.filter((review) => filter === 'all'
     || (filter === '5' ? review.rating === 5 : filter === 'low' ? review.rating <= 2 : ['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(review.riskTag ?? '')));
@@ -58,6 +62,28 @@ export default function ReviewsManager({ initialReviews }: { initialReviews: Adm
     }
   }
 
+  async function moderateReview(review: AdminReview, status: 'APPROVED' | 'REJECTED') {
+    setModeratingId(review.id);
+    setMessage('');
+    try {
+      const response = await fetch(`/api/admin/reviews/${encodeURIComponent(review.id)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json() as { item?: { status: string; rewardVoucherCode: string | null }; voucherCode?: string | null; emailSent?: boolean; error?: { message?: string } };
+      if (!response.ok || !result.item) throw new Error(result.error?.message ?? 'Không thể cập nhật trạng thái đánh giá.');
+      setReviews((current) => current.map((item) => item.id === review.id ? { ...item, ...result.item } : item));
+      setMessage(status === 'APPROVED'
+        ? result.emailSent ? `Đã duyệt đánh giá và gửi voucher ${result.voucherCode}.` : `Đã duyệt đánh giá. Voucher ${result.voucherCode ?? ''} đã sẵn sàng trong tài khoản.`
+        : 'Đã từ chối đánh giá.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái đánh giá.');
+    } finally {
+      setModeratingId(null);
+    }
+  }
+
   return (
     <section className="admin-reviews-manager" aria-label="Quản lý đánh giá">
       <div className="admin-review-filters" role="tablist" aria-label="Lọc đánh giá">
@@ -71,6 +97,12 @@ export default function ReviewsManager({ initialReviews }: { initialReviews: Adm
           <div className="admin-review-product"><Link href={`/products/${encodeURIComponent(review.product.slug)}`}>{review.product.name}</Link><span>{review.order?.orderCode ?? 'Đánh giá sản phẩm'}</span></div>
           <p className="admin-review-rating" aria-label={`${review.rating} sao`}>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={15} fill={index < review.rating ? 'currentColor' : 'none'} />)}<strong>{review.rating}/5</strong></p>
           <p className="admin-review-comment">{review.comment}</p>
+          {review.images.length > 0 && <div className="admin-review-images" aria-label="Ảnh khách hàng đính kèm">{review.images.map((image) => <a key={image} href={image} target="_blank" rel="noreferrer"><img src={image} alt={`Ảnh đánh giá của ${review.customerName}`} loading="lazy" /></a>)}</div>}
+          <div className="admin-review-moderation">
+            <span className={`admin-review-status${review.status === 'APPROVED' ? ' is-replied' : ''}`}>{review.status === 'APPROVED' ? 'Đã duyệt' : review.status === 'REJECTED' ? 'Đã từ chối' : 'Chờ duyệt'}</span>
+            {review.status === 'PENDING' && <><button type="button" disabled={moderatingId === review.id} onClick={() => void moderateReview(review, 'APPROVED')}>Duyệt &amp; cấp voucher</button><button type="button" className="is-secondary" disabled={moderatingId === review.id} onClick={() => void moderateReview(review, 'REJECTED')}>Từ chối</button></>}
+            {review.rewardVoucherCode && <code>{review.rewardVoucherCode}</code>}
+          </div>
           {review.adminReply && <blockquote>{review.adminReply}<small>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString('vi-VN') : ''}</small></blockquote>}
           <button type="button" className="admin-review-reply-button" onClick={() => { setDraft(review.adminReply ?? ''); setOpenId(openId === review.id ? null : review.id); }}><MessageCircle size={15} />{review.adminReply ? 'Sửa phản hồi' : 'Phản hồi'}</button>
           {openId === review.id && <form className="admin-review-reply-editor" onSubmit={(event) => { event.preventDefault(); void saveReply(review, draft); }}>

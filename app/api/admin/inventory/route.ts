@@ -19,7 +19,7 @@ export async function GET(request: Request) {
         select: {
           id: true, name: true, category: true, price: true, unit: true, stock: true, active: true, image: true,
           variants: { select: { id: true, title: true, inventory: true, sku: true } },
-          productionLots: { select: { id: true, batchCode: true, productVariantId: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
+          productionLots: { select: { id: true, batchCode: true, qrToken: true, productVariantId: true, mfgDate: true, expDate: true, receivedQty: true, availableQty: true, status: true, testReportUrl: true, receivingNote: true } },
         },
         orderBy: { name: 'asc' },
       }),
@@ -84,7 +84,7 @@ export async function PATCH(request: Request) {
             if (!variant) return { error: 'VARIANT_NOT_FOUND' as const };
           }
           const createdLot = await transaction.productionLot.create({
-            data: { batchCode, productId: body.productId!, productVariantId, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
+            data: { batchCode, qrToken: randomUUID(), productId: body.productId!, productVariantId, mfgDate, expDate, receivedQty: body.receivedQty!, availableQty: body.receivedQty!, testReportUrl, receivingNote: body.receivingNote?.trim() || null },
           });
           await recordMovement(transaction, {
             productId: body.productId!,

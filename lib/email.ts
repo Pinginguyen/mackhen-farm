@@ -61,6 +61,23 @@ export async function sendCompensationVoucherEmail(input: {
   });
 }
 
+export async function sendReviewRewardEmail(input: { toEmail: string; customerName: string; voucherCode: string; expiresAt: Date }) {
+  const { user, transporter } = createEmailTransporter();
+  const customerName = escapeHtml(input.customerName);
+  const voucherCode = escapeHtml(input.voucherCode);
+  const expiresAt = input.expiresAt.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const shopUrl = `${(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhenfarm.vn').replace(/\/+$/, '')}/products`;
+  const html = emailLayout('Cảm ơn bạn đã chia sẻ trải nghiệm', `<p style="margin:0 0 14px;line-height:1.6">Xin chào ${customerName}, đánh giá của bạn đã được duyệt. Mắc Khén Farm gửi tặng bạn voucher giảm 10% như lời cảm ơn.</p><p style="margin:20px 0;padding:16px;border:1px dashed #8b1e1e;text-align:center"><strong style="display:block;color:#78716c;font-size:12px">MÃ ƯU ĐÃI CÁ NHÂN</strong><span style="display:block;margin:8px 0;color:#8b1e1e;font-size:22px;font-weight:700">${voucherCode}</span><small>Giảm 10% cho đơn từ 100.000đ · Hạn dùng ${escapeHtml(expiresAt)}</small></p><p style="margin:22px 0;text-align:center"><a href="${escapeHtml(shopUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Khám phá sản phẩm</a></p>`);
+
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: '[Mắc Khén Farm] Voucher cảm ơn đánh giá của bạn',
+    text: `Xin chào ${input.customerName}, đánh giá của bạn đã được duyệt. Mã voucher ${input.voucherCode} giảm 10% cho đơn từ 100.000đ, hạn dùng đến ${expiresAt}. ${shopUrl}`,
+    html,
+  });
+}
+
 export async function sendB2bInquiryEmail(input: {
   companyName: string;
   country: string;
@@ -124,10 +141,11 @@ export async function sendOrderConfirmationEmail(input: {
   toEmail: string;
   customerName: string;
   orderCode: string;
-  paymentMethod: 'COD' | 'VIETQR' | 'MOMO';
+  paymentMethod: 'COD' | 'VIETQR' | 'MOMO' | 'WALLET';
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
+  walletAmountSpent?: number;
   totalAmount: number;
   items: OrderEmailItem[];
 }) {
@@ -140,24 +158,26 @@ export async function sendOrderConfirmationEmail(input: {
   const bankId = process.env.VIETQR_BANK_ID;
   const accountNumber = process.env.VIETQR_ACCOUNT_NUMBER;
   const accountName = process.env.VIETQR_ACCOUNT_NAME ?? '';
+  const amountDue = input.totalAmount - (input.walletAmountSpent ?? 0);
   let qrUrl = '';
-  if (input.paymentMethod === 'VIETQR' && bankId && accountNumber) {
+  if (input.paymentMethod === 'VIETQR' && amountDue > 0 && bankId && accountNumber) {
     const qr = new URL(`https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNumber)}-compact2.png`);
-    qr.searchParams.set('amount', String(input.totalAmount));
+    qr.searchParams.set('amount', String(amountDue));
     qr.searchParams.set('addInfo', input.orderCode);
     if (accountName) qr.searchParams.set('accountName', accountName);
     qrUrl = qr.toString();
   }
   const transferBlock = input.paymentMethod === 'VIETQR'
-    ? `<h3 style="margin:22px 0 8px;color:#1b4332;font-size:15px">Thông tin chuyển khoản</h3>${qrUrl ? `<p style="text-align:center;margin:14px 0"><img src="${escapeHtml(qrUrl)}" width="220" height="220" alt="Mã VietQR cho đơn ${orderCode}" style="display:block;width:220px;max-width:100%;height:auto;margin:0 auto"></p>` : ''}<p style="margin:6px 0;line-height:1.6">Ngân hàng: <strong>${escapeHtml(bankId ?? 'MB')}</strong><br>Số tài khoản: <strong>${escapeHtml(accountNumber ?? 'Xem thông tin tại trang thanh toán')}</strong><br>Chủ tài khoản: <strong>${escapeHtml(accountName || 'Mắc Khén Farm')}</strong><br>Nội dung chuyển khoản: <strong>${orderCode}</strong><br>Số tiền: <strong>${input.totalAmount.toLocaleString('vi-VN')}đ</strong></p>`
-    : `<p style="margin:18px 0;padding:12px;background:#f8f6f1;line-height:1.6">${input.paymentMethod === 'COD' ? 'Bạn thanh toán khi nhận hàng.' : 'Phương thức thanh toán đã được ghi nhận cho đơn hàng.'}</p>`;
-  const html = emailLayout('Xác nhận đơn hàng', `<p style="margin:0 0 12px;line-height:1.6">Xin chào ${customerName}, Mắc Khén Farm đã tiếp nhận đơn <strong>${orderCode}</strong>.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px"><thead><tr><th align="left" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Sản phẩm</th><th style="padding:8px 6px;border-bottom:2px solid #d6c9b3">SL</th><th align="right" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Thành tiền</th></tr></thead><tbody>${rows}</tbody></table><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;font-size:13px"><tr><td style="padding:4px 0">Tạm tính</td><td align="right">${input.subtotal.toLocaleString('vi-VN')}đ</td></tr><tr><td style="padding:4px 0">Vận chuyển</td><td align="right">${input.shippingFee.toLocaleString('vi-VN')}đ</td></tr>${input.discountAmount ? `<tr><td style="padding:4px 0">Ưu đãi</td><td align="right">−${input.discountAmount.toLocaleString('vi-VN')}đ</td></tr>` : ''}<tr><td style="padding:9px 0;border-top:1px solid #ddd;font-size:16px"><strong>Tổng thanh toán</strong></td><td align="right" style="padding:9px 0;border-top:1px solid #ddd;color:#841e1e;font-size:16px"><strong>${input.totalAmount.toLocaleString('vi-VN')}đ</strong></td></tr></table>${transferBlock}<p style="margin:22px 0;text-align:center"><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Theo dõi đơn hàng</a></p>`);
+    ? `<h3 style="margin:22px 0 8px;color:#1b4332;font-size:15px">Thông tin chuyển khoản</h3>${qrUrl ? `<p style="text-align:center;margin:14px 0"><img src="${escapeHtml(qrUrl)}" width="220" height="220" alt="Mã VietQR cho đơn ${orderCode}" style="display:block;width:220px;max-width:100%;height:auto;margin:0 auto"></p>` : ''}<p style="margin:6px 0;line-height:1.6">Ngân hàng: <strong>${escapeHtml(bankId ?? 'MB')}</strong><br>Số tài khoản: <strong>${escapeHtml(accountNumber ?? 'Xem thông tin tại trang thanh toán')}</strong><br>Chủ tài khoản: <strong>${escapeHtml(accountName || 'Mắc Khén Farm')}</strong><br>Nội dung chuyển khoản: <strong>${orderCode}</strong><br>Số tiền còn phải chuyển: <strong>${amountDue.toLocaleString('vi-VN')}đ</strong></p>`
+    : `<p style="margin:18px 0;padding:12px;background:#f8f6f1;line-height:1.6">${input.paymentMethod === 'COD' ? 'Bạn thanh toán khi nhận hàng.' : input.paymentMethod === 'WALLET' ? 'Đơn hàng đã được thanh toán bằng ví nội bộ.' : 'Phương thức thanh toán đã được ghi nhận cho đơn hàng.'}</p>`;
+  const walletLine = input.walletAmountSpent ? `<tr><td style="padding:4px 0">Đã dùng ví nội bộ</td><td align="right">−${input.walletAmountSpent.toLocaleString('vi-VN')}đ</td></tr>` : '';
+  const html = emailLayout('Xác nhận đơn hàng', `<p style="margin:0 0 12px;line-height:1.6">Xin chào ${customerName}, Mắc Khén Farm đã tiếp nhận đơn <strong>${orderCode}</strong>.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px"><thead><tr><th align="left" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Sản phẩm</th><th style="padding:8px 6px;border-bottom:2px solid #d6c9b3">SL</th><th align="right" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Thành tiền</th></tr></thead><tbody>${rows}</tbody></table><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;font-size:13px"><tr><td style="padding:4px 0">Tạm tính</td><td align="right">${input.subtotal.toLocaleString('vi-VN')}đ</td></tr><tr><td style="padding:4px 0">Vận chuyển</td><td align="right">${input.shippingFee.toLocaleString('vi-VN')}đ</td></tr>${input.discountAmount ? `<tr><td style="padding:4px 0">Ưu đãi</td><td align="right">−${input.discountAmount.toLocaleString('vi-VN')}đ</td></tr>` : ''}${walletLine}<tr><td style="padding:9px 0;border-top:1px solid #ddd;font-size:16px"><strong>Tổng thanh toán</strong></td><td align="right" style="padding:9px 0;border-top:1px solid #ddd;color:#841e1e;font-size:16px"><strong>${(input.totalAmount - (input.walletAmountSpent ?? 0)).toLocaleString('vi-VN')}đ</strong></td></tr></table>${transferBlock}<p style="margin:22px 0;text-align:center"><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Theo dõi đơn hàng</a></p>`);
 
   await transporter.sendMail({
     from: `"Mắc Khén Farm" <${user}>`,
     to: input.toEmail,
     subject: `[Mắc Khén Farm] Xác nhận đơn hàng ${input.orderCode}`,
-    text: `Xin chào ${input.customerName}, đơn ${input.orderCode} đã được tiếp nhận. Tổng thanh toán: ${input.totalAmount.toLocaleString('vi-VN')}đ. Tra cứu: ${trackingUrl}`,
+    text: `Xin chào ${input.customerName}, đơn ${input.orderCode} đã được tiếp nhận. Tổng thanh toán: ${(input.totalAmount - (input.walletAmountSpent ?? 0)).toLocaleString('vi-VN')}đ. Tra cứu: ${trackingUrl}`,
     html,
   });
 }

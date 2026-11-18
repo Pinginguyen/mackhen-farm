@@ -28,6 +28,7 @@ type TrackedOrder = {
   shippingFee?: number;
   discountAmount?: number;
   totalAmount: number;
+  walletAmountSpent?: number;
   trackingCode: string | null;
   carrier: 'GHTK' | 'SPX' | 'VIETTEL_POST' | null;
   createdAt: string;
@@ -81,6 +82,7 @@ function normalizeOrder(value: unknown): TrackedOrder | null {
     shippingFee: typeof order.shippingFee === 'number' ? order.shippingFee : undefined,
     discountAmount: typeof order.discountAmount === 'number' ? order.discountAmount : undefined,
     totalAmount: typeof order.totalAmount === 'number' && Number.isFinite(order.totalAmount) ? order.totalAmount : 0,
+    walletAmountSpent: typeof order.walletAmountSpent === 'number' && Number.isFinite(order.walletAmountSpent) ? order.walletAmountSpent : 0,
     trackingCode: typeof order.trackingCode === 'string' ? order.trackingCode : null,
     carrier,
     createdAt: typeof order.createdAt === 'string' ? order.createdAt : new Date().toISOString(),
@@ -299,7 +301,7 @@ export default function TrackingForm() {
               <p><strong>{text('Người nhận:')}</strong> {order.customerName ?? text('Khách hàng')}</p>
               <p><strong>{text('Điện thoại:')}</strong> {order.phone ?? order.maskedPhone ?? text('Không có')}</p>
               <p><strong>{text('Địa chỉ:')}</strong> {order.address ?? text(order.maskedAddress ?? 'Không có')}</p>
-              <p><strong>{text('Thanh toán:')}</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'COD' ? 'COD' : text('Chưa xác minh')}</p>
+              <p><strong>{text('Thanh toán:')}</strong> {order.paymentMethod === 'VIETQR' ? 'VietQR' : order.paymentMethod === 'MOMO' ? 'MoMo' : order.paymentMethod === 'WALLET' ? text('Ví nội bộ') : order.paymentMethod === 'COD' ? 'COD' : text('Chưa xác minh')}</p>
             </div>
 
             {orderStatus === 'CANCELLED' ? (
@@ -355,7 +357,8 @@ export default function TrackingForm() {
               {order.subtotal !== undefined && <p><span>{text('Tạm tính')}</span><strong>{formatCurrency(order.subtotal)}</strong></p>}
               {order.discountAmount ? <p><span>{text('Giảm giá')}</span><strong>−{formatCurrency(order.discountAmount)}</strong></p> : null}
               {order.shippingFee !== undefined && <p><span>{text('Vận chuyển')}</span><strong>{order.shippingFee ? formatCurrency(order.shippingFee) : text('Miễn phí')}</strong></p>}
-              <p><span>{text('Tổng cộng')}</span><strong>{formatCurrency(order.totalAmount)}</strong></p>
+              {Boolean(order.walletAmountSpent) && <p><span>{text('Đã dùng ví nội bộ')}</span><strong>−{formatCurrency(order.walletAmountSpent ?? 0)}</strong></p>}
+              <p><span>{text('Cần thanh toán')}</span><strong>{formatCurrency(order.totalAmount - (order.walletAmountSpent ?? 0))}</strong></p>
             </div>
             <section className="tracking-esg-certificate" aria-label={text('Chứng nhận tác động sinh thái')}>
               <p className="eyebrow">ESG IMPACT CERTIFICATE</p>

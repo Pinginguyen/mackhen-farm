@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       if (order.paymentMethod !== 'VIETQR') {
         return NextResponse.json({ success: false, message: 'Order is not a VietQR payment' }, { status: 409 });
       }
-      if (order.totalAmount !== amount) {
+      if (order.totalAmount - (order.walletAmountSpent ?? 0) !== amount) {
         return NextResponse.json({ success: false, message: 'Payment amount does not match the order' }, { status: 409 });
       }
       latePaymentOnCancelledOrder = order.orderStatus === 'CANCELLED';

@@ -62,11 +62,12 @@ export async function GET(request: Request) {
           paymentStatus: order.paymentStatus,
           orderStatus: order.orderStatus,
           totalAmount: order.totalAmount,
+          walletAmountSpent: order.walletAmountSpent,
           createdAt: order.createdAt,
           holdExpiresAt: order.holdExpiresAt,
           reconciled: order.reconciled,
           payment: order.payments[0] ?? null,
-          hasCachedPaymentEvidence: cachedPayment?.status === 'PAID' && cachedPayment.amount === order.totalAmount,
+          hasCachedPaymentEvidence: cachedPayment?.status === 'PAID' && cachedPayment.amount === order.totalAmount - (order.walletAmountSpent ?? 0),
           returnRequest: order.returnRequests[0] ?? null,
         };
       }),
@@ -113,10 +114,10 @@ export async function POST(request: Request) {
       }
       const matchedOrder = await prisma.order.findUnique({
         where: { orderCode },
-        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, paymentStatus: true, reconciled: true, totalAmount: true, phone: true, address: true },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, paymentStatus: true, reconciled: true, totalAmount: true, walletAmountSpent: true, phone: true, address: true },
       });
       if (!matchedOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng cần khớp.' } }, { status: 404 });
-      if (transfer.amount !== matchedOrder.totalAmount) {
+      if (transfer.amount !== matchedOrder.totalAmount - (matchedOrder.walletAmountSpent ?? 0)) {
         return NextResponse.json({ error: { message: 'Số tiền giao dịch không khớp tổng đơn; không thể xác nhận đơn đã thanh toán.' } }, { status: 409 });
       }
       if (matchedOrder.orderStatus === 'CANCELLED' || matchedOrder.paymentStatus === 'PAID' && matchedOrder.reconciled) {
@@ -182,8 +183,9 @@ export async function POST(request: Request) {
 
     if (payload.action === 'RECONCILE') {
       const cachedPayment = getCachedPaymentStatus(orderCode);
-      const paymentEvidence = order.payments.find((payment) => payment.status === 'PAID' && payment.amount === order.totalAmount)
-        ?? (cachedPayment?.status === 'PAID' && cachedPayment.amount === order.totalAmount ? cachedPayment : null);
+      const amountDue = order.totalAmount - (order.walletAmountSpent ?? 0);
+      const paymentEvidence = order.payments.find((payment) => payment.status === 'PAID' && payment.amount === amountDue)
+        ?? (cachedPayment?.status === 'PAID' && cachedPayment.amount === amountDue ? cachedPayment : null);
       if (!paymentEvidence) {
         return NextResponse.json({ error: { code: 'PAYMENT_EVIDENCE_MISSING', message: 'Chưa có webhook hoặc payment record xác thực khớp số tiền. Chưa thể tự chuyển đơn sang đã thanh toán.' } }, { status: 409 });
       }

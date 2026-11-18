@@ -24,7 +24,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
   let profile = null;
   if (session) {
     try {
-      profile = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true, loyaltyPoints: true } });
+      profile = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true, loyaltyPoints: true, wallet: { select: { balance: true } } } });
     } catch {
       profile = null;
     }
@@ -58,7 +58,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
             {cartUnavailable || cartItems.length === 0 ? (
               <CheckoutEmptyState unavailable={cartUnavailable} buyNow={buyNow} />
             ) : (
-              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} freeShippingThreshold={cart.freeShippingThreshold} upsellProduct={upsellProduct} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} loyaltyPointsAvailable={profile?.loyaltyPoints ?? 0} />
+              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} freeShippingThreshold={cart.freeShippingThreshold} upsellProduct={upsellProduct} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} loyaltyPointsAvailable={profile?.loyaltyPoints ?? 0} walletBalanceAvailable={profile?.wallet?.balance ?? 0} />
             )}
           </div>
 

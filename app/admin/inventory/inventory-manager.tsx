@@ -1,12 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, PauseCircle, Plus, RefreshCw } from 'lucide-react';
+import QRCode from 'qrcode';
 
 type Lot = {
   id: string;
   batchCode: string;
+  qrToken: string;
   productVariantId: string | null;
   mfgDate: string;
   expDate: string;
@@ -36,7 +38,22 @@ export default function InventoryManager({ initialInventory }: { initialInventor
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [affectedCustomers, setAffectedCustomers] = useState<{ orderCode: string; customerName: string; phone: string }[]>([]);
+  const [createdQrToken, setCreatedQrToken] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const selectedProduct = initialInventory.find((item) => item.id === productId);
+
+  useEffect(() => {
+    if (!createdQrToken) {
+      setQrDataUrl('');
+      return;
+    }
+    let active = true;
+    const url = `${window.location.origin}/truy-xuat?qr=${encodeURIComponent(createdQrToken)}`;
+    void QRCode.toDataURL(url, { width: 240, margin: 1, errorCorrectionLevel: 'H' })
+      .then((dataUrl) => { if (active) setQrDataUrl(dataUrl); })
+      .catch(() => { if (active) setQrDataUrl(''); });
+    return () => { active = false; };
+  }, [createdQrToken]);
 
   async function createLot(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,8 +67,9 @@ export default function InventoryManager({ initialInventory }: { initialInventor
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'CREATE_LOT', productId, productVariantId: productVariantId || null, batchCode: lotCode, mfgDate, expDate, receivedQty, testReportUrl, receivingNote }),
       });
-      const result = await response.json() as { error?: { message?: string } };
+      const result = await response.json() as { lot?: { qrToken?: string }; error?: { message?: string } };
       if (!response.ok) throw new Error(result.error?.message ?? 'Không thể tạo lô sản xuất.');
+      setCreatedQrToken(result.lot?.qrToken ?? '');
       setMessage(`Đã nhập lô ${lotCode.trim().toUpperCase()}.`);
       setLotCode('');
       setReceivingNote('');
@@ -106,6 +124,10 @@ export default function InventoryManager({ initialInventory }: { initialInventor
 
       {error && <p className="admin-return-alert" role="alert">{error}</p>}
       {message && <p className="admin-return-notice" role="status">{message}</p>}
+      {createdQrToken && <section className="admin-panel admin-lot-qr" aria-label="Mã QR truy xuất nguồn gốc">
+        <div><p className="eyebrow">QR · TRACEABILITY &amp; WARRANTY</p><h3>Mã QR duy nhất cho lô {lotCode.trim().toUpperCase() || 'vừa tạo'}</h3><p>Khách quét mã để xác thực lô và gửi yêu cầu bảo hành vị giác trong 24 giờ sau giao hàng.</p><code>{createdQrToken}</code></div>
+        {qrDataUrl && <div><img src={qrDataUrl} alt="Mã QR truy xuất lô" width={180} height={180} /><a className="secondary-action" href={qrDataUrl} download={`traceability-${createdQrToken}.png`}>Tải mã QR</a></div>}
+      </section>}
       {affectedCustomers.length > 0 && <section className="admin-panel" aria-label="Khách hàng đã mua lô bị tạm dừng">
         <header><div><p className="eyebrow">Chủ động CSKH</p><h3>Khách đã mua lô bị tạm dừng</h3></div><strong>{affectedCustomers.length}</strong></header>
         <div className="admin-table-scroll"><table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Điện thoại</th></tr></thead><tbody>{affectedCustomers.map((customer) => <tr key={`${customer.orderCode}-${customer.phone}`}><td>{customer.orderCode}</td><td>{customer.customerName}</td><td><a href={`tel:${customer.phone}`}>{customer.phone}</a></td></tr>)}</tbody></table></div>
@@ -122,7 +144,7 @@ export default function InventoryManager({ initialInventory }: { initialInventor
             <td><strong className={item.available < 0 ? 'inventory-critical' : item.available < 20 ? 'inventory-atp-warning' : ''}>{item.available}</strong>{item.available < 20 && <span className={item.available < 0 ? 'inventory-critical' : 'inventory-atp-warning'}><AlertTriangle size={13} /> {item.available < 0 ? 'Vượt tồn' : 'Cần tái đặt hàng'}</span>}</td>
             <td>{item.active ? 'Đang bán' : 'Đã ẩn'}</td>
             <td><div className="admin-lot-list">{item.productionLots.length ? item.productionLots.map((lot) => <div className="admin-lot-row" key={lot.id}>
-              <span><strong>{lot.batchCode}</strong><small>{lot.productVariantId ? `${item.variants.find((variant) => variant.id === lot.productVariantId)?.title ?? 'Variant'} · ` : ''}{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
+              <span><strong>{lot.batchCode}</strong><small>{lot.productVariantId ? `${item.variants.find((variant) => variant.id === lot.productVariantId)?.title ?? 'Variant'} · ` : ''}{lot.availableQty}/{lot.receivedQty} khả dụng · HSD {new Date(lot.expDate).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small><a href={`/truy-xuat?qr=${encodeURIComponent(lot.qrToken)}`} target="_blank" rel="noreferrer">Mở hộ chiếu QR</a>{lot.testReportUrl && <a href={lot.testReportUrl} target="_blank" rel="noreferrer">Hồ sơ kiểm nghiệm</a>}</span>
               <span className={`admin-lot-status ${lot.status.toLowerCase()}`}>{statusLabels[lot.status] ?? lot.status}</span>
               {lot.status !== 'RECALLED' && lot.status !== 'EXPIRED' && <button type="button" className="admin-lot-pause" disabled={busy} onClick={() => void pauseLot(lot.batchCode)} title="Tạm dừng lô và ẩn sản phẩm"><PauseCircle size={15} /> Tạm dừng lô</button>}
             </div>) : <span>Chưa khai báo lô</span>}</div></td>

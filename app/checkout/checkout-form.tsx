@@ -112,7 +112,7 @@ function rememberUserOrder(orderCode: string) {
   }
 }
 
-export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, freeShippingThreshold, upsellProduct, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary, loyaltyPointsAvailable = 0 }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; freeShippingThreshold: number; upsellProduct?: CartUpsellProduct; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode; loyaltyPointsAvailable?: number }) {
+export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, freeShippingThreshold, upsellProduct, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary, loyaltyPointsAvailable = 0, walletBalanceAvailable = 0 }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; freeShippingThreshold: number; upsellProduct?: CartUpsellProduct; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode; loyaltyPointsAvailable?: number; walletBalanceAvailable?: number }) {
   const items = Array.isArray(receivedItems) ? receivedItems : [];
   const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
@@ -140,6 +140,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
   const [shippingQuoteLoading, setShippingQuoteLoading] = useState(false);
   const [shippingQuoteError, setShippingQuoteError] = useState('');
   const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+  const [useWalletBalance, setUseWalletBalance] = useState(false);
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
   const normalizedVoucher = voucher.trim().toUpperCase();
@@ -149,7 +150,8 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
   const effectiveShipping = freeShippingApplied ? 0 : shippingQuote?.fee ?? shipping;
   const redeemablePoints = Math.min(loyaltyPointsAvailable, Math.floor(Math.max(0, subtotal + effectiveShipping - discount) / POINT_REDEMPTION_VALUE_VND));
   const loyaltyDiscount = useLoyaltyPoints ? redeemablePoints * POINT_REDEMPTION_VALUE_VND : 0;
-  const checkoutTotal = Math.max(0, subtotal + effectiveShipping - discount - loyaltyDiscount);
+  const walletAmountUsed = useWalletBalance ? Math.min(walletBalanceAvailable, Math.max(0, subtotal + effectiveShipping - discount - loyaltyDiscount)) : 0;
+  const checkoutTotal = Math.max(0, subtotal + effectiveShipping - discount - loyaltyDiscount - walletAmountUsed);
   const weightGrams = items.reduce((sum, item) => sum + (item.weightGrams ?? 500) * item.quantity, 0);
 
   useEffect(() => {
@@ -293,6 +295,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         note: form.get('notes'),
         voucherCode: appliedVoucher,
         useLoyaltyPoints,
+        useWalletBalance,
         affiliateCode: getStoredAffiliateCode(),
         referralCode: getStoredCustomerReferralCode(),
         items: checkoutItems.map((item) => ({
@@ -323,6 +326,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
           success?: boolean;
           orderId?: string;
           orderCode?: string;
+          paymentMethod?: string;
           redirectUrl?: string;
           error?: unknown;
         };
@@ -356,7 +360,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         }
 
         rememberUserOrder(result.orderCode);
-        if (paymentMethod === 'COD') {
+        if (result.paymentMethod === 'COD' || result.paymentMethod === 'WALLET') {
           clearLocalCartSnapshot();
           if (buyNow) clearBuyNowSnapshot();
         }
@@ -426,6 +430,11 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         <input type="checkbox" checked={useLoyaltyPoints} disabled={!redeemablePoints} onChange={(event) => setUseLoyaltyPoints(event.target.checked)} />
         <span>{isEN ? `Use ${redeemablePoints.toLocaleString()} of ${loyaltyPointsAvailable.toLocaleString()} points` : `Dùng ${redeemablePoints.toLocaleString()} / ${loyaltyPointsAvailable.toLocaleString()} điểm`}</span>
         {useLoyaltyPoints && <strong>−{formatCurrency(loyaltyDiscount)}</strong>}
+      </label>}
+      {walletBalanceAvailable > 0 && <label className="checkout-wallet-option">
+        <input type="checkbox" checked={useWalletBalance} onChange={(event) => setUseWalletBalance(event.target.checked)} />
+        <span>{isEN ? `Use wallet balance (${formatCurrency(walletBalanceAvailable)})` : `Sử dụng số dư ví nội bộ (${formatCurrency(walletBalanceAvailable)})`}</span>
+        {useWalletBalance && <strong>−{formatCurrency(walletAmountUsed)}</strong>}
       </label>}
       {appliedVoucher && <div className="checkout-discount-summary"><span>{isEN ? 'Discount' : 'Giảm giá'}</span><strong>−{formatCurrency(discount)}</strong><span>{isEN ? 'Total after discount' : 'Tổng thanh toán sau giảm'}</span><strong>{formatCurrency(checkoutTotal)}{currency !== 'VND' && <> ({formatApproxVnd(checkoutTotal)})</>}</strong>{currency !== 'VND' && <small>{isEN ? 'Displayed using a fixed reference exchange rate. VietQR remains payable in VND.' : 'Hiển thị theo tỷ giá tham khảo cố định; VietQR vẫn thanh toán bằng VND.'}</small>}</div>}
       <fieldset className="payment-method-options"><legend>{isEN ? 'Payment method' : 'Phương thức thanh toán'}</legend>

@@ -13,6 +13,7 @@ type Review = {
   customerName: string;
   rating: number;
   comment: string;
+  images?: string[];
   createdAt: string;
   adminReply: string | null;
   adminReplyAt: string | null;
@@ -288,6 +289,7 @@ export default function ProductReviewsSection({
                   <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
                 </div>
                 <p className="review-comment-text">{review.comment}</p>
+                {!!review.images?.length && <div className="review-customer-images" aria-label={isEN ? 'Customer product photos' : 'Ảnh khách hàng chụp sản phẩm'}>{review.images.map((image) => <a href={image} target="_blank" rel="noreferrer" key={image}><img src={image} alt={isEN ? 'Customer product photo' : 'Ảnh sản phẩm thực tế'} loading="lazy" /></a>)}</div>}
                 {review.adminReply && <div className="review-merchant-reply">
                   <header><Store size={15} aria-hidden="true" /><strong>{isEN ? 'Reply from Mac Khen Farm' : 'Phản hồi từ Mắc Khén Farm'}</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}</time></header>
                   <p>{review.adminReply}</p>

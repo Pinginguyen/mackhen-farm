@@ -10,6 +10,8 @@ import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 type Profile = { name: string; email: string; phone: string | null; address: string | null; loyaltyPoints: number; lifetimePoints: number; membershipTier: string };
 type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; productSlug: string; quantity: number; price: number }[]; localFallback?: boolean };
 type PointHistoryItem = { id: string; points: number; type: 'EARN' | 'SPEND'; description: string; createdAt: string };
+type WalletHistoryItem = { id: string; amount: number; type: 'CREDIT' | 'DEBIT'; description: string; createdAt: string };
+type ReviewReward = { id: string; rewardVoucherCode: string | null; createdAt: string; product: { name: string } };
 
 const statusLabels: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Chờ xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao', SHIPPING: 'Đang giao', DELIVERED: 'Đã giao', COMPLETED: 'Đã giao', CANCELLED: 'Đã hủy' };
 
@@ -22,11 +24,12 @@ function mergeOrders(current: AccountOrder[], incoming: AccountOrder[]): Account
   return [...byCode.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export default function AccountDashboard({ profile, orders, pointHistory, initialTab }: { profile: Profile; orders: AccountOrder[]; pointHistory: PointHistoryItem[]; initialTab: 'profile' | 'orders' }) {
+export default function AccountDashboard({ profile, orders, pointHistory, reviewRewards, initialTab }: { profile: Profile; orders: AccountOrder[]; pointHistory: PointHistoryItem[]; reviewRewards: ReviewReward[]; initialTab: 'profile' | 'orders' }) {
   const [tab, setTab] = useState(initialTab);
   const [orderList, setOrderList] = useState(orders);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [wallet, setWallet] = useState<{ balance: number; transactions: WalletHistoryItem[] }>({ balance: 0, transactions: [] });
   const memberTier = profile.membershipTier === 'VVIP' ? 'Gold' : profile.membershipTier === 'VIP' ? 'Silver' : 'Bronze';
 
   useEffect(() => {
@@ -61,6 +64,15 @@ export default function AccountDashboard({ profile, orders, pointHistory, initia
       .catch(() => undefined);
     return () => controller.abort();
   }, [orders]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/account/wallet', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => response.ok ? await response.json() as { wallet?: typeof wallet } : null)
+      .then((result) => { if (result?.wallet) setWallet(result.wallet); })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,6 +117,16 @@ export default function AccountDashboard({ profile, orders, pointHistory, initia
               </li>)}</ul> : <p>Chưa có biến động điểm thưởng.</p>}
             </div>
           </section>
+          <section className="wallet-panel" aria-labelledby="wallet-title">
+            <div className="wallet-panel-balance"><p className="eyebrow">VÍ NỘI BỘ</p><h2 id="wallet-title">{formatCurrency(wallet.balance)}</h2><p>Dùng thanh toán đơn hàng · Cashback 2% khi đơn hoàn tất</p></div>
+            <div className="wallet-history"><h3>Lịch sử ví</h3>
+              {wallet.transactions.length ? <ul>{wallet.transactions.map((transaction) => <li key={transaction.id}><span><strong>{transaction.description}</strong><small>{new Date(transaction.createdAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small></span><b className={transaction.type === 'CREDIT' ? 'points-earned' : 'points-spent'}>{transaction.type === 'CREDIT' ? '+' : '−'}{formatCurrency(transaction.amount)}</b></li>)}</ul> : <p>Chưa có giao dịch trong ví.</p>}
+            </div>
+          </section>
+          {reviewRewards.length > 0 && <section className="review-reward-panel" aria-labelledby="review-reward-title">
+            <h2 id="review-reward-title">Voucher cảm ơn đánh giá</h2>
+            <ul>{reviewRewards.map((reward) => <li key={reward.id}><span>{reward.product.name}</span><code>{reward.rewardVoucherCode}</code><small>Giảm 10% · dùng một lần</small></li>)}</ul>
+          </section>}
           <form className="form-list account-profile-form" onSubmit={saveProfile}>
             <div className="field"><label htmlFor="account-name">Họ và tên</label><input id="account-name" name="name" defaultValue={profile.name} maxLength={100} required /></div>
             <div className="field"><label htmlFor="account-email">Email</label><input id="account-email" value={profile.email} readOnly /></div>

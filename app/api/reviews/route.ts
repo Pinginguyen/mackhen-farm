@@ -12,20 +12,24 @@ function normalizeVietnamesePhone(value: string): string | null {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { productId?: string; customerName?: string; orderCode?: string; phone?: string; rating?: number; comment?: string };
+    const body = await request.json() as { productId?: string; customerName?: string; orderCode?: string; phone?: string; rating?: number; comment?: string; images?: unknown };
     const productId = body.productId?.trim();
     const orderCode = body.orderCode?.trim().toUpperCase();
     const phone = body.phone ? normalizeVietnamesePhone(body.phone) : null;
     const customerName = body.customerName?.trim();
     const comment = body.comment?.trim();
+    const images = Array.isArray(body.images) && body.images.every((url) => typeof url === 'string' && url.length <= 2048 && /^https:\/\//i.test(url))
+      ? [...new Set(body.images as string[])]
+      : body.images === undefined ? [] : null;
     if (!productId || !orderCode || !phone || !Number.isInteger(body.rating) || body.rating! < 1 || body.rating! > 5 || !comment || comment.length < 3 || comment.length > 1000) {
       return NextResponse.json({ error: 'Vui lòng nhập đủ thông tin và chọn số sao từ 1 đến 5.' }, { status: 400 });
     }
+    if (!images || images.length > 5) return NextResponse.json({ error: 'Danh sách ảnh không hợp lệ hoặc vượt quá 5 ảnh.' }, { status: 400 });
 
     return withDatabase(async () => {
       const order = await prisma.order.findUnique({
         where: { orderCode },
-        select: { id: true, customerName: true, phone: true, orderStatus: true, items: { select: { productId: true } } },
+        select: { id: true, customerName: true, phone: true, orderStatus: true, user: { select: { email: true } }, customer: { select: { email: true } }, items: { select: { productId: true } } },
       });
       if (!order) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       if (normalizeVietnamesePhone(order.phone) !== phone) return NextResponse.json({ error: { code: 'PHONE_MISMATCH', message: 'Số điện thoại không khớp với đơn hàng.' } }, { status: 403 });
@@ -43,6 +47,7 @@ export async function POST(request: Request) {
           customerName: displayName,
           rating: body.rating!,
           comment,
+          images,
           riskTag: classifyReviewRisk(body.rating!, comment),
           riskAnalyzedAt: new Date(),
         },

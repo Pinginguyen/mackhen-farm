@@ -55,6 +55,7 @@ export function sendOrderConfirmationIfNeeded(orderId: string): Promise<boolean>
     shippingFee: order.shippingFee,
     discountAmount: order.discountAmount,
     totalAmount: order.totalAmount,
+    walletAmountSpent: order.walletAmountSpent,
     items: order.items.map((item) => ({ productName: item.titleSnapshot, quantity: item.quantity, unitPrice: item.unitPrice })),
   }));
 }

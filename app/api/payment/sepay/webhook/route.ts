@@ -80,6 +80,7 @@ export async function POST(request: Request) {
         orderCode: true,
         numericCode: true,
         totalAmount: true,
+        walletAmountSpent: true,
         phone: true,
         address: true,
         paymentMethod: true,
@@ -88,17 +89,18 @@ export async function POST(request: Request) {
       },
     }) : null;
     const eligibleOrder = order && ['VIETQR', 'MOMO'].includes(order.paymentMethod) ? order : null;
-    const exactMatch = Boolean(eligibleOrder && transferAmount === eligibleOrder.totalAmount);
+    const amountDue = eligibleOrder ? eligibleOrder.totalAmount - (eligibleOrder.walletAmountSpent ?? 0) : 0;
+    const exactMatch = Boolean(eligibleOrder && transferAmount === amountDue);
     const mismatchReason = !orderCode
       ? 'Không tìm thấy mã đơn trong nội dung chuyển khoản.'
       : !order
         ? `Không tìm thấy đơn ${orderCode}.`
         : !eligibleOrder
           ? 'Đơn hàng không sử dụng phương thức thanh toán trực tuyến.'
-          : transferAmount < eligibleOrder.totalAmount
-            ? `Thiếu ${eligibleOrder.totalAmount - transferAmount}đ so với tổng đơn.`
-            : transferAmount > eligibleOrder.totalAmount
-              ? `Thừa ${transferAmount - eligibleOrder.totalAmount}đ so với tổng đơn.`
+          : transferAmount < amountDue
+            ? `Thiếu ${amountDue - transferAmount}đ so với số tiền còn phải thanh toán.`
+            : transferAmount > amountDue
+              ? `Thừa ${transferAmount - amountDue}đ so với số tiền còn phải thanh toán.`
               : null;
     const transferStatus = exactMatch ? 'MATCHED' as const : eligibleOrder ? 'MISMATCH' as const : 'UNMATCHED' as const;
 

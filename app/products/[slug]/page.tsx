@@ -19,7 +19,7 @@ import { getEffectivePrice } from '@/lib/pricing';
 import { getProductRecommendations } from '@/lib/product-recommendations';
 import ProductRecommendationShelf from '@/components/ProductRecommendationShelf';
 
-type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
+type ProductReview = { id: string; customerName: string; rating: number; comment: string; images: string[]; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
 export const revalidate = 300;
 export const dynamicParams = false;
@@ -49,7 +49,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   try {
     const databaseProduct = await prisma.product.findFirst({
       where: { OR: [{ slug: params.slug }, { id: params.slug }] },
-      include: { variants: true, reviews: { orderBy: { createdAt: 'desc' }, take: 20, include: { replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
+      include: { variants: true, reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20, include: { replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
     });
     if (databaseProduct) {
       inactiveInDatabase = !databaseProduct.active;
@@ -72,6 +72,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         customerName: review.customerName,
         rating: review.rating,
         comment: review.comment,
+        images: review.images,
         createdAt: review.createdAt.toISOString(),
         adminReply: review.adminReply,
         adminReplyAt: review.adminReplyAt?.toISOString() ?? null,
@@ -80,7 +81,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
       try {
         const ratingGroups = await prisma.review.groupBy({
           by: ['rating'],
-          where: { productId: databaseProduct.id },
+          where: { productId: databaseProduct.id, status: 'APPROVED' },
           _count: { _all: true },
         });
         ratingGroups.forEach((group) => {

@@ -17706,6 +17706,175 @@ a.audit-target-chip:hover {
   color: #9a3412;
 }
 
+.wallet-panel,
+.review-reward-panel,
+.traceability-warranty,
+.admin-lot-qr {
+  margin: 20px 0;
+  padding: 18px 0;
+  border-top: 1px solid #e7e5e4;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.wallet-panel h2,
+.review-reward-panel h2 {
+  margin: 4px 0;
+  color: var(--forest);
+}
+
+.wallet-history ul,
+.review-reward-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wallet-history li,
+.review-reward-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0eeec;
+}
+
+.wallet-history li > span,
+.review-reward-panel li > span {
+  display: grid;
+  gap: 3px;
+}
+
+.wallet-history small,
+.review-reward-panel small {
+  color: #78716c;
+}
+
+.review-reward-panel code,
+.admin-review-moderation code {
+  padding: 6px 9px;
+  border: 1px dashed #9b2424;
+  border-radius: 5px;
+  color: #841e1e;
+  font-weight: 700;
+}
+
+.checkout-wallet-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d6d3d1;
+  border-radius: 6px;
+}
+
+.checkout-wallet-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1b4332;
+}
+
+.checkout-wallet-option span {
+  flex: 1;
+}
+
+.admin-lot-qr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-lot-qr h3,
+.traceability-warranty h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  color: var(--forest);
+}
+
+.admin-lot-qr > div:last-child {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.admin-lot-qr img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+
+.traceability-warranty-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.traceability-warranty-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.traceability-warranty-form input {
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #d6d3d1;
+  border-radius: 5px;
+}
+
+.traceability-warranty-form button,
+.admin-review-moderation button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 5px;
+  background: #1b4332;
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-review-moderation button.is-secondary {
+  border: 1px solid #d6d3d1;
+  background: #fff;
+  color: #57534e;
+}
+
+.admin-review-moderation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.admin-review-images,
+.review-customer-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.admin-review-images img,
+.review-customer-images img {
+  width: 96px;
+  height: 96px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
 @media (max-width: 760px) {
   .product-recommendation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -17713,6 +17882,15 @@ a.audit-target-chip:hover {
   }
 
   .admin-report-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .traceability-warranty-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-lot-qr {
     align-items: flex-start;
     flex-direction: column;
   }

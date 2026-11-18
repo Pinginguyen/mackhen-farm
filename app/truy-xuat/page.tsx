@@ -5,10 +5,13 @@ import { CheckCircle2, FlaskConical, Leaf, LoaderCircle, MapPin, Search } from '
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent, translateProductName } from '@/lib/translations';
 import { fetchPublicSiteAsset } from '@/lib/site-asset-client';
+import WarrantyActivation from './warranty-activation';
 
 type TraceabilityData = {
   batchCode: string;
+  qrToken: string;
   productName: string;
+  originRegion?: string;
   manufacturingDate: string;
   expiryDate: string;
   packaging?: string;
@@ -38,6 +41,11 @@ export default function TraceabilityPage() {
     fetchPublicSiteAsset('TRACEABILITY_BANNER', '/products/soy-pulp.svg')
       .then((url) => { if (active) setHeroBannerUrl(url); });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const qrToken = new URLSearchParams(window.location.search).get('qr');
+    if (qrToken) void searchBatch(qrToken);
   }, []);
 
   async function searchBatch(batchCode: string) {
@@ -112,12 +120,14 @@ export default function TraceabilityPage() {
               <dl className="traceability-product-facts">
                 <div><dt>{text('Ngày sản xuất')}</dt><dd>{batch.manufacturingDate}</dd></div>
                 <div><dt>{text('Hạn sử dụng')}</dt><dd>{batch.expiryDate}</dd></div>
+                <div><dt>{text('Vùng nguyên liệu')}</dt><dd>{text(batch.originRegion ?? 'Sơn La, Tây Bắc')}</dd></div>
                 <div><dt>{text('Trạng thái lô')}</dt><dd>{text(batch.status)}</dd></div>
                 <div><dt>{text('Số lượng nhập')}</dt><dd>{batch.receivedQty.toLocaleString('vi-VN')}</dd></div>
                 {batch.packaging && <div><dt>{text('Quy cách')}</dt><dd>{text(batch.packaging)}</dd></div>}
                 {batch.ingredients && <div><dt>{text('Thành phần')}</dt><dd>{text(batch.ingredients)}</dd></div>}
                 {batch.receivingNote && <div><dt>{text('Ghi chú lô')}</dt><dd>{batch.receivingNote}</dd></div>}
               </dl>
+              {batch.status !== 'EXPIRED' && <WarrantyActivation qrToken={batch.qrToken} />}
               {batch.testReportUrl && <a className="secondary-action" href={batch.testReportUrl} target="_blank" rel="noreferrer">{text('Xem phiếu kiểm nghiệm của lô')}</a>}
             </section>
             <section className="dpp-passport" aria-labelledby="dpp-passport-title">
