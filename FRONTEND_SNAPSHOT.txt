@@ -1,0 +1,94 @@
+=== FILE: app/page.tsx ===
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
+
+import ProductCatalogFilter, { type CatalogProduct } from '@/components/ProductCatalogFilter';
+import HomeTransparencyTabs from '@/components/HomeTransparencyTabs';
+import { prisma } from '@/lib/prisma';
+import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile } from '@/lib/store-data';
+import LocalizedText from '@/components/LocalizedText';
+import LocalizedHeroImage from '@/components/LocalizedHeroImage';
+import HomeHeroReveal from '@/components/HomeHeroReveal';
+import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
+import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import { getSiteAsset } from '@/lib/site-assets';
+import PromoVoucherCode from '@/components/home/PromoVoucherCode';
+import { getCoreContentSettings } from '@/lib/system-settings';
+import ForbiddenNotice from '@/components/layout/ForbiddenNotice';
+
+export const revalidate = 300;
+
+export default async function HomePage() {
+  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, contentSettings] = await Promise.all([
+    getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
+    getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
+    getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
+    getSiteAsset('STORY_SECTION_IMAGE', '/products/hat-doi.jpg'),
+    getCoreCont
+
+=== FILE: app/products/[slug]/page.tsx ===
+import { notFound } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
+import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile, type Product } from '@/lib/store-data';
+import { DEFAULT_PRODUCTS } from '@/lib/default-products';
+import AddToCart from './add-to-cart';
+import ProductImageGallery from './product-image-gallery';
+import ProductRating from '@/components/ProductRating';
+import ProductReviewsSection from '@/components/ProductReviewsSection';
+import ProductHighlights from '@/components/ProductHighlights';
+import LocalizedProductName from './localized-product-name';
+import CroEventTracker from '@/components/CroEventTracker';
+import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
+import TasteGuarantee from '@/components/checkout/TasteGuarantee';
+import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
+import NutriGradeBadge from '@/components/product/NutriGradeBadge';
+import ProductEditorialDetails from '@/components/product/ProductEditorialDetails';
+import { getSystemSettings } from '@/lib/system-settings';
+
+type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
+
+export const revalidate = 300;
+export const dynamicParams = false;
+
+export async function generateStaticPa
+
+=== FILE: components/cart/CartDrawer.tsx ===
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Minus, Plus, ShoppingBag, Trash2, Truck, X } from 'lucide-react';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+import CartUpsell from './CartUpsell';
+import type { CartUpsellProduct } from './CartUpsell';
+
+type CartVariant = { id: string; label: string; price: number; weight: string; stock: number };
+type CartItem = {
+  id: string;
+  productId: string;
+  productSlug: string;
+  image: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  stock: number;
+  variantId: string | null;
+  variantLabel: string | null;
+  variants: CartVariant[];
+  upsellProduct: CartUpsellProduct | null;
+};
+type CartSnapshot = { items: CartItem[]; subtotal: number; shipping: number; total: number; freeShippingThreshold: number; tasteGuaranteeText: string };
+
+const emptyCart: CartSnapshot = { items: [], subtotal: 0, shipping: 0, total: 0, freeShippingThreshold: 0, tasteGuaranteeText: '' };
+
+export default function CartDrawer() {
+  const [open, setOpen] = useState(false);
+  const [cart, setCart] = useState<CartSnapshot>(emptyCart);
+  const [loading, setLoading] = useState(false);
+  const [pendingItem, setPendingItem] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const { currency, formatCurrency, translateProductName, locale } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'S
+

@@ -30,7 +30,7 @@ type CartItem = {
 
 export function CartPageHeading() {
   const { currency } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
 
   return (
     <div className="page-title">
@@ -51,7 +51,7 @@ function CartItemRow({
 }) {
   const [saving, setSaving] = useState(false);
   const { currency, formatCurrency, translateProductName } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
   const productName = translateProductName(item.name);
   const selectedVariant = item.variants.find((variant) => variant.id === item.variantId);
   const maxQuantity = selectedVariant?.stock ?? item.stock;
@@ -113,7 +113,7 @@ function CartItemRow({
 export default function CartContent({ initialItems, freeShippingThreshold }: { initialItems: CartItem[]; freeShippingThreshold: number }) {
   const { currency, formatCurrency } = useLocaleCurrency();
   const router = useRouter();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
   const [items, setItems] = useState(initialItems);
   const [cartListRef] = useAutoAnimate();
   const itemsRef = useRef(initialItems);

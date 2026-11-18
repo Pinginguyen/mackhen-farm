@@ -4,6 +4,7 @@ export type ProductVariant = {
   label: string;
   price: number;
   originalPrice?: number | null;
+  flashSaleEndsAt?: Date | string | null;
   weight: string;
   inventory?: number;
   stock: number;
@@ -79,6 +80,7 @@ export type Product = {
   category: string;
   price: number;
   originalPrice?: number | null;
+  flashSaleEndsAt?: Date | string | null;
   unit?: string | null;
   weight?: number | null;
   protein?: string | null;

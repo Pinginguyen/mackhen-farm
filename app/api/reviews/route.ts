@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
+import { classifyReviewRisk } from '@/lib/sentiment-analysis';
 
 function normalizeVietnamesePhone(value: string): string | null {
   const digits = value.replace(/\D/g, '');
@@ -35,7 +36,17 @@ export async function POST(request: Request) {
       if (existingReview) return NextResponse.json({ error: { code: 'DUPLICATE_REVIEW', message: 'Bạn đã đánh giá sản phẩm này trong đơn hàng trước đó.' } }, { status: 409 });
 
       const displayName = customerName && customerName.length > 1 ? customerName : order.customerName;
-      const review = await prisma.review.create({ data: { orderId: order.id, productId, customerName: displayName, rating: body.rating!, comment } });
+      const review = await prisma.review.create({
+        data: {
+          orderId: order.id,
+          productId,
+          customerName: displayName,
+          rating: body.rating!,
+          comment,
+          riskTag: classifyReviewRisk(body.rating!, comment),
+          riskAnalyzedAt: new Date(),
+        },
+      });
       const average = await prisma.review.aggregate({ where: { productId }, _avg: { rating: true } });
       await prisma.product.update({ where: { id: productId }, data: { rating: average._avg.rating ?? 0 } });
       return NextResponse.json({ review }, { status: 201 });

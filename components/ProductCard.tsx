@@ -10,6 +10,8 @@ import ProductRating from '@/components/ProductRating';
 import TasteSensoryMeter from '@/components/product/TasteSensoryMeter';
 import ProductQuickView from '@/components/ProductQuickView';
 import { recordCroEvent } from '@/components/CroEventTracker';
+import FlashSaleCountdown, { useFlashSaleStatus } from '@/components/product/FlashSaleCountdown';
+import { getEffectivePrice } from '@/lib/pricing';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 
@@ -19,6 +21,10 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   const [quickAdded, setQuickAdded] = useState(false);
   const { locale, formatCurrency, translateProductName, t } = useLocaleCurrency();
   const productName = translateProductName(product.name);
+  const hasSalePrice = product.originalPrice != null && product.originalPrice > product.price;
+  const saleStatus = useFlashSaleStatus(hasSalePrice ? product.flashSaleEndsAt : null);
+  const displayedPrice = getEffectivePrice(product);
+  const displayedOriginalPrice = saleStatus.expired ? null : product.originalPrice;
   const secondImage = product.images?.find((image) => image && image !== product.image);
   const imageIsUnoptimized = (image: string) => image.startsWith('data:') || /^https?:\/\//i.test(image);
   const proteinAmount = product.protein?.match(/\d+(?:\.\d+)?/)?.[0];
@@ -55,7 +61,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
         </Link>
         <div className="product-badges">
           {product.stock === 0 && <span className="product-badge out-of-stock-badge">Tạm hết hàng</span>}
-          {product.badge?.trim() && <span className="product-highlight-badge">{product.badge}</span>}
+          {product.badge?.trim() && !(saleStatus.expired && product.originalPrice != null) && <span className="product-highlight-badge">{product.badge}</span>}
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
         <div className="artisan-quick-macros" aria-label={locale === 'en' ? 'Product highlights' : 'Điểm nổi bật sản phẩm'}>
@@ -72,6 +78,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
         <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
+        {product.stock > 0 && product.stock <= 5 && <p className="product-low-stock">🔥 {locale === 'en' ? `Only ${product.stock} left in stock` : `Chỉ còn lại ${product.stock} sản phẩm trong kho!`}</p>}
         <TasteSensoryMeter
           compact
           spiciness={product.spiciness}
@@ -85,7 +92,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           valueAxis3={product.valueAxis3}
         />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
-        <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(product.price)}</strong>{product.originalPrice != null && <del className="!text-stone-400">{formatCurrency(product.originalPrice)}</del>}</div></div>
+        <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(displayedPrice)}</strong>{displayedOriginalPrice != null && <del className="!text-stone-400">{formatCurrency(displayedOriginalPrice)}</del>}</div>{saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}</div>
         <Link
           href={`/products/${product.slug}`}
           aria-disabled={product.stock === 0}

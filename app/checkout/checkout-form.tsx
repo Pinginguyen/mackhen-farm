@@ -13,11 +13,14 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 import { formatApproxVnd } from '@/lib/translations';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { getStoredAffiliateCode } from '@/lib/affiliate-attribution';
+import { FREE_SHIPPING_PRODUCT_SLUG } from '@/lib/shipping';
 import CartUpsell from '@/components/cart/CartUpsell';
 import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
+import { POINT_REDEMPTION_VALUE_VND } from '@/lib/loyalty';
 
-type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number };
+type CheckoutItem = { id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; unitPrice: number; weightGrams?: number };
 type BuyNowSnapshot = { productId: string; variantId: string | null; quantity: number };
+type ShippingQuote = { fee: number; carrier: 'GHTK' | 'VIETTEL_POST'; estimatedDays: string; source: 'MOCK' | 'GHTK' | 'VIETTEL_POST' };
 
 type InitialCustomer = { name: string; email: string; phone: string; address: string };
 type AvailableVoucher = { id: string; code: string; discountType: 'PERCENTAGE' | 'FIXED'; value: number; maxDiscount: number | null; minSpend: number; expiresAt: string | null; freeShipping: boolean; firstOrderOnly: boolean };
@@ -108,7 +111,7 @@ function rememberUserOrder(orderCode: string) {
   }
 }
 
-export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, freeShippingThreshold, upsellProduct, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; freeShippingThreshold: number; upsellProduct?: CartUpsellProduct; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode }) {
+export default function CheckoutForm({ items: receivedItems, initialCustomer, subtotal, shipping, freeShippingThreshold, upsellProduct, checkoutUnavailable = false, buyNow = false, initialPaymentMethod = 'VIETQR', mobileSummary, loyaltyPointsAvailable = 0 }: { items?: CheckoutItem[] | null; initialCustomer?: InitialCustomer; subtotal: number; shipping: number; freeShippingThreshold: number; upsellProduct?: CartUpsellProduct; checkoutUnavailable?: boolean; buyNow?: boolean; initialPaymentMethod?: 'COD' | 'VIETQR'; mobileSummary?: ReactNode; loyaltyPointsAvailable?: number }) {
   const items = Array.isArray(receivedItems) ? receivedItems : [];
   const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
@@ -131,12 +134,57 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
   const [voucherListError, setVoucherListError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod);
   const [shippingCountry, setShippingCountry] = useState('VN');
+  const [deliveryLocation, setDeliveryLocation] = useState({ province: '', district: '' });
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
+  const [shippingQuoteLoading, setShippingQuoteLoading] = useState(false);
+  const [shippingQuoteError, setShippingQuoteError] = useState('');
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
   const [buyNowSnapshot, setBuyNowSnapshot] = useState<BuyNowSnapshot | null>(null);
   const [buyNowLoaded, setBuyNowLoaded] = useState(!buyNow);
   const normalizedVoucher = voucher.trim().toUpperCase();
-  const freeShippingApplied = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
+  const freeShippingApplied = (freeShippingThreshold > 0 && subtotal >= freeShippingThreshold)
+    || items.some((item) => item.productSlug === FREE_SHIPPING_PRODUCT_SLUG);
   const discount = appliedVoucher ? voucherDiscount : 0;
-  const checkoutTotal = Math.max(0, subtotal + shipping - discount);
+  const effectiveShipping = freeShippingApplied ? 0 : shippingQuote?.fee ?? shipping;
+  const redeemablePoints = Math.min(loyaltyPointsAvailable, Math.floor(Math.max(0, subtotal + effectiveShipping - discount) / POINT_REDEMPTION_VALUE_VND));
+  const loyaltyDiscount = useLoyaltyPoints ? redeemablePoints * POINT_REDEMPTION_VALUE_VND : 0;
+  const checkoutTotal = Math.max(0, subtotal + effectiveShipping - discount - loyaltyDiscount);
+  const weightGrams = items.reduce((sum, item) => sum + (item.weightGrams ?? 500) * item.quantity, 0);
+
+  useEffect(() => {
+    if (shippingCountry !== 'VN' || freeShippingApplied || !deliveryLocation.province || !deliveryLocation.district) {
+      setShippingQuote(null);
+      setShippingQuoteError('');
+      setShippingQuoteLoading(false);
+      return;
+    }
+    setShippingQuote(null);
+    setShippingQuoteError('');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setShippingQuoteLoading(true);
+      setShippingQuoteError('');
+      try {
+        const response = await fetch('/api/shipping/rate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ...deliveryLocation, weightGrams }),
+          signal: controller.signal,
+        });
+        const result = await response.json() as ShippingQuote | { error?: { message?: string } };
+        if (!response.ok || !('fee' in result)) throw new Error('error' in result ? result.error?.message : undefined);
+        setShippingQuote(result);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setShippingQuote(null);
+          setShippingQuoteError(error instanceof Error ? error.message : 'Không thể lấy phí vận chuyển.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setShippingQuoteLoading(false);
+      }
+    }, 350);
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [deliveryLocation, freeShippingApplied, shippingCountry, weightGrams]);
 
   useEffect(() => {
     if (!buyNow) return;
@@ -235,10 +283,15 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', '),
         discountCode: appliedVoucher,
         customer: { name: form.get('name'), email: form.get('email'), phone: form.get('phone') },
-        delivery: { address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', ') },
+        delivery: {
+          address: [form.get('province'), form.get('district'), form.get('ward'), form.get('address')].filter(Boolean).join(', '),
+          province: form.get('province'),
+          district: form.get('district'),
+        },
         paymentMethod,
         note: form.get('notes'),
         voucherCode: appliedVoucher,
+        useLoyaltyPoints,
         affiliateCode: getStoredAffiliateCode(),
         items: checkoutItems.map((item) => ({
           id: item.id,
@@ -330,7 +383,18 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
       <div className="field"><label htmlFor="name">{isEN ? 'Full name' : 'Họ tên'}</label><input id="name" name="name" autoComplete="name" defaultValue={initialCustomer?.name} required /></div>
       <div className="field"><label htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="email" defaultValue={initialCustomer?.email} /></div>
       <div className="field"><label htmlFor="phone">{isEN ? 'Phone number' : 'Điện thoại'}</label><ValidatedPhoneInput id="phone" name="phone" autoComplete="tel" defaultValue={initialCustomer?.phone} required /></div>
-      <VietnamAddressFields initialAddress={initialCustomer?.address} />
+      <VietnamAddressFields initialAddress={initialCustomer?.address} onLocationChange={setDeliveryLocation} />
+      {shippingQuoteLoading && <p className="checkout-service-notice" role="status">{isEN ? 'Updating shipping rate...' : 'Đang cập nhật phí vận chuyển...'}</p>}
+      {shippingQuoteError && <p className="checkout-service-notice" role="status">{isEN ? 'Live shipping rate unavailable; the final rate will be verified when the order is placed.' : 'Chưa lấy được phí ship realtime; hệ thống sẽ xác minh lại khi đặt hàng.'}</p>}
+      {(shippingQuote || useLoyaltyPoints) && <div className="checkout-discount-summary" aria-live="polite">
+        <span>{isEN ? 'Shipping estimate' : 'Phí vận chuyển dự kiến'}</span>
+        <strong>{freeShippingApplied ? formatCurrency(0) : formatCurrency(effectiveShipping)}</strong>
+        {shippingQuote && <><span>{isEN ? 'Estimated delivery' : 'Thời gian dự kiến'}</span><strong>{shippingQuote.estimatedDays}</strong></>}
+        {loyaltyDiscount > 0 && <><span>{isEN ? 'Points discount' : 'Giảm từ điểm thưởng'}</span><strong>−{formatCurrency(loyaltyDiscount)}</strong></>}
+        <span>{isEN ? 'Estimated total' : 'Tổng thanh toán dự kiến'}</span>
+        <strong>{formatCurrency(checkoutTotal)}</strong>
+        {shippingQuote?.source === 'MOCK' && <small>{isEN ? 'Demo rate; carrier credentials are not configured.' : 'Phí mô phỏng; API đối tác chưa được cấu hình.'}</small>}
+      </div>}
       {freeShippingApplied && <p className="automatic-shipping-banner" role="status">{isEN ? 'The best available offer has been applied: free nationwide shipping.' : 'Hệ thống đã tự động chọn ưu đãi tốt nhất: Miễn phí vận chuyển toàn quốc (-35.000đ).'}</p>}
       <div className="checkout-voucher-entry">
         <label className="field" htmlFor="voucher">{isEN ? 'Discount code' : 'Mã giảm giá'}</label>
@@ -355,7 +419,12 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
       </div>}
       {voucherFeedback && <p className={voucherFeedback.type === 'success' ? 'checkout-voucher-success' : 'checkout-voucher-error'} role={voucherFeedback.type === 'success' ? 'status' : 'alert'}>{voucherFeedback.text}</p>}
       {voucherFeedback?.requiresLogin && <p className="checkout-voucher-error"><Link href={`/dang-nhap?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>{isEN ? 'Log in' : 'Đăng nhập'}</Link> · <Link href={`/dang-ky?callbackUrl=${encodeURIComponent(buyNow ? '/checkout?mode=buy_now' : '/checkout')}`}>{isEN ? 'Create an account' : 'Tạo tài khoản'}</Link></p>}
-      {appliedVoucher && <div className="checkout-discount-summary"><span>{isEN ? 'Discount' : 'Giảm giá'}</span><strong>−{formatCurrency(discount)}</strong><span>{isEN ? 'Total after discount' : 'Tổng thanh toán sau giảm'}</span><strong>{formatCurrency(checkoutTotal)}{currency === 'SGD' && <> ({formatApproxVnd(checkoutTotal)})</>}</strong>{currency === 'SGD' && <small>{isEN ? 'Converted at the interbank exchange rate' : 'Thanh toán quy đổi theo tỷ giá liên ngân hàng'}</small>}</div>}
+      {loyaltyPointsAvailable > 0 && <label className="checkout-loyalty-option">
+        <input type="checkbox" checked={useLoyaltyPoints} disabled={!redeemablePoints} onChange={(event) => setUseLoyaltyPoints(event.target.checked)} />
+        <span>{isEN ? `Use ${redeemablePoints.toLocaleString()} of ${loyaltyPointsAvailable.toLocaleString()} points` : `Dùng ${redeemablePoints.toLocaleString()} / ${loyaltyPointsAvailable.toLocaleString()} điểm`}</span>
+        {useLoyaltyPoints && <strong>−{formatCurrency(loyaltyDiscount)}</strong>}
+      </label>}
+      {appliedVoucher && <div className="checkout-discount-summary"><span>{isEN ? 'Discount' : 'Giảm giá'}</span><strong>−{formatCurrency(discount)}</strong><span>{isEN ? 'Total after discount' : 'Tổng thanh toán sau giảm'}</span><strong>{formatCurrency(checkoutTotal)}{currency !== 'VND' && <> ({formatApproxVnd(checkoutTotal)})</>}</strong>{currency !== 'VND' && <small>{isEN ? 'Displayed using a fixed reference exchange rate. VietQR remains payable in VND.' : 'Hiển thị theo tỷ giá tham khảo cố định; VietQR vẫn thanh toán bằng VND.'}</small>}</div>}
       <fieldset className="payment-method-options"><legend>{isEN ? 'Payment method' : 'Phương thức thanh toán'}</legend>
         <label className={paymentMethod === 'COD' ? 'is-selected' : ''}><input type="radio" name="method" value="COD" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} /><span><strong>COD</strong><small>{isEN ? 'Pay on delivery' : 'Thanh toán khi nhận hàng'}</small></span></label>
         <label className={paymentMethod === 'VIETQR' ? 'is-selected' : ''}><input type="radio" name="method" value="VIETQR" checked={paymentMethod === 'VIETQR'} onChange={() => setPaymentMethod('VIETQR')} /><span><strong>VietQR</strong><small>{isEN ? 'Scan to make a bank transfer' : 'Quét mã, chuyển khoản ngân hàng'}</small></span></label>

@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers';
 
 import { prisma } from '@/lib/prisma';
-import { calculateShipping } from '@/lib/shipping';
+import { calculateShipping, parseShippingWeightGrams } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export type CartUpsellProduct = { id: string; slug: string; name: string; image: string; price: number; stock: number };
 export type CartSnapshotItem = {
@@ -18,6 +19,7 @@ export type CartSnapshotItem = {
   name: string;
   quantity: number;
   unitPrice: number;
+  weightGrams: number;
   total: number;
 };
 
@@ -32,7 +34,7 @@ export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } 
 
     const cart = await prisma.cart.findUnique({
       where: { id: decodeURIComponent(cartId) },
-      include: { items: { include: { product: { include: { variants: true, upsellProduct: { select: { id: true, slug: true, name: true, image: true, price: true, stock: true, active: true } } } }, variant: true } } },
+      include: { items: { include: { product: { include: { variants: true, upsellProduct: { select: { id: true, slug: true, name: true, image: true, price: true, originalPrice: true, flashSaleEndsAt: true, stock: true, active: true } } } }, variant: true } } },
     });
 
     const items = (cart?.items ?? []).map((item) => ({
@@ -42,13 +44,14 @@ export async function readCartSnapshot({ buyNow = false }: { buyNow?: boolean } 
       image: item.product.image,
       variantId: item.productVariantId,
       variantLabel: item.variant?.title ?? null,
-      variants: item.product.variants.map((variant) => ({ ...variant, label: variant.title, stock: variant.inventory })),
-      upsellProduct: item.product.upsellProduct?.active ? item.product.upsellProduct : null,
+      variants: item.product.variants.map((variant) => ({ ...variant, price: getEffectivePrice({ price: variant.price, originalPrice: variant.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), label: variant.title, stock: variant.inventory })),
+      upsellProduct: item.product.upsellProduct?.active ? { ...item.product.upsellProduct, price: getEffectivePrice(item.product.upsellProduct) } : null,
       stock: item.variant?.inventory ?? item.product.stock,
       name: item.productName,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      total: item.quantity * item.unitPrice,
+      unitPrice: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
+      weightGrams: parseShippingWeightGrams(item.product.weight, item.variant?.weight),
+      total: item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
     }));
 
     const subtotal = items.reduce((sum, item) => sum + item.total, 0);

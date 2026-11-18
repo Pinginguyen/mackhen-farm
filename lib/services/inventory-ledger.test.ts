@@ -76,6 +76,21 @@ describe('recordMovement', () => {
     expect(createMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ data: [expect.objectContaining({ orderId: 'order-1', lotId: 'lot-second', type: 'ALLOCATION', delta: -3 })] }));
   });
 
+  it('prioritizes the nearest warehouse before expiry date and records its warehouse ID', async () => {
+    lotFindMany.mockResolvedValueOnce([
+      { id: 'lot-near', batchCode: 'NEAR', availableQty: 2, expDate: new Date('2027-02-01T00:00:00.000Z'), warehouseId: 'warehouse-hcm', warehouse: { province: 'Thành phố Hồ Chí Minh', district: 'Quận 1' } },
+      { id: 'lot-far', batchCode: 'FAR', availableQty: 2, expDate: new Date('2027-01-01T00:00:00.000Z'), warehouseId: 'warehouse-son-la', warehouse: { province: 'Tỉnh Sơn La', district: 'Huyện Vân Hồ' } },
+    ]);
+
+    const allocations = await allocateStockFEFO(tx, 'variant-1', 1, {
+      orderId: 'order-1', productId: 'product-1', productName: 'Khô bò thực vật', cartItemId: 'cart-item-2',
+      destinationProvince: 'Thành phố Hồ Chí Minh', destinationDistrict: 'Quận 1',
+    });
+
+    expect(allocations[0]).toMatchObject({ lotId: 'lot-near', warehouseId: 'warehouse-hcm' });
+    expect(createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ lotId: 'lot-near', warehouseId: 'warehouse-hcm' })] }));
+  });
+
   it('rejects before changing lots when eligible lot stock is insufficient', async () => {
     lotFindMany.mockResolvedValueOnce([{ id: 'lot-short', batchCode: 'LOT-SHORT', availableQty: 1, expDate: new Date('2027-01-01T00:00:00.000Z') }]);
 

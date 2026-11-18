@@ -8,6 +8,7 @@ import ProductCard from '@/components/ProductCard';
 import type { NutritionFacts, PairingGuide, SensoryProfile } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export type CatalogProduct = {
   id: string;
@@ -16,6 +17,7 @@ export type CatalogProduct = {
   category: string;
   price: number;
   originalPrice: number | null;
+  flashSaleEndsAt?: Date | string | null;
   unit: string | null;
   protein: string | null;
   rating: number;
@@ -67,9 +69,9 @@ export default function ProductCatalogFilter({ products, initialQuery = '', show
     const productSearchText = `${product.name} ${product.category} ${product.description}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLocaleLowerCase('vi');
     const matchesSearch = !normalizedQuery || productSearchText.includes(normalizedQuery);
     const matchesPrice = priceFilter === 'ALL'
-      || (priceFilter === 'UNDER_50' && product.price < 50000)
-      || (priceFilter === '50_100' && product.price >= 50000 && product.price <= 100000)
-      || (priceFilter === 'OVER_150' && product.price > 150000);
+      || (priceFilter === 'UNDER_50' && getEffectivePrice(product) < 50000)
+      || (priceFilter === '50_100' && getEffectivePrice(product) >= 50000 && getEffectivePrice(product) <= 100000)
+      || (priceFilter === 'OVER_150' && getEffectivePrice(product) > 150000);
     const proteinGrams = Number(product.protein?.match(/\d+(?:\.\d+)?/)?.[0] ?? 0);
     return matchesSearch && matchesPrice && (!proteinOnly || proteinGrams > 20);
   });

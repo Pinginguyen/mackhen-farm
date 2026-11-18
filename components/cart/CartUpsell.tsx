@@ -15,7 +15,7 @@ export type CartUpsellProduct = {
 
 export default function CartUpsell({ product, onAdded }: { product: CartUpsellProduct; onAdded?: () => void | Promise<void> }) {
   const { currency, formatCurrency, translateProductName } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 

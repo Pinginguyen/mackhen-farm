@@ -15,7 +15,9 @@ export async function GET(request: Request) {
     const ratingFilter = params.get('rating');
     const where: Prisma.ReviewWhereInput = ratingFilter === '5'
       ? { rating: 5 }
-      : ratingFilter === 'low' ? { rating: { lte: 2 } } : {};
+      : ratingFilter === 'low' ? { rating: { lte: 2 } }
+        : ratingFilter === 'risk' ? { riskTag: { in: ['HIGH_RISK', 'URGENT_QUALITY_RISK'] } }
+          : {};
     const items = await prisma.review.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -25,6 +27,7 @@ export async function GET(request: Request) {
         customerName: true,
         rating: true,
         comment: true,
+        riskTag: true,
         createdAt: true,
         adminReply: true,
         adminReplyAt: true,
@@ -32,6 +35,9 @@ export async function GET(request: Request) {
         order: { select: { orderCode: true, phone: true } },
       },
     });
+    items.sort((left, right) => Number(['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(right.riskTag ?? ''))
+      - Number(['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(left.riskTag ?? ''))
+      || right.createdAt.getTime() - left.createdAt.getTime());
     return NextResponse.json({ items });
   }, 'Admin review listing failed');
 }

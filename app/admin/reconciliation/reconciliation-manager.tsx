@@ -4,17 +4,40 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Wallet } from 'lucide-react';
 
-import type { ReconciliationItem } from './page';
+import type { BankTransferItem, ReconciliationItem, ReconciliationSummary } from './page';
 
 function formatCurrency(amount: number) {
   return `${amount.toLocaleString('vi-VN')}đ`;
 }
 
-export default function ReconciliationManager({ initialItems }: { initialItems: ReconciliationItem[] }) {
+export default function ReconciliationManager({ initialItems, initialTransfers, summary }: { initialItems: ReconciliationItem[]; initialTransfers: BankTransferItem[]; summary: ReconciliationSummary }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [matchDrafts, setMatchDrafts] = useState<Record<string, { orderCode: string; reason: string }>>({});
+
+  async function manuallyMatch(transfer: BankTransferItem) {
+    const draft = matchDrafts[transfer.id] ?? { orderCode: transfer.orderCode ?? '', reason: '' };
+    setBusyId(transfer.id);
+    setMessage('');
+    setError('');
+    try {
+      const response = await fetch('/api/admin/reconciliation', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'MATCH_TRANSFER', bankTransferId: transfer.id, orderCode: draft.orderCode, reason: draft.reason }),
+      });
+      const result = await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(result.error?.message ?? 'Không thể khớp giao dịch.');
+      setMessage(`Đã khớp thủ công giao dịch ${transfer.transactionId ?? transfer.id}.`);
+      router.refresh();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Không thể khớp giao dịch.');
+    } finally {
+      setBusyId('');
+    }
+  }
 
   async function runAction(item: ReconciliationItem, action: 'RECONCILE' | 'PREPARE_REFUND') {
     setBusyId(item.id);
@@ -41,6 +64,12 @@ export default function ReconciliationManager({ initialItems }: { initialItems: 
     <div className="admin-reconciliation">
       {error && <p className="admin-return-alert" role="alert">{error}</p>}
       {message && <p className="admin-return-notice" role="status">{message}</p>}
+      <div className="admin-reconciliation-summary-grid">
+        <article><span>Tiền nhận hôm nay</span><strong>{formatCurrency(summary.todayReceived)}</strong></article>
+        <article><span>Tiền nhận tuần này</span><strong>{formatCurrency(summary.weekReceived)}</strong></article>
+        <article><span>Giao dịch khớp hôm nay</span><strong>{summary.todayMatched}</strong></article>
+        <article><span>Giá trị đơn đã thanh toán tuần này</span><strong>{formatCurrency(summary.weekPaidOrders)}</strong></article>
+      </div>
       <div className="admin-reconciliation-summary"><Clock3 size={17} /><span>{initialItems.length} đơn thanh toán trực tuyến đang chờ xác minh quá 5 phút</span></div>
       <div className="admin-table-scroll">
         <table className="admin-reconciliation-table">
@@ -70,6 +99,30 @@ export default function ReconciliationManager({ initialItems }: { initialItems: 
           {!initialItems.length && <tr><td colSpan={7}>Không có đơn thanh toán trực tuyến nào quá hạn tra soát.</td></tr>}</tbody>
         </table>
       </div>
+      <section className="admin-bank-transfer-review" aria-labelledby="bank-transfer-review-title">
+        <h2 id="bank-transfer-review-title">Giao dịch lệch cần kế toán xử lý</h2>
+        <div className="admin-table-scroll">
+          <table className="admin-reconciliation-table">
+            <thead><tr><th>Giao dịch</th><th>Nội dung</th><th>Thực nhận</th><th>Đơn dự kiến</th><th>Lý do</th><th>Khớp thủ công</th></tr></thead>
+            <tbody>{initialTransfers.map((transfer) => {
+              const draft = matchDrafts[transfer.id] ?? { orderCode: transfer.orderCode ?? '', reason: '' };
+              return <tr key={transfer.id}>
+                <td><strong>{transfer.transactionId ?? transfer.id}</strong><small>{new Date(transfer.receivedAt).toLocaleString('vi-VN')}</small><small>{transfer.status}</small></td>
+                <td>{transfer.content || '—'}</td>
+                <td><strong>{formatCurrency(transfer.amount)}</strong></td>
+                <td>{transfer.order ? `${transfer.order.orderCode} · ${formatCurrency(transfer.order.totalAmount)}` : transfer.orderCode ?? 'Chưa nhận diện'}</td>
+                <td>{transfer.mismatchReason ?? 'Cần ghép mã đơn'}</td>
+                <td><div className="admin-bank-transfer-match">
+                  <input aria-label="Mã đơn cần khớp" placeholder="MKF-000000" value={draft.orderCode} onChange={(event) => setMatchDrafts((current) => ({ ...current, [transfer.id]: { ...draft, orderCode: event.target.value } }))} />
+                  <input aria-label="Lý do khớp thủ công" placeholder="Lý do / chứng từ đối chiếu" value={draft.reason} onChange={(event) => setMatchDrafts((current) => ({ ...current, [transfer.id]: { ...draft, reason: event.target.value } }))} />
+                  <button type="button" className="admin-reconciliation-primary" onClick={() => void manuallyMatch(transfer)} disabled={busyId === transfer.id || !draft.orderCode.trim() || draft.reason.trim().length < 8}>Khớp lệnh</button>
+                </div></td>
+              </tr>;
+            })}
+            {!initialTransfers.length && <tr><td colSpan={6}>Không có giao dịch lệch hoặc chưa ghép đơn.</td></tr>}</tbody>
+          </table>
+        </div>
+      </section>
       <p className="admin-reconciliation-note">Đối soát chỉ cập nhật từ payment record/webhook khớp số tiền. Lệnh hoàn tiền được ghi nhận ở trạng thái chờ phê duyệt; thao tác chuyển khoản thực tế phải do người có thẩm quyền xác nhận.</p>
     </div>
   );

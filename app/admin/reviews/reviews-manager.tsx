@@ -9,6 +9,7 @@ export type AdminReview = {
   customerName: string;
   rating: number;
   comment: string;
+  riskTag: string | null;
   createdAt: string;
   adminReply: string | null;
   adminReplyAt: string | null;
@@ -20,6 +21,7 @@ const filters = [
   { value: 'all', label: 'Tất cả' },
   { value: '5', label: '5 sao' },
   { value: 'low', label: '1–2 sao cần xử lý' },
+  { value: 'risk', label: 'Rủi ro cao' },
 ];
 
 export default function ReviewsManager({ initialReviews }: { initialReviews: AdminReview[] }) {
@@ -29,7 +31,8 @@ export default function ReviewsManager({ initialReviews }: { initialReviews: Adm
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const visibleReviews = reviews.filter((review) => filter === 'all' || (filter === '5' ? review.rating === 5 : review.rating <= 2));
+  const visibleReviews = reviews.filter((review) => filter === 'all'
+    || (filter === '5' ? review.rating === 5 : filter === 'low' ? review.rating <= 2 : ['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(review.riskTag ?? '')));
 
   async function saveReply(review: AdminReview, content: string) {
     setPending(review.id);
@@ -62,8 +65,9 @@ export default function ReviewsManager({ initialReviews }: { initialReviews: Adm
       </div>
       {message && <p className="admin-review-message" role="status">{message}</p>}
       <div className="admin-review-list">
-        {visibleReviews.map((review) => <article className="admin-review-card" key={review.id}>
+        {visibleReviews.map((review) => <article className={`admin-review-card${['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(review.riskTag ?? '') ? ' is-high-risk' : ''}`} key={review.id}>
           <header><div><strong>{review.customerName}</strong><small>{review.order?.phone ?? 'Không có SĐT'} · {new Date(review.createdAt).toLocaleString('vi-VN')}</small></div><span className={`admin-review-status${review.adminReply ? ' is-replied' : ''}`}>{review.adminReply ? 'Đã phản hồi' : 'Chưa phản hồi'}</span></header>
+          {['HIGH_RISK', 'URGENT_QUALITY_RISK'].includes(review.riskTag ?? '') && <span className="admin-review-risk-badge" role="status">HIGH RISK · Cần xử lý</span>}
           <div className="admin-review-product"><Link href={`/products/${encodeURIComponent(review.product.slug)}`}>{review.product.name}</Link><span>{review.order?.orderCode ?? 'Đánh giá sản phẩm'}</span></div>
           <p className="admin-review-rating" aria-label={`${review.rating} sao`}>{Array.from({ length: 5 }, (_, index) => <Star key={index} size={15} fill={index < review.rating ? 'currentColor' : 'none'} />)}<strong>{review.rating}/5</strong></p>
           <p className="admin-review-comment">{review.comment}</p>

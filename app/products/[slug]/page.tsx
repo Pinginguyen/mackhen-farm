@@ -15,6 +15,7 @@ import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
 import NutriGradeBadge from '@/components/product/NutriGradeBadge';
 import ProductEditorialDetails from '@/components/product/ProductEditorialDetails';
 import { getSystemSettings } from '@/lib/system-settings';
+import { getEffectivePrice } from '@/lib/pricing';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -120,6 +121,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
+  const effectivePrice = getEffectivePrice(product);
   const structuredData = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
@@ -130,7 +132,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
     offers: {
       '@type': 'Offer',
       priceCurrency: 'VND',
-      price: product.price,
+      price: effectivePrice,
       availability: `https://schema.org/${product.stock > 0 ? 'InStock' : 'OutOfStock'}`,
     },
     ...(reviewCount > 0 ? {
@@ -165,6 +167,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               <span>{product.unit ?? 'Theo quy cách đóng gói'}</span>
               <ProductRating rating={product.rating} size="sm" />
             </div>
+            {product.stock > 0 && product.stock <= 5 && <p className="product-low-stock">🔥 Chỉ còn lại {product.stock} sản phẩm trong kho!</p>}
             <TasteSensoryMeter
               spiciness={product.spiciness}
               chewiness={product.chewiness}
@@ -176,7 +179,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
               valueAxis2={product.valueAxis2}
               valueAxis3={product.valueAxis3}
             />
-            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} />
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={product.image} price={product.price} originalPrice={product.originalPrice} unit={product.unit} variants={product.variants} stock={product.stock} flashSaleEndsAt={product.flashSaleEndsAt} />
             <p className="detail-description">{product.description}</p>
             <div className="product-details-grid">
               <ProductEditorialDetails

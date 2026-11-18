@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpdate, variantUpdate, lotFindUnique, lotUpdateMany, movementCreateMany, movementFindUnique, requireAdmin, captureException, transaction, prisma } = vi.hoisted(() => {
+const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpdate, variantUpdate, lotFindUnique, lotUpdateMany, movementCreateMany, movementFindUnique, requireAdmin, captureException, pushOrderToCarrierShipment, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(),
-    productUpdate: vi.fn(), variantUpdate: vi.fn(), lotFindUnique: vi.fn(), lotUpdateMany: vi.fn(), movementCreateMany: vi.fn(), movementFindUnique: vi.fn(), requireAdmin: vi.fn(), captureException: vi.fn(),
+    productUpdate: vi.fn(), variantUpdate: vi.fn(), lotFindUnique: vi.fn(), lotUpdateMany: vi.fn(), movementCreateMany: vi.fn(), movementFindUnique: vi.fn(), requireAdmin: vi.fn(), captureException: vi.fn(), pushOrderToCarrierShipment: vi.fn(),
   };
   const tx = {
     order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
@@ -19,6 +19,10 @@ const { orderFindMany, orderFindUnique, orderUpdate, orderUpdateMany, productUpd
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@sentry/nextjs', () => ({ captureException }));
+vi.mock('@/lib/services/shipping-carrier', () => ({ pushOrderToCarrierShipment }));
+vi.mock('@/lib/api-database', () => ({
+  withDatabase: (operation: () => Promise<Response>) => operation().catch(() => new Response(JSON.stringify({ error: { message: 'Database operation failed.' } }), { status: 500 })),
+}));
 
 import { GET, PATCH } from './route';
 
@@ -37,6 +41,7 @@ describe('/api/admin/orders', () => {
     prisma.$transaction.mockClear();
     requireAdmin.mockReset().mockResolvedValue(null);
     captureException.mockReset();
+    pushOrderToCarrierShipment.mockReset().mockResolvedValue({ carrier: 'GHTK', trackingCode: 'GHTK123', shippingStatus: 'LABEL_CREATED', labelUrl: '/label' });
   });
 
   it('returns affiliate attribution with the order for KOC commission reconciliation', async () => {
@@ -115,6 +120,36 @@ describe('/api/admin/orders', () => {
     expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ orderStatus: 'HANDED_OFF', carrier: 'SPX', trackingCode: expect.stringMatching(/^SPX\d{11}$/) }),
     }));
+  });
+
+  it('creates a carrier shipment after the order is confirmed', async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: 'order-1', orderStatus: 'PENDING', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: null, trackingCode: null, deliveredAt: null, items: [] });
+    orderUpdate.mockResolvedValueOnce({ id: 'order-1', orderCode: 'MKF-100001', orderStatus: 'CONFIRMED', paymentStatus: 'PENDING', carrier: null, trackingCode: null });
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'CONFIRMED' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(pushOrderToCarrierShipment).toHaveBeenCalledWith({ id: 'order-1' }, undefined);
+    expect(await response.json()).toMatchObject({ carrier: 'GHTK', trackingCode: 'GHTK123' });
+  });
+
+  it('keeps the existing label when a confirmed order moves to processing', async () => {
+    orderFindUnique.mockResolvedValueOnce({ id: 'order-1', orderStatus: 'CONFIRMED', paymentStatus: 'PENDING', paymentMethod: 'COD', carrier: 'GHTK', trackingCode: 'GHTK123', deliveredAt: null, items: [] });
+    orderUpdate.mockResolvedValueOnce({ id: 'order-1', orderCode: 'MKF-100001', orderStatus: 'PROCESSING', paymentStatus: 'PENDING', carrier: 'GHTK', trackingCode: 'GHTK123' });
+
+    const response = await PATCH(new Request('https://mackhen.example/api/admin/orders', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orderCode: 'MKF-100001', status: 'PROCESSING' }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ carrier: 'GHTK', trackingCode: 'GHTK123' }) }));
+    expect(pushOrderToCarrierShipment).not.toHaveBeenCalled();
   });
 
   it.each(['DELIVERED', 'COMPLETED'])('marks a %s order paid automatically', async (status) => {

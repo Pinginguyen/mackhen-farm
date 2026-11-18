@@ -4819,6 +4819,23 @@ textarea {
   font-size: 1rem;
 }
 
+.checkout-loyalty-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 12px;
+  border-left: 3px solid #c5a059;
+  background: #f8f4eb;
+  color: #44403c;
+  font-size: 0.84rem;
+}
+
+.checkout-loyalty-option input { width: 16px; height: 16px; flex: 0 0 auto; accent-color: #1b4332; }
+.checkout-loyalty-option span { flex: 1 1 auto; }
+.checkout-loyalty-option strong { color: #166534; white-space: nowrap; }
+
 .free-shipping-note {
   color: var(--forest);
   font-weight: 700;
@@ -5460,6 +5477,39 @@ textarea {
   margin-top: 34px;
 }
 
+.loyalty-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px 24px;
+  margin-bottom: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.loyalty-balance .eyebrow { margin: 0 0 6px; }
+.loyalty-balance h2 { margin: 0; color: #1b4332; font-family: Georgia, 'Times New Roman', serif; font-size: 1.45rem; }
+.loyalty-balance p:last-child { margin: 5px 0 0; color: #6b6258; font-size: 0.82rem; }
+.membership-tier-badge { align-self: center; padding: 7px 13px; border: 1px solid; border-radius: 999px; font-size: 0.78rem; font-weight: 800; }
+.membership-tier-badge.tier-member { border-color: #b8814a; background: #f5e6d3; color: #704515; }
+.membership-tier-badge.tier-vip { border-color: #9ca3af; background: #f1f3f5; color: #374151; }
+.membership-tier-badge.tier-vvip { border-color: #c5a059; background: #fbf3d9; color: #75530d; }
+.loyalty-history { grid-column: 1 / -1; }
+.loyalty-history h3 { margin: 0 0 8px; color: #292524; font-size: 0.95rem; }
+.loyalty-history ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.loyalty-history li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-top: 1px solid #e7e5e4; }
+.loyalty-history li span { display: grid; gap: 3px; min-width: 0; }
+.loyalty-history li strong { overflow-wrap: anywhere; color: #44403c; font-size: 0.82rem; }
+.loyalty-history li small, .loyalty-history > p { color: #78716c; font-size: 0.75rem; }
+.loyalty-history li b { flex: 0 0 auto; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.loyalty-history .points-earned { color: #166534; }
+.loyalty-history .points-spent { color: #9b2424; }
+
+@media (max-width: 600px) {
+  .loyalty-panel { gap: 14px; }
+  .loyalty-balance h2 { font-size: 1.2rem; }
+}
+
 .account-tabs {
   display: flex;
   gap: 8px;
@@ -5865,6 +5915,14 @@ textarea {
   width: 100%;
   min-height: 48px;
 }
+
+.exit-intent-subscribe { display: grid; width: 100%; gap: 8px; padding-top: 12px; border-top: 1px solid #e7e5e4; text-align: left; }
+.exit-intent-subscribe > label:first-child { display: flex; align-items: center; gap: 6px; color: #44403c; font-size: 0.8rem; font-weight: 700; }
+.exit-intent-subscribe > input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid #d6d3d1; border-radius: 7px; background: #fff; font-size: 0.9rem; }
+.exit-intent-consent { display: flex; align-items: flex-start; gap: 7px; color: #57534e; font-size: 0.72rem; line-height: 1.5; }
+.exit-intent-consent input { margin-top: 2px; accent-color: #1b4332; }
+.exit-intent-subscribe .secondary-action { min-height: 40px; }
+.exit-intent-subscribe > small { color: #57534e; font-size: 0.75rem; line-height: 1.5; }
 
 .exit-intent-continue {
   border: 0;
@@ -7653,6 +7711,10 @@ body {
   color: #a8a29e;
   font-size: 0.75rem;
 }
+
+.flash-sale-countdown { display: inline-flex; align-items: center; gap: 7px; color: #8b4513; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.flash-sale-countdown strong { padding: 3px 6px; border-radius: 4px; background: #7c1d1d; color: #fff; font-size: 0.72rem; }
+.product-low-stock { margin: 0; color: #9a3412; font-size: 0.76rem; font-weight: 700; line-height: 1.4; }
 
 .product-card.is-out-of-stock .image-box img {
   filter: grayscale(0.55);
@@ -9526,6 +9588,20 @@ body {
 .admin-reconciliation-summary {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.admin-reconciliation-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.admin-reconciliation-summary-grid article { display: grid; gap: 5px; padding: 12px; border-left: 3px solid #c5a059; background: #f8f6f1; }
+.admin-reconciliation-summary-grid span { color: var(--muted); font-size: 0.72rem; }
+.admin-reconciliation-summary-grid strong { color: #1b4332; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.admin-bank-transfer-review { display: grid; gap: 10px; margin-top: 12px; }
+.admin-bank-transfer-review h2 { margin: 0; color: #292524; font-size: 1.05rem; }
+.admin-bank-transfer-match { display: grid; min-width: 190px; gap: 6px; }
+.admin-bank-transfer-match input { min-height: 34px; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: white; font-size: 0.75rem; }
+.admin-bank-transfer-match .admin-reconciliation-primary { justify-content: center; min-height: 34px; font-size: 0.75rem; }
+
+@media (max-width: 800px) {
+  .admin-reconciliation-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .admin-reconciliation-table {
@@ -14949,6 +15025,9 @@ a.audit-target-chip:hover {
   border-radius: 8px;
   background: #fffdfa;
 }
+
+.admin-review-card.is-high-risk { border-color: #efb3ad; background: #fff8f6; }
+.admin-review-risk-badge { width: fit-content; padding: 4px 8px; border-radius: 4px; background: #fee2e2; color: #991b1b; font-size: 0.68rem; font-weight: 800; }
 
 .admin-review-card > header,
 .admin-review-product {

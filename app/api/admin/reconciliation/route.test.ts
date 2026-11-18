@@ -1,16 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindMany, orderFindUnique, orderUpdate, paymentUpsert, refundOperationFindFirst, refundOperationCreate, requireAdmin, writeAuditLog, transaction, prisma } = vi.hoisted(() => {
+const { orderFindMany, orderFindUnique, orderUpdate, paymentUpsert, paymentFindFirst, paymentUpdate, paymentCreate, bankTransferFindUnique, bankTransferUpdateMany, refundOperationFindFirst, refundOperationCreate, requireAdmin, writeAuditLog, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), paymentUpsert: vi.fn(),
+    orderFindMany: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), paymentUpsert: vi.fn(), paymentFindFirst: vi.fn(), paymentUpdate: vi.fn(), paymentCreate: vi.fn(), bankTransferFindUnique: vi.fn(), bankTransferUpdateMany: vi.fn(),
     refundOperationFindFirst: vi.fn(), refundOperationCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(),
   };
-  const tx = { order: { update: mocks.orderUpdate }, payment: { upsert: mocks.paymentUpsert } };
+  const tx = {
+    order: { update: mocks.orderUpdate },
+    payment: { upsert: mocks.paymentUpsert, findFirst: mocks.paymentFindFirst, update: mocks.paymentUpdate, create: mocks.paymentCreate },
+    bankTransfer: { updateMany: mocks.bankTransferUpdateMany },
+  };
   return {
     ...mocks,
     transaction: tx,
     prisma: {
       order: { findMany: mocks.orderFindMany, findUnique: mocks.orderFindUnique },
+      bankTransfer: { findUnique: mocks.bankTransferFindUnique },
       $transaction: vi.fn((operation: (value: typeof tx) => Promise<unknown>) => operation(tx)),
       refundOperation: { findFirst: mocks.refundOperationFindFirst, create: mocks.refundOperationCreate },
     },
@@ -20,6 +25,8 @@ const { orderFindMany, orderFindUnique, orderUpdate, paymentUpsert, refundOperat
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
+vi.mock('@/lib/services/telegram-notifier', () => ({ notifyPaidOrder: vi.fn() }));
+vi.mock('@/lib/order-email-notifications', () => ({ sendOrderConfirmationIfNeeded: vi.fn().mockResolvedValue(false) }));
 
 import { POST } from './route';
 
@@ -39,6 +46,11 @@ describe('POST /api/admin/reconciliation', () => {
     });
     orderUpdate.mockReset().mockResolvedValue({});
     paymentUpsert.mockReset().mockResolvedValue({});
+    paymentFindFirst.mockReset().mockResolvedValue(null);
+    paymentUpdate.mockReset().mockResolvedValue({});
+    paymentCreate.mockReset().mockResolvedValue({});
+    bankTransferFindUnique.mockReset().mockResolvedValue({ id: 'transfer-1', transactionId: 'SP-1', orderCode: null, amount: 169000, status: 'UNMATCHED', mismatchReason: 'unknown', orderId: null });
+    bankTransferUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     refundOperationFindFirst.mockReset().mockResolvedValue(null);
     refundOperationCreate.mockReset().mockResolvedValue({ id: 'refund-1', status: 'PENDING_APPROVAL', amount: 169000 });
     writeAuditLog.mockReset().mockResolvedValue(undefined);
@@ -89,5 +101,18 @@ describe('POST /api/admin/reconciliation', () => {
     expect(response.status).toBe(201);
     expect(refundOperationCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING_APPROVAL', amount: 169000, reason: 'Hoàn tiền từ Quỹ dự phòng xử lý sự cố đứt gãy kết nối' }) }));
     expect((await response.json()).message).toContain('chưa có giao dịch chuyển tiền nào được gửi');
+  });
+
+  it('manually matches an unmatched transfer with a required audit reason', async () => {
+    const response = await post({ action: 'MATCH_TRANSFER', orderCode: 'MKF-111111', bankTransferId: 'transfer-1', reason: 'Khách cung cấp sao kê xác thực.' });
+
+    expect(response.status).toBe(200);
+    expect(bankTransferUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'transfer-1', status: 'UNMATCHED', orderId: null },
+      data: expect.objectContaining({ orderId: 'order-1', orderCode: 'MKF-111111', status: 'MANUALLY_MATCHED' }),
+    }));
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paymentStatus: 'PAID', reconciliationStatus: 'MANUALLY_MATCHED', reconciled: true }) }));
+    expect(paymentCreate).toHaveBeenCalledWith({ data: { orderId: 'order-1', orderCode: 111111, status: 'PAID', amount: 169000, externalId: 'SP-1' } });
+    expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'MANUALLY_MATCH_BANK_TRANSFER', targetEntity: 'BankTransfer' }));
   });
 });

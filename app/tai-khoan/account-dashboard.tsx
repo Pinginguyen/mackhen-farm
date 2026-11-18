@@ -7,8 +7,9 @@ import LogoutButton from '@/app/logout-button';
 import { formatCurrency } from '@/lib/store-data';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
-type Profile = { name: string; email: string; phone: string | null; address: string | null };
+type Profile = { name: string; email: string; phone: string | null; address: string | null; loyaltyPoints: number; lifetimePoints: number; membershipTier: string };
 type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; productSlug: string; quantity: number; price: number }[]; localFallback?: boolean };
+type PointHistoryItem = { id: string; points: number; type: 'EARN' | 'SPEND'; description: string; createdAt: string };
 
 const statusLabels: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Chờ xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao', SHIPPING: 'Đang giao', DELIVERED: 'Đã giao', COMPLETED: 'Đã giao', CANCELLED: 'Đã hủy' };
 
@@ -21,11 +22,12 @@ function mergeOrders(current: AccountOrder[], incoming: AccountOrder[]): Account
   return [...byCode.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export default function AccountDashboard({ profile, orders, initialTab }: { profile: Profile; orders: AccountOrder[]; initialTab: 'profile' | 'orders' }) {
+export default function AccountDashboard({ profile, orders, pointHistory, initialTab }: { profile: Profile; orders: AccountOrder[]; pointHistory: PointHistoryItem[]; initialTab: 'profile' | 'orders' }) {
   const [tab, setTab] = useState(initialTab);
   const [orderList, setOrderList] = useState(orders);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const memberTier = profile.membershipTier === 'VVIP' ? 'Gold' : profile.membershipTier === 'VIP' ? 'Silver' : 'Bronze';
 
   useEffect(() => {
     let savedCodes: string[] = [];
@@ -88,6 +90,21 @@ export default function AccountDashboard({ profile, orders, initialTab }: { prof
       </div>
       {tab === 'profile' ? (
         <div id="profile-panel" role="tabpanel" aria-labelledby="profile-tab">
+          <section className="loyalty-panel" aria-labelledby="loyalty-title">
+            <div className="loyalty-balance">
+              <p className="eyebrow">MẮC KHÉN FARM · MEMBERSHIP</p>
+              <h2 id="loyalty-title">{profile.loyaltyPoints.toLocaleString('vi-VN')} điểm thưởng</h2>
+              <p>Đã tích lũy trọn đời {profile.lifetimePoints.toLocaleString('vi-VN')} điểm · 1 điểm đổi 100đ</p>
+            </div>
+            <span className={`membership-tier-badge tier-${profile.membershipTier.toLowerCase()}`}>{memberTier}</span>
+            <div className="loyalty-history">
+              <h3>Lịch sử điểm thưởng</h3>
+              {pointHistory.length ? <ul>{pointHistory.map((entry) => <li key={entry.id}>
+                <span><strong>{entry.description}</strong><small>{new Date(entry.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</small></span>
+                <b className={entry.type === 'EARN' ? 'points-earned' : 'points-spent'}>{entry.type === 'EARN' ? '+' : '−'}{entry.points.toLocaleString('vi-VN')}</b>
+              </li>)}</ul> : <p>Chưa có biến động điểm thưởng.</p>}
+            </div>
+          </section>
           <form className="form-list account-profile-form" onSubmit={saveProfile}>
             <div className="field"><label htmlFor="account-name">Họ và tên</label><input id="account-name" name="name" defaultValue={profile.name} maxLength={100} required /></div>
             <div className="field"><label htmlFor="account-email">Email</label><input id="account-email" value={profile.email} readOnly /></div>

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { calculateShipping } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export function GET(request: Request) {
   if (!cartId.id) return NextResponse.json({ items: [], subtotal: 0, shipping: 0, total: 0, freeShippingThreshold: settings.freeShippingThreshold, tasteGuaranteeText: settings.tasteGuaranteeText });
   const cart = await prisma.cart.findUnique({
     where: { id: cartId.id },
-    include: { items: { include: { product: { include: { variants: true, upsellProduct: { select: { id: true, slug: true, name: true, image: true, price: true, stock: true, active: true } } } }, variant: true } } },
+    include: { items: { include: { product: { include: { variants: true, upsellProduct: { select: { id: true, slug: true, name: true, image: true, price: true, originalPrice: true, flashSaleEndsAt: true, stock: true, active: true } } } }, variant: true } } },
   });
   const items = (cart?.items ?? []).map((item) => ({
     id: item.id,
@@ -31,13 +32,13 @@ export function GET(request: Request) {
     image: item.product.image,
     variantId: item.productVariantId,
     variantLabel: item.variant?.title ?? null,
-    variants: item.product.variants.map((variant) => ({ ...variant, label: variant.title, stock: variant.inventory })),
+    variants: item.product.variants.map((variant) => ({ ...variant, price: getEffectivePrice({ price: variant.price, originalPrice: variant.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), label: variant.title, stock: variant.inventory })),
     stock: item.variant?.inventory ?? item.product.stock,
-    upsellProduct: item.product.upsellProduct?.active ? item.product.upsellProduct : null,
+    upsellProduct: item.product.upsellProduct?.active ? { ...item.product.upsellProduct, price: getEffectivePrice(item.product.upsellProduct) } : null,
     name: item.productName,
     quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    total: item.quantity * item.unitPrice,
+    unitPrice: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
+    total: item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
   }));
   const subtotal = items.reduce((sum, item) => sum + item.total, 0);
   const shipping = calculateShipping(subtotal, (cart?.items ?? []).map((item) => item.product.slug), settings.freeShippingThreshold);

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userUpdate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userFindUnique, userUpdate, userUpdateMany, pointHistoryCreate, calculateRealtimeShippingRate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
     cartFindUnique: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), orderUpdate: vi.fn(), orderItemCreateMany: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(), productionLotFindMany: vi.fn(),
-    userUpdate: vi.fn(),
+    userFindUnique: vi.fn(), userUpdate: vi.fn(), userUpdateMany: vi.fn(), pointHistoryCreate: vi.fn(), calculateRealtimeShippingRate: vi.fn(),
     productionLotUpdateMany: vi.fn(),
     movementCreateMany: vi.fn(), movementFindUnique: vi.fn(),
     compensationVoucherFindUnique: vi.fn(), compensationVoucherUpdateMany: vi.fn(),
@@ -16,7 +16,8 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
     product: { updateMany: mocks.productUpdateMany },
     productVariant: { updateMany: mocks.productVariantUpdateMany },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
-    user: { update: mocks.userUpdate },
+    user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate, updateMany: mocks.userUpdateMany },
+    pointHistory: { create: mocks.pointHistoryCreate },
     order: { findUnique: mocks.orderFindUnique, findMany: mocks.orderFindMany, count: mocks.orderCount, findFirst: mocks.orderFindFirst, create: mocks.orderCreate, update: mocks.orderUpdate },
     orderItem: { createMany: mocks.orderItemCreateMany },
     productionLot: { findFirst: mocks.productionLotFindFirst, findMany: mocks.productionLotFindMany, updateMany: mocks.productionLotUpdateMany },
@@ -25,11 +26,12 @@ const { cartFindUnique, productUpdateMany, productVariantUpdateMany, customerUps
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
     affiliate: { findUnique: mocks.affiliateFindUnique },
   };
-  return { ...mocks, transaction: tx, prisma: { order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
+  return { ...mocks, transaction: tx, prisma: { cart: { findUnique: mocks.cartFindUnique }, order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
 vi.mock('@/lib/system-settings', () => ({ getSystemSettings: async () => ({ freeShippingThreshold: 500000 }) }));
+vi.mock('@/lib/services/shipping-carrier', () => ({ calculateRealtimeShippingRate }));
 
 import { SESSION_COOKIE, createSessionToken } from '@/lib/auth';
 import { POST } from './route';
@@ -67,7 +69,11 @@ describe('POST /api/orders checkout', () => {
         : null));
     voucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     affiliateFindUnique.mockReset().mockResolvedValue(null);
+    userFindUnique.mockReset().mockResolvedValue({ loyaltyPoints: 0 });
     userUpdate.mockReset().mockResolvedValue({ id: 'user-1' });
+    userUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    pointHistoryCreate.mockReset().mockResolvedValue({ id: 'point-history-1' });
+    calculateRealtimeShippingRate.mockReset().mockResolvedValue({ fee: 25000, carrier: 'GHTK', estimatedDays: '2-4 ngày', source: 'MOCK' });
     orderFindMany.mockReset().mockResolvedValue([]);
     orderCreate.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', numericCode: 123456, orderStatus: 'PENDING', totalAmount: 169000 });
     orderUpdate.mockReset().mockResolvedValue({ id: 'order-1' });
@@ -132,6 +138,41 @@ describe('POST /api/orders checkout', () => {
       skipDuplicates: true,
     }));
     expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ orderId: 'order-1', lotId: 'lot-default', lotCode: 'LOT-MKF-2026-001', quantity: 1 })] });
+  });
+
+  it('redeems only the authenticated balance and records the point spend in the order transaction', async () => {
+    userFindUnique.mockResolvedValueOnce({ loyaltyPoints: 250 });
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: memberCookie() },
+      body: JSON.stringify({
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
+        delivery: { address: 'Lai Chau, Tam Duong, Binh Lu' },
+        paymentMethod: 'VIETQR',
+        useLoyaltyPoints: true,
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ loyaltyPointsSpent: 250, discountAmount: 25000, totalAmount: 179000 }) }));
+    expect(userUpdateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'new-member', loyaltyPoints: { gte: 250 } }, data: { loyaltyPoints: { decrement: 250 } } }));
+    expect(pointHistoryCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: 'new-member', orderId: 'order-1', points: 250, type: 'SPEND' }) }));
+  });
+
+  it('uses the server-side realtime shipping fee for a selected province and district', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/checkout', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=cart-1' },
+      body: JSON.stringify({
+        customer: { name: 'Nguyen Thi A', phone: '0762793244' },
+        delivery: { address: 'Vân Hồ, Sơn La', province: 'Sơn La', district: 'Vân Hồ' },
+        paymentMethod: 'VIETQR',
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(calculateRealtimeShippingRate).toHaveBeenCalledWith({ province: 'Sơn La', district: 'Vân Hồ', weightGrams: 500 });
+    expect(orderCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ shippingFee: 25000, totalAmount: 194000 }) }));
   });
 
   it('rejects malformed affiliate codes before creating an order', async () => {

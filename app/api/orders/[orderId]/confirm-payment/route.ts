@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
 
 export async function POST(_request: Request, { params }: { params: { orderId: string } }) {
   return withDatabase(async () => {
@@ -16,6 +17,9 @@ export async function POST(_request: Request, { params }: { params: { orderId: s
     }
     if (!payment) return NextResponse.json({ error: { message: 'Không tìm thấy giao dịch thanh toán.' } }, { status: 404 });
     if (order.paymentStatus === 'PAID' && payment.status === 'PAID') {
+      void sendOrderConfirmationIfNeeded(order.id).catch((error) => {
+        console.error('Payment confirmation email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+      });
       return NextResponse.json({ confirmed: true });
     }
     if (Date.now() - payment.createdAt.getTime() > 15 * 60 * 1000) {

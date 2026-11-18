@@ -8,8 +8,11 @@ import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
+import { pushOrderToCarrierShipment } from '@/lib/services/shipping-carrier';
+import { awardOrderLoyaltyPoints } from '@/lib/loyalty';
+import { sendOrderConfirmationIfNeeded, sendShippingUpdateIfNeeded } from '@/lib/order-email-notifications';
 import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, ShippingCarrier } from '@prisma/client';
 import { allowedTransitions, orderStatuses } from '@/lib/order-workflow';
 
 export const dynamic = 'force-dynamic';
@@ -142,7 +145,7 @@ export async function PATCH(request: Request) {
       trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
-      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderCode: true, orderStatus: true, paymentStatus: true, paymentMethod: true, totalAmount: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, affiliateCode: true, affiliateCommissionStatus: true, affiliateCommissionEligibleAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true } } } });
+      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderCode: true, userId: true, orderStatus: true, paymentStatus: true, paymentMethod: true, totalAmount: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, affiliateCode: true, affiliateCommissionStatus: true, affiliateCommissionEligibleAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true, lot: { select: { warehouseId: true } } } } } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const targetStatus = requestedStatus ?? currentOrder.orderStatus;
       const nextStatuses: readonly string[] = allowedTransitions[currentOrder.orderStatus];
@@ -185,6 +188,7 @@ export async function PATCH(request: Request) {
       const returningInventory = statusChanged && ['RETURNED', 'CANCELLED'].includes(targetStatus);
       const preserveCarrier = targetStatus === 'CANCELLED' && statusChanged;
       const clearCarrier = targetStatus === 'RETURNED' && statusChanged;
+      const preserveActiveShipment = ['CONFIRMED', 'PROCESSING'].includes(targetStatus);
       const order = await runOrderUpdateTransaction(() => prisma.$transaction(async (transaction) => {
         const claimed = await transaction.order.updateMany({
           where: {
@@ -204,6 +208,7 @@ export async function PATCH(request: Request) {
               productId: item.productId,
               variantId: item.productVariantId,
               lotId: item.lotId,
+              warehouseId: item.lot?.warehouseId,
               type: movementType,
               delta: item.quantity,
               idempotencyKey: orderMovementKey(item.id, movementType),
@@ -220,7 +225,7 @@ export async function PATCH(request: Request) {
           }
         }
 
-        return transaction.order.update({
+        const updatedOrder = await transaction.order.update({
           where: { orderCode },
           data: {
             orderStatus: targetStatus,
@@ -228,8 +233,8 @@ export async function PATCH(request: Request) {
             ...(body.phone !== undefined ? { phone: normalizedPhone } : {}),
             ...(body.address !== undefined ? { address } : {}),
             ...(manualPayment ? { note: [currentOrder.note?.trim(), `[Thanh toán thủ công bởi ${getRequestSession(request)?.email ?? 'unknown-admin'}]: ${paymentReason}`].filter(Boolean).join('\n') } : {}),
-            carrier: preserveCarrier ? currentOrder.carrier : clearCarrier ? null : normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : statusChanged ? null : currentOrder.carrier,
-            trackingCode: preserveCarrier ? currentOrder.trackingCode : clearCarrier ? null : trackingCode || (body.trackingCode !== undefined ? null : statusChanged ? null : currentOrder.trackingCode),
+            carrier: preserveCarrier ? currentOrder.carrier : clearCarrier ? null : normalizedCarrier !== undefined ? (normalizedCarrier || null) as (typeof carriers)[number] | null : statusChanged && !preserveActiveShipment ? null : currentOrder.carrier,
+            trackingCode: preserveCarrier ? currentOrder.trackingCode : clearCarrier ? null : trackingCode || (body.trackingCode !== undefined ? null : statusChanged && !preserveActiveShipment ? null : currentOrder.trackingCode),
             deliveredAt: isDelivered ? deliveryTimestamp : null,
             ...(statusChanged && ['CANCELLED', 'RETURNED'].includes(targetStatus) && currentOrder.affiliateCode
               ? { affiliateCommissionStatus: 'CANCELLED' as const }
@@ -242,10 +247,33 @@ export async function PATCH(request: Request) {
               : {}),
           },
         });
+        if (isDelivered && !wasDelivered) {
+          await awardOrderLoyaltyPoints(transaction, { userId: currentOrder.userId, orderId: currentOrder.id, amountVnd: currentOrder.totalAmount });
+        }
+        return updatedOrder;
       }));
       if (!order) return NextResponse.json({ error: { message: 'Xung đột trạng thái đơn hàng.' } }, { status: 409 });
+      let autoShipment: Awaited<ReturnType<typeof pushOrderToCarrierShipment>> | null = null;
+      const selectedAutoCarrier = normalizedCarrier ?? currentOrder.carrier ?? undefined;
+      const autoCarrierEligible = !selectedAutoCarrier || selectedAutoCarrier === 'GHTK' || selectedAutoCarrier === 'VIETTEL_POST';
+      if (order.id && statusChanged && ['CONFIRMED', 'PROCESSING'].includes(targetStatus) && !order.trackingCode && autoCarrierEligible) {
+        try {
+          autoShipment = await pushOrderToCarrierShipment({ id: order.id }, selectedAutoCarrier as ShippingCarrier | undefined);
+        } catch (error) {
+          console.error('Order status saved; automatic carrier shipment creation failed.', error instanceof Error ? error.message : 'UnknownError');
+          Sentry.captureException(error, { tags: { route: '/api/admin/orders', operation: 'carrier-shipment-create' } });
+        }
+      }
       if (currentOrder.paymentStatus !== 'PAID' && order.paymentStatus === 'PAID') {
         await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: currentOrder.totalAmount, phone: order.phone, address: order.address });
+        void sendOrderConfirmationIfNeeded(order.id).catch((error) => {
+          console.error('Paid-order email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+        });
+      }
+      if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(targetStatus) && (statusChanged || body.trackingCode !== undefined) && order.trackingCode) {
+        void sendShippingUpdateIfNeeded(order.id).catch((error) => {
+          console.error('Shipping update email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+        });
       }
       await writeAuditLog(request, {
         adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
@@ -255,7 +283,7 @@ export async function PATCH(request: Request) {
         oldValue: { orderStatus: currentOrder.orderStatus, paymentStatus: currentOrder.paymentStatus, phone: currentOrder.phone, address: currentOrder.address, carrier: currentOrder.carrier, trackingCode: currentOrder.trackingCode, note: currentOrder.note },
         newValue: { orderStatus: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode, note: order.note, paymentReason: manualPayment ? paymentReason : undefined, cancelReason: targetStatus === 'CANCELLED' ? cancelReason : undefined },
       });
-      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: order.carrier, trackingCode: order.trackingCode });
+      return NextResponse.json({ orderCode: order.orderCode, status: order.orderStatus, paymentStatus: order.paymentStatus, phone: order.phone, address: order.address, carrier: autoShipment?.carrier ?? order.carrier, trackingCode: autoShipment?.trackingCode ?? order.trackingCode });
     });
   } catch (error) {
     console.error('Admin order update failed:', error);

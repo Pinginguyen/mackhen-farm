@@ -5,7 +5,7 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 
 export default function PrivacyPolicyContent() {
   const { currency } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
 
   return (
     <>

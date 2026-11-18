@@ -21,9 +21,9 @@ export default function CheckoutOrderSummary({ items, shipping, total, freeShipp
       <div className="summary-list">
         {items.map((item) => <div className="item" key={item.id}><span>{translateProductName(item.name, isEN ? 'en' : 'vi')} x{item.quantity}</span><strong>{formatCurrency(item.total)}</strong></div>)}
         <div className="item"><span>{isEN ? 'Shipping' : 'Vận chuyển'}</span><strong>{freeShippingApplied ? <><del>{formatCurrency(35000)}</del> {formatCurrency(0)}</> : shipping === 0 ? (isEN ? `Free · ${formatCurrency(0)}` : `Miễn phí · ${formatCurrency(0)}`) : formatCurrency(shipping)}</strong></div>
-        <div className="item"><span>{isEN ? 'Total before discount' : 'Tạm tính trước mã giảm giá'}</span><strong>{formatCurrency(total)}{currency === 'SGD' && <> ({formatApproxVnd(total)})</>}</strong></div>
+        <div className="item"><span>{isEN ? 'Total before discount' : 'Tạm tính trước mã giảm giá'}</span><strong>{formatCurrency(total)}{currency !== 'VND' && <> ({formatApproxVnd(total)})</>}</strong></div>
       </div>
-      {currency === 'SGD' && <p className="checkout-cross-border-notice">{isEN ? 'Converted at the interbank exchange rate' : 'Thanh toán quy đổi theo tỷ giá liên ngân hàng'}</p>}
+      {currency !== 'VND' && <p className="checkout-cross-border-notice">{isEN ? 'Displayed using a fixed reference exchange rate. VietQR remains payable in VND.' : 'Hiển thị theo tỷ giá tham khảo cố định; VietQR vẫn thanh toán bằng VND.'}</p>}
     </>
   );
 }

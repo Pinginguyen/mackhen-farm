@@ -18,7 +18,7 @@ export default function ProductCylinder3DLoader({ products }: { products: Catalo
   const [mobile, setMobile] = useState(false);
   const [nearViewport, setNearViewport] = useState(false);
   const { currency, formatCurrency } = useLocaleCurrency();
-  const isEN = currency === 'SGD';
+  const isEN = currency !== 'VND';
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)');

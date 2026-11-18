@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindUnique, orderUpdate, paymentFindFirst, paymentUpdate, paymentCreate, prisma } = vi.hoisted(() => {
+const { orderFindUnique, orderUpdate, paymentFindFirst, paymentUpdate, paymentCreate, transferCreateMany, prisma } = vi.hoisted(() => {
   const mocks = {
     orderFindUnique: vi.fn(),
     orderUpdate: vi.fn(),
     paymentFindFirst: vi.fn(),
     paymentUpdate: vi.fn(),
     paymentCreate: vi.fn(),
+    transferCreateMany: vi.fn(),
   };
   const transactionClient = {
     order: { update: mocks.orderUpdate },
     payment: { findFirst: mocks.paymentFindFirst, update: mocks.paymentUpdate, create: mocks.paymentCreate },
+    bankTransfer: { createMany: mocks.transferCreateMany },
   };
   return {
     ...mocks,
@@ -22,6 +24,7 @@ const { orderFindUnique, orderUpdate, paymentFindFirst, paymentUpdate, paymentCr
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma }));
+vi.mock('@/lib/order-email-notifications', () => ({ sendOrderConfirmationIfNeeded: vi.fn().mockResolvedValue(false) }));
 
 import { POST } from './route';
 
@@ -46,6 +49,7 @@ describe('POST /api/payment/sepay/webhook', () => {
     paymentFindFirst.mockReset().mockResolvedValue({ id: 'payment-1' });
     paymentUpdate.mockReset().mockResolvedValue({ id: 'payment-1' });
     paymentCreate.mockReset().mockResolvedValue({ id: 'payment-1' });
+    transferCreateMany.mockReset().mockResolvedValue({ count: 1 });
   });
 
   afterEach(() => vi.unstubAllEnvs());
@@ -75,7 +79,7 @@ describe('POST /api/payment/sepay/webhook', () => {
   it('marks a matching order paid and stores the SePay reference code', async () => {
     const response = await POST(makeRequest({
       content: 'Thanh toan don MKF123456',
-      transferAmount: 70000,
+      transferAmount: 65000,
       referenceCode: 'SP-9988',
       gateway: 'MBBank',
     }));
@@ -85,11 +89,11 @@ describe('POST /api/payment/sepay/webhook', () => {
     expect(orderFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { orderCode: 'MKF-123456' } }));
     expect(orderUpdate).toHaveBeenCalledWith({
       where: { id: 'order-1' },
-      data: { paymentStatus: 'PAID', orderStatus: 'PAID', holdExpiresAt: null, sepayTransactionId: 'SP-9988' },
+      data: expect.objectContaining({ paymentStatus: 'PAID', orderStatus: 'PAID', holdExpiresAt: null, sepayTransactionId: 'SP-9988', reconciled: true, reconciliationStatus: 'MATCHED' }),
     });
     expect(paymentUpdate).toHaveBeenCalledWith({
       where: { id: 'payment-1' },
-      data: { status: 'PAID', amount: 70000, externalId: 'SP-9988' },
+      data: { status: 'PAID', amount: 65000, externalId: 'SP-9988' },
     });
   });
 
@@ -97,7 +101,7 @@ describe('POST /api/payment/sepay/webhook', () => {
     orderUpdate.mockRejectedValueOnce(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
 
     const response = await POST(makeRequest({
-      content: 'MKF-123456', transferAmount: 70000, id: 9988, referenceCode: 'SP-9988',
+      content: 'MKF-123456', transferAmount: 65000, id: 9988, referenceCode: 'SP-9988',
     }));
 
     expect(response.status).toBe(200);
@@ -133,8 +137,17 @@ describe('POST /api/payment/sepay/webhook', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
-    expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ reconciliationStatus: 'MISMATCH', reconciled: false }) }));
     expect(paymentUpdate).not.toHaveBeenCalled();
+    expect(transferCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ status: 'MISMATCH', amount: 64999, orderId: 'order-1' })] }));
+  });
+
+  it('records transfers with unknown order content for manual matching', async () => {
+    orderFindUnique.mockResolvedValueOnce(null);
+    const response = await POST(makeRequest({ content: 'khach chuyen khoan', transferAmount: 65000, id: 9989 }));
+
+    expect(response.status).toBe(200);
+    expect(transferCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ status: 'UNMATCHED', orderId: null, orderCode: null, amount: 65000 })] }));
   });
 
   it('acknowledges malformed JSON with HTTP 200', async () => {

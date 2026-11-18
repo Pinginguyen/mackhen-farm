@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { calculateShipping } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export async function POST(request: Request) {
   let body: { productId?: string; variantId?: string; quantity?: number; buyNow?: boolean };
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
 
   const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : undefined;
   if (body.variantId && !variant) return NextResponse.json({ error: { code: 'VARIANT_NOT_FOUND', message: 'Không tìm thấy phân loại' } }, { status: 404 });
+  const unitPrice = getEffectivePrice({ price: variant?.price ?? product.price, originalPrice: variant?.originalPrice ?? product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt });
   const availableStock = variant?.inventory ?? product.stock;
   if (quantity > availableStock) return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
 
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
     const nextQuantity = Number(existing?.quantity ?? 0) + Number(quantity);
     if (nextQuantity > availableStock) return { error: 'INSUFFICIENT_STOCK' as const };
     if (existing) {
-      return { item: await transaction.cartItem.update({ where: { id: existing.id }, data: { quantity: nextQuantity } }) };
+      return { item: await transaction.cartItem.update({ where: { id: existing.id }, data: { quantity: nextQuantity, unitPrice } }) };
     }
     return {
       item: await transaction.cartItem.create({
@@ -54,15 +56,15 @@ export async function POST(request: Request) {
           productVariantId: variant?.id,
           productName: product.name,
           quantity: nextQuantity,
-          unitPrice: variant?.price ?? product.price,
+          unitPrice,
         },
       }),
     };
   });
   if ('error' in outcome) return NextResponse.json({ error: { code: outcome.error, message: 'Tổng số lượng vượt quá tồn kho' } }, { status: 409 });
   const item = outcome.item;
-  const cartItems = await prisma.cartItem.findMany({ where: { cartId: id }, include: { product: { select: { slug: true } } } });
-  const total = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity * cartItem.unitPrice, 0);
+  const cartItems = await prisma.cartItem.findMany({ where: { cartId: id }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+  const total = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity * getEffectivePrice({ price: cartItem.variant?.price ?? cartItem.product.price, originalPrice: cartItem.variant?.originalPrice ?? cartItem.product.originalPrice, flashSaleEndsAt: cartItem.product.flashSaleEndsAt }), 0);
   const shipping = calculateShipping(total, cartItems.map((cartItem) => cartItem.product.slug), settings.freeShippingThreshold);
   const cartCount = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
   const response = NextResponse.json({
@@ -108,6 +110,7 @@ export async function PATCH(request: Request) {
       const quantity = body.quantity as number;
       const availableStock = variant?.inventory ?? current.product.stock;
       if (quantity > availableStock) return { error: 'INSUFFICIENT_STOCK', status: 409 as const, message: 'Số lượng vượt quá tồn kho' };
+      const unitPrice = getEffectivePrice({ price: variant?.price ?? current.product.price, originalPrice: variant?.originalPrice ?? current.product.originalPrice, flashSaleEndsAt: current.product.flashSaleEndsAt });
 
       const variantId = variant?.id ?? null;
       const duplicate = await transaction.cartItem.findFirst({
@@ -119,7 +122,7 @@ export async function PATCH(request: Request) {
         }
         const item = await transaction.cartItem.update({
           where: { id: duplicate.id },
-          data: { quantity: duplicate.quantity + quantity },
+          data: { quantity: duplicate.quantity + quantity, unitPrice },
         });
         await transaction.cartItem.delete({ where: { id: current.id } });
         return { item };
@@ -131,7 +134,7 @@ export async function PATCH(request: Request) {
           productVariantId: variantId,
           productName: current.product.name,
           quantity,
-          unitPrice: variant?.price ?? current.product.price,
+          unitPrice,
         },
       });
       return { item };
@@ -141,8 +144,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: { code: result.error, message: result.message } }, { status: result.status });
     }
 
-    const cartItems = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
-    const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const cartItems = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+    const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
     const shipping = calculateShipping(subtotal, cartItems.map((item) => item.product.slug), settings.freeShippingThreshold);
     const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     return NextResponse.json({ item: result.item, totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
@@ -168,8 +171,8 @@ export async function DELETE(request: Request) {
     const deleted = await prisma.cartItem.deleteMany({ where: { id: body.itemId, cartId: decodedCartId } });
     if (!deleted.count) return NextResponse.json({ error: { code: 'CART_ITEM_NOT_FOUND', message: 'Không tìm thấy sản phẩm trong giỏ hàng' } }, { status: 404 });
 
-    const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true } } } });
-    const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+    const subtotal = items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
     const shipping = calculateShipping(subtotal, items.map((item) => item.product.slug), settings.freeShippingThreshold);
     const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
     return NextResponse.json({ totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });

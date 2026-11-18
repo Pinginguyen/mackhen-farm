@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import { formatVndCurrency } from '@/lib/translations';
 import PaymentConfirmation from '../../payment/payment-confirmation';
 import CopyPaymentDetails from '../copy-payment-details';
 import PaymentStatusPoller from './payment-status-poller';
@@ -37,13 +38,14 @@ export default function VietQrPaymentDetails({
 }) {
   const { locale, currency, formatCurrency } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
-  const amountLabel = formatCurrency(amount);
+  const amountLabel = formatVndCurrency(amount);
+  const convertedAmount = currency === 'VND' ? null : formatCurrency(amount);
 
   return (
     <>
       <div className="page-title">
         <div><p className="eyebrow">{isEN ? 'Order' : 'Đơn hàng'} {orderCode}</p><h1>{isEN ? 'Scan to pay by bank transfer' : 'Quét mã để chuyển khoản'}</h1></div>
-        <strong className="payment-total">{amountLabel}</strong>
+        <strong className="payment-total">{amountLabel}{convertedAmount && <small className="block text-sm font-medium">≈ {convertedAmount}</small>}</strong>
       </div>
       {isLocalOnly && <p className="payment-order-unavailable" role="status">{isEN ? 'This order has not been saved or verified online. These details are for reference only; contact the store to confirm before transferring funds.' : 'Đơn chưa được lưu hoặc xác minh trực tuyến. Thông tin này chỉ để tra cứu; vui lòng liên hệ cửa hàng để đối soát trước khi chuyển khoản.'}</p>}
       <PaymentStatusPoller orderCode={orderCode} orderId={orderId ?? orderCode} canPoll={Boolean(orderId)} initiallyPaid={alreadyConfirmed}>
@@ -56,7 +58,7 @@ export default function VietQrPaymentDetails({
             <div><dt>{isEN ? 'Bank' : 'Ngân hàng'}</dt><dd>{bankId === 'MB' ? 'MB Bank' : bankId}</dd></div>
             <div><dt>{isEN ? 'Account number' : 'Số tài khoản'}</dt><dd>{accountNumber}</dd></div>
             <div><dt>{isEN ? 'Account holder' : 'Chủ tài khoản'}</dt><dd>{accountName}</dd></div>
-            <div><dt>{isEN ? 'Amount' : 'Số tiền'}</dt><dd>{amountLabel}</dd></div>
+            <div><dt>{isEN ? 'Amount to transfer' : 'Số tiền cần chuyển'}</dt><dd>{amountLabel}{convertedAmount && <small className="block">≈ {convertedAmount}</small>}</dd></div>
             <div><dt>{isEN ? 'Transfer reference' : 'Nội dung chuyển khoản'}</dt><dd>{orderCode}</dd></div>
           </dl>
           <CopyPaymentDetails accountNumber={accountNumber} transferContent={orderCode} />

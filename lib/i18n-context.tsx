@@ -48,7 +48,7 @@ export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
       const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as { locale?: unknown; currency?: unknown } | null
         ?? readLocaleCurrencyCookie();
       if (saved?.locale === 'vi' || saved?.locale === 'en') setLocale(saved.locale);
-      if (saved?.currency === 'VND' || saved?.currency === 'SGD') setCurrency(saved.currency);
+      if (saved?.currency === 'VND' || saved?.currency === 'SGD' || saved?.currency === 'USD') setCurrency(saved.currency);
     } catch {
       // Ignore unavailable or malformed local storage.
     }
@@ -69,7 +69,7 @@ export function LocaleCurrencyProvider({ children }: { children: ReactNode }) {
     const applyPreference = (event: Event) => {
       const preference = (event as CustomEvent<{ locale?: unknown; currency?: unknown }>).detail;
       if (preference?.locale === 'vi' || preference?.locale === 'en') setLocale(preference.locale);
-      if (preference?.currency === 'VND' || preference?.currency === 'SGD') setCurrency(preference.currency);
+      if (preference?.currency === 'VND' || preference?.currency === 'SGD' || preference?.currency === 'USD') setCurrency(preference.currency);
     };
     window.addEventListener('mackhen:locale-currency-sync', applyPreference);
     return () => window.removeEventListener('mackhen:locale-currency-sync', applyPreference);

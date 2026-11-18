@@ -31,6 +31,18 @@ enum InventoryMovementType {
   ADJUSTMENT
 }
 
+enum PointTransactionType {
+  EARN
+  SPEND
+}
+
+enum BankTransferStatus {
+  UNMATCHED
+  MISMATCH
+  MATCHED
+  MANUALLY_MATCHED
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -78,9 +90,13 @@ model User {
   address   String?
   signupIpHash String?
   role      UserRole @default(CUSTOMER)
+  loyaltyPoints Int @default(0)
+  lifetimePoints Int @default(0)
+  membershipTier String @default("MEMBER")
   orders    Order[]
   affiliate Affiliate?
   reviewReplies ReviewReply[]
+  pointHistory PointHistory[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -103,6 +119,7 @@ model Product {
   category      String
   price         Int
   originalPrice Int?
+  flashSaleEndsAt DateTime?
   unit          String?
   weight        Int?
   protein       String?
@@ -203,6 +220,7 @@ model ProductionLot {
   batchCode       String           @unique @map("lotCode")
   productId       String
   productVariantId String?
+  warehouseId String?
   mfgDate         DateTime
   expDate         DateTime
   receivedQty     Int
@@ -212,6 +230,7 @@ model ProductionLot {
   receivingNote   String?
   product         Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant         ProductVariant?  @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  warehouse       Warehouse?       @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   orderItems      OrderItem[]
   inventoryMovements InventoryMovement[]
   createdAt       DateTime         @default(now())
@@ -219,6 +238,25 @@ model ProductionLot {
 
   @@index([productId, status, expDate])
   @@index([productVariantId, status, expDate])
+  @@index([warehouseId, status, expDate])
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String
+  province  String?
+  district  String?
+  latitude  Float?
+  longitude Float?
+  active    Boolean  @default(true)
+  lots      ProductionLot[]
+  inventoryMovements InventoryMovement[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, province, district])
 }
 model Cart {
   id        String     @id
@@ -335,6 +373,7 @@ model Order {
   subtotal      Int
   shippingFee   Float                @map("shipping")
   discountAmount Float               @default(0)
+  loyaltyPointsSpent Int             @default(0)
   voucherCode   String?
   affiliateCode String?
   affiliateCommissionRate Int?
@@ -349,6 +388,8 @@ model Order {
   grossAmount   Float                 @default(0)
   netAmount     Float                 @default(0)
   reconciled    Boolean               @default(false)
+  reconciliationStatus String         @default("PENDING")
+  reconciliationNote String?
   holdExpiresAt DateTime?
   note          String?
   trackingCode  String?
@@ -367,6 +408,11 @@ model Order {
   compensationVouchers CompensationVoucher[]
   reviews       Review[]
   affiliatePayout AffiliatePayout? @relation(fields: [affiliatePayoutId], references: [id], onDelete: SetNull)
+  pointHistory PointHistory[]
+  bankTransfers BankTransfer[]
+  orderConfirmationEmailSentAt DateTime?
+  shippingUpdateEmailSentAt DateTime?
+  reviewRequestEmailSentAt DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -409,6 +455,7 @@ model InventoryMovement {
   productId        String
   productVariantId String?
   lotId            String?               @map("productionLotId")
+  warehouseId      String?
   orderId          String?
   type             InventoryMovementType
   delta            Int
@@ -417,12 +464,30 @@ model InventoryMovement {
   product          Product               @relation(fields: [productId], references: [id], onDelete: Restrict)
   productVariant   ProductVariant?       @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
   productionLot    ProductionLot?        @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  warehouse        Warehouse?            @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   order            Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([productId, createdAt])
   @@index([productVariantId, createdAt])
   @@index([lotId, createdAt], map: "InventoryMovement_productionLotId_createdAt_idx")
   @@index([orderId, createdAt])
+  @@index([warehouseId, createdAt])
+}
+
+model PointHistory {
+  id             String               @id @default(cuid())
+  userId         String
+  orderId        String?
+  points         Int
+  type           PointTransactionType
+  description    String
+  idempotencyKey String               @unique
+  createdAt      DateTime             @default(now())
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order          Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([orderId, type])
 }
 
 model B2bInquiry {
@@ -617,4 +682,34 @@ model SiteAsset {
   imageUrl  String
   altText   String?
   updatedAt DateTime @updatedAt
+}
+
+model BankTransfer {
+  id              String             @id @default(cuid())
+  transactionId   String?            @unique
+  idempotencyKey  String             @unique
+  orderCode       String?
+  amount          Int
+  content         String
+  status          BankTransferStatus @default(UNMATCHED)
+  mismatchReason  String?
+  orderId         String?
+  receivedAt      DateTime           @default(now())
+  order           Order?             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([status, receivedAt])
+  @@index([orderId, receivedAt])
+  @@index([orderCode, receivedAt])
+}
+
+model MarketingSubscriber {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  unsubscribeToken String  @unique
+  source          String
+  consentAt       DateTime @default(now())
+  unsubscribedAt  DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
 }

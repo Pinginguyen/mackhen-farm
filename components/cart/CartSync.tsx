@@ -8,10 +8,10 @@ const LOCALE_CURRENCY_KEY = 'mackhen_locale_currency';
 
 type SyncMessage =
   | { id: string; type: 'cart-updated' }
-  | { id: string; type: 'locale-currency'; locale: 'vi' | 'en'; currency: 'VND' | 'SGD' };
+  | { id: string; type: 'locale-currency'; locale: 'vi' | 'en'; currency: 'VND' | 'SGD' | 'USD' };
 type OutgoingSyncMessage =
   | { type: 'cart-updated' }
-  | { type: 'locale-currency'; locale: 'vi' | 'en'; currency: 'VND' | 'SGD' };
+  | { type: 'locale-currency'; locale: 'vi' | 'en'; currency: 'VND' | 'SGD' | 'USD' };
 
 function isSyncMessage(value: unknown): value is SyncMessage {
   if (typeof value !== 'object' || value === null || !('id' in value) || !('type' in value)) return false;
@@ -20,7 +20,7 @@ function isSyncMessage(value: unknown): value is SyncMessage {
   if (message.type === 'cart-updated') return true;
   return message.type === 'locale-currency'
     && (message.locale === 'vi' || message.locale === 'en')
-    && (message.currency === 'VND' || message.currency === 'SGD');
+    && (message.currency === 'VND' || message.currency === 'SGD' || message.currency === 'USD');
 }
 
 export default function CartSync() {
@@ -64,7 +64,7 @@ export default function CartSync() {
       if (receivingRemoteMessage.current) return;
       const detail = (event as CustomEvent<{ locale?: unknown; currency?: unknown }>).detail;
       if ((detail?.locale === 'vi' || detail?.locale === 'en')
-        && (detail.currency === 'VND' || detail.currency === 'SGD')) {
+        && (detail.currency === 'VND' || detail.currency === 'SGD' || detail.currency === 'USD')) {
         publish({ type: 'locale-currency', locale: detail.locale, currency: detail.currency });
       }
     };
@@ -80,7 +80,7 @@ export default function CartSync() {
         try {
           const preference = JSON.parse(event.newValue) as { locale?: unknown; currency?: unknown };
           if ((preference.locale === 'vi' || preference.locale === 'en')
-            && (preference.currency === 'VND' || preference.currency === 'SGD')) {
+            && (preference.currency === 'VND' || preference.currency === 'SGD' || preference.currency === 'USD')) {
             window.dispatchEvent(new CustomEvent('mackhen:locale-currency-sync', { detail: preference }));
           }
         } catch {

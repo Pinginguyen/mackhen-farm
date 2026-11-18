@@ -11,6 +11,8 @@ import type { ProductVariant } from '@/lib/store-data';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import StickyQuickBuyBar from '@/components/product/StickyQuickBuyBar';
 import { playClickSound } from '@/components/common/SoundEffect';
+import FlashSaleCountdown, { useFlashSaleStatus } from '@/components/product/FlashSaleCountdown';
+import { getEffectivePrice } from '@/lib/pricing';
 
 function animateFlyToCart(image: string, origin: DOMRect) {
   const cart = document.querySelector<HTMLElement>('.header-cart');
@@ -67,7 +69,7 @@ function animateFlyToCart(image: string, origin: DOMRect) {
   });
 }
 
-export default function AddToCart({ productId, productSlug, name, image, price, originalPrice, unit, variants }: {
+export default function AddToCart({ productId, productSlug, name, image, price, originalPrice, unit, variants, stock = 0, flashSaleEndsAt }: {
   productId: string;
   productSlug: string;
   name: string;
@@ -76,6 +78,8 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   originalPrice?: number | null;
   unit?: string | null;
   variants: ProductVariant[];
+  stock?: number;
+  flashSaleEndsAt?: Date | string | null;
 }) {
   const router = useRouter();
   const [variantId, setVariantId] = useState(variants[0]?.id ?? '');
@@ -87,8 +91,13 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
   const { locale, currency, formatCurrency, t } = useLocaleCurrency();
   const primaryActionsRef = useRef<HTMLDivElement>(null);
   const selectedVariant = variants.find((variant) => variant.id === variantId);
-  const selectedPrice = selectedVariant?.price ?? price;
-  const selectedOriginalPrice = selectedVariant?.originalPrice ?? originalPrice;
+  const selectedBasePrice = selectedVariant?.price ?? price;
+  const selectedBaseOriginalPrice = selectedVariant?.originalPrice ?? originalPrice;
+  const saleStatus = useFlashSaleStatus(selectedBaseOriginalPrice != null && selectedBaseOriginalPrice > selectedBasePrice ? flashSaleEndsAt : null);
+  const selectedPrice = getEffectivePrice({ price: selectedVariant?.price ?? price, originalPrice: selectedVariant?.originalPrice ?? originalPrice, flashSaleEndsAt });
+  const selectedOriginalPrice = saleStatus.expired ? null : selectedVariant?.originalPrice ?? originalPrice;
+  const selectedStock = selectedVariant?.stock ?? stock;
+  const outOfStock = selectedStock < 1;
 
   function clearBuyNowSnapshot() {
     try {
@@ -113,7 +122,7 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
           image,
           variantId: variantId || null,
           variantLabel: selectedVariant?.label ?? null,
-          unitPrice: selectedVariant?.price ?? price,
+          unitPrice: selectedPrice,
           quantity,
         }));
       } catch {
@@ -166,11 +175,17 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <strong className="!text-[#841E1E] !text-3xl !font-bold">{formatCurrency(selectedPrice)}</strong>
         {selectedOriginalPrice != null && selectedOriginalPrice > selectedPrice && <del className="!text-stone-400">{formatCurrency(selectedOriginalPrice)}</del>}
       </div>
+      {saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}
       {variants.length >= 2 && (
         <label className="field">
           <span>Phân loại</span>
-          <select value={variantId} onChange={(event) => setVariantId(event.target.value)}>
-            {variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>{variant.label} · {variant.weight} · {formatCurrency(variant.price)}</option>)}
+          <select value={variantId} onChange={(event) => {
+            const nextVariantId = event.target.value;
+            const nextVariant = variants.find((variant) => variant.id === nextVariantId);
+            setVariantId(nextVariantId);
+            setQuantity((value) => Math.min(value, Math.max(1, Math.min(20, nextVariant?.stock ?? stock))));
+          }}>
+            {variants.map((variant) => <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>{variant.label} · {variant.weight} · {formatCurrency(getEffectivePrice({ price: variant.price, originalPrice: variant.originalPrice, flashSaleEndsAt }))}</option>)}
           </select>
         </label>
       )}
@@ -179,20 +194,20 @@ export default function AddToCart({ productId, productSlug, name, image, price, 
         <span id="product-quantity-label">Số lượng</span>
         <div className="quantity-stepper" role="group" aria-labelledby="product-quantity-label">
           <button className="micro-tactile micro-tactile--small" type="button" aria-label="Giảm số lượng" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={16} /></button>
-          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={20} value={quantity} onChange={(event) => setQuantity(Math.min(20, Math.max(1, Number(event.target.value) || 1)))} />
-          <button className="micro-tactile micro-tactile--small" type="button" aria-label="Tăng số lượng" disabled={quantity >= 20} onClick={() => setQuantity((value) => Math.min(20, value + 1))}><Plus size={16} /></button>
+          <input id="product-quantity" aria-label="Số lượng" type="number" min={1} max={Math.max(1, Math.min(20, selectedStock))} value={quantity} onChange={(event) => setQuantity(Math.min(Math.max(1, Math.min(20, selectedStock)), Math.max(1, Number(event.target.value) || 1)))} />
+          <button className="micro-tactile micro-tactile--small" type="button" aria-label="Tăng số lượng" disabled={quantity >= Math.min(20, selectedStock)} onClick={() => setQuantity((value) => Math.min(20, selectedStock, value + 1))}><Plus size={16} /></button>
         </div>
       </div>
       <div className="inline-actions" ref={primaryActionsRef}>
-        <button className={`primary-action micro-tactile !min-h-[58px] !rounded-2xl !px-5 !text-base !font-semibold !shadow-md !transition-all !duration-300 active:!scale-[0.98] hover:!shadow-lg ${isAdded ? '!bg-emerald-600 !text-white animate-bounce' : '!bg-[#841E1E] !text-white hover:!bg-[#701818]'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
-        <button className="secondary-action micro-tactile !min-h-[58px] !rounded-2xl !border-2 !border-[#841E1E] !bg-transparent !px-5 !text-base !font-semibold !text-[#841E1E] !transition-all !duration-300 hover:!bg-[#841E1E]/5 active:!scale-[0.98]" type="button" onClick={() => addItem(true)} disabled={saving || productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}>{saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
+        <button className={`primary-action micro-tactile !min-h-[58px] !rounded-2xl !px-5 !text-base !font-semibold !shadow-md !transition-all !duration-300 active:!scale-[0.98] hover:!shadow-lg ${isAdded ? '!bg-emerald-600 !text-white animate-bounce' : '!bg-[#841E1E] !text-white hover:!bg-[#701818]'}`} type="button" onClick={(event) => void addItem(false, event.currentTarget.getBoundingClientRect())} disabled={saving || productUnavailable || outOfStock}>{outOfStock ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : isAdded ? '✓ ĐÃ THÊM THÀNH CÔNG!' : saving ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : t('addToCart')}</button>
+        <button className="secondary-action micro-tactile !min-h-[58px] !rounded-2xl !border-2 !border-[#841E1E] !bg-transparent !px-5 !text-base !font-semibold !text-[#841E1E] !transition-all !duration-300 hover:!bg-[#841E1E]/5 active:!scale-[0.98]" type="button" onClick={() => void addItem(true)} disabled={saving || productUnavailable || outOfStock}>{outOfStock ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : saving ? (locale === 'en' ? 'Processing...' : 'Đang xử lý...') : t('buyNow')}</button>
       </div>
       <StickyQuickBuyBar
         product={{ name, image, price: selectedPrice }}
         currency={currency}
         anchorRef={primaryActionsRef}
         onAddToCart={() => void addItem(false)}
-        disabled={productUnavailable || Boolean(selectedVariant && selectedVariant.stock < 1)}
+        disabled={productUnavailable || outOfStock}
         loading={saving}
       />
       {message && <p role="status">{message}</p>}

@@ -9,11 +9,14 @@ import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
 import { withDatabase } from '@/lib/api-database';
 import { sendCompensationVoucherEmail } from '@/lib/email';
+import { restockOrderItemsForReturn } from '@/lib/services/inventory-ledger';
 import type { ReturnRequestStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 const issueTypes = [
+  'Sản phẩm bị lỗi',
+  'Sai vị / không đúng mô tả',
   'Giao sai sản phẩm',
   'Bao bì bị rách hoặc xì chân không',
   'Hàng có dấu hiệu ẩm mốc',
@@ -122,10 +125,13 @@ export async function POST(request: Request) {
           ...(numericCode !== null && Number.isSafeInteger(numericCode) ? [{ numericCode }] : []),
         ],
       },
-      select: { id: true, orderCode: true, phone: true },
+      select: { id: true, orderCode: true, phone: true, orderStatus: true },
     });
     if (!order || normalizePhone(order.phone) !== customerPhone) {
       return NextResponse.json({ error: 'Không tìm thấy đơn hàng phù hợp.' }, { status: 404 });
+    }
+    if (!['DELIVERED', 'COMPLETED'].includes(order.orderStatus)) {
+      return NextResponse.json({ error: 'Chỉ đơn đã giao thành công mới đủ điều kiện gửi yêu cầu đổi trả.' }, { status: 409 });
     }
 
     const item = await prisma.returnRequest.create({
@@ -257,89 +263,144 @@ export async function PATCH(request: Request) {
       }
     }
     const refundCompleted = ['REFUNDED', 'COMPLETED'].includes(status);
-    const item = status === 'VOUCHER_ISSUED' && resolutionMethod === 'VOUCHER'
-      ? await (async () => {
-        const createVoucher = (includeReturnRequestRelation: boolean) => prisma.$transaction(async (transaction) => {
-          const baseCode = `COMP-${current.order.orderCode}`;
-          const codeExists = await transaction.voucher.findUnique({ where: { code: baseCode }, select: { id: true } });
-          const code = codeExists ? `${baseCode}-${randomBytes(2).toString('hex').toUpperCase()}` : baseCode;
-          const voucher = await transaction.voucher.create({
+    const approveReturnAndRestock = (nextStatus: 'REPLACEMENT_APPROVED' | 'REFUND_APPROVED') => prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.returnRequest.updateMany({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: nextStatus,
+          adminNote,
+          ...(nextStatus === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
+        },
+      });
+      if (claimed.count !== 1) return null;
+      await restockOrderItemsForReturn(transaction, current.orderId, id);
+      if (nextStatus === 'REFUND_APPROVED') {
+        const existingOperation = await transaction.refundOperation.findFirst({
+          where: { returnRequestId: id, status: { in: ['PENDING_APPROVAL', 'APPROVED', 'SENT', 'COMPLETED'] } },
+        });
+        if (!existingOperation) {
+          await transaction.refundOperation.create({
             data: {
-              code,
-              name: `Voucher đền bù đơn ${current.order.orderCode}`,
-              discountType: 'FIXED',
-              value: Number(voucherValue),
-              maxDiscount: null,
-              minSpend: 0,
-              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-              isActive: true,
-              usageLimit: 1,
-              freeShipping: false,
-              firstOrderOnly: false,
-              showOnPromoPage: false,
-              ...(includeReturnRequestRelation ? { returnRequestId: id } : {}),
+              orderId: current.orderId,
+              returnRequestId: id,
+              amount: current.order.totalAmount,
+              bankName: current.refundBankName!,
+              accountNumber: current.refundAccountNumber!,
+              accountHolder: current.refundAccountHolder!,
+              reason: `Hoàn tiền theo yêu cầu đổi trả ${current.order.orderCode}`,
+              status: 'PENDING_APPROVAL',
+              requestedBy: adminEmail,
             },
           });
-          const updated = await transaction.returnRequest.update({
-            where: { id },
-            data: { status: 'VOUCHER_ISSUED', adminNote },
-            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
-          });
-          return { ...updated, issuedVoucher: voucher };
-        });
-
-        try {
-          return await createVoucher(true);
-        } catch (error) {
-          if (!isMissingReturnVoucherRelationColumn(error)) throw error;
-          console.error('Issuing a return voucher without the optional returnRequestId relation; apply pending migrations.', error);
-          return createVoucher(false);
         }
-      })()
-      : status === 'VOUCHER_ISSUED'
-      ? await prisma.$transaction(async (transaction) => {
-        await transaction.compensationVoucher.create({
-          data: {
-            code: `MKF50-${randomBytes(4).toString('hex').toUpperCase()}`,
-            orderId: current.orderId,
-            returnRequestId: id,
-            customerPhone: current.customerPhone,
-            discountPercent: 50,
-            expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-            createdBy: adminEmail,
-          },
-        });
-        return transaction.returnRequest.update({
-          where: { id },
-          data: { status, adminNote },
-          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
-        });
-      })
-      : refundCompleted
-        ? await prisma.$transaction(async (transaction) => {
-          const order = await transaction.order.findUnique({ where: { id: current.orderId }, select: { totalAmount: true, refundedAt: true } });
-          if (!order) throw new Error('Refund order not found.');
-          const updatedReturn = await transaction.returnRequest.update({
-            where: { id },
-            data: { status: status as ReturnRequestStatus, adminNote, refundTransferReference, refundCompletedBy: adminEmail },
-            include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
-          });
-          await transaction.order.update({
-            where: { id: current.orderId },
-            data: { paymentStatus: 'REFUNDED', refundAmount: order.totalAmount, refundedAt: order.refundedAt ?? new Date(), affiliateCommissionStatus: 'CANCELLED' },
-          });
-          return updatedReturn;
-        })
-        : await prisma.returnRequest.update({
+      }
+      return transaction.returnRequest.update({
         where: { id },
         data: {
-          status: status as ReturnRequestStatus,
+          status: nextStatus,
           adminNote,
-          ...(status === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
-          ...(['REFUNDED', 'COMPLETED'].includes(status) ? { refundTransferReference, refundCompletedBy: adminEmail } : {}),
+          ...(nextStatus === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: current.refundApprovedAt ?? new Date() } : {}),
         },
-          include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+        include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
       });
+    });
+    const item = status === 'REPLACEMENT_APPROVED' && current.status === 'PENDING'
+      ? await approveReturnAndRestock('REPLACEMENT_APPROVED')
+      : status === 'REFUND_APPROVED' && current.status === 'PENDING'
+        ? await approveReturnAndRestock('REFUND_APPROVED')
+        : status === 'VOUCHER_ISSUED' && resolutionMethod === 'VOUCHER'
+          ? await (async () => {
+            const createVoucher = (includeReturnRequestRelation: boolean) => prisma.$transaction(async (transaction) => {
+              const baseCode = `COMP-${current.order.orderCode}`;
+              const codeExists = await transaction.voucher.findUnique({ where: { code: baseCode }, select: { id: true } });
+              const code = codeExists ? `${baseCode}-${randomBytes(2).toString('hex').toUpperCase()}` : baseCode;
+              const voucher = await transaction.voucher.create({
+                data: {
+                  code,
+                  name: `Voucher đền bù đơn ${current.order.orderCode}`,
+                  discountType: 'FIXED',
+                  value: Number(voucherValue),
+                  maxDiscount: null,
+                  minSpend: 0,
+                  expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                  isActive: true,
+                  usageLimit: 1,
+                  freeShipping: false,
+                  firstOrderOnly: false,
+                  showOnPromoPage: false,
+                  ...(includeReturnRequestRelation ? { returnRequestId: id } : {}),
+                },
+              });
+              const updated = await transaction.returnRequest.update({
+                where: { id },
+                data: { status: 'VOUCHER_ISSUED', adminNote },
+                include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+              });
+              return { ...updated, issuedVoucher: voucher };
+            });
+
+            try {
+              return await createVoucher(true);
+            } catch (error) {
+              if (!isMissingReturnVoucherRelationColumn(error)) throw error;
+              console.error('Issuing a return voucher without the optional returnRequestId relation; apply pending migrations.', error);
+              return createVoucher(false);
+            }
+          })()
+          : status === 'VOUCHER_ISSUED'
+            ? await prisma.$transaction(async (transaction) => {
+              const claimed = current.status === 'PENDING'
+                ? await transaction.returnRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'VOUCHER_ISSUED', adminNote } })
+                : { count: 1 };
+              if (claimed.count !== 1) return null;
+              if (current.status === 'PENDING') await restockOrderItemsForReturn(transaction, current.orderId, id);
+              await transaction.compensationVoucher.create({
+                data: {
+                  code: `MKF50-${randomBytes(4).toString('hex').toUpperCase()}`,
+                  orderId: current.orderId,
+                  returnRequestId: id,
+                  customerPhone: current.customerPhone,
+                  discountPercent: 50,
+                  expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+                  createdBy: adminEmail,
+                },
+              });
+              return transaction.returnRequest.update({
+                where: { id },
+                data: { status, adminNote },
+                include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+              });
+            })
+            : refundCompleted
+              ? await prisma.$transaction(async (transaction) => {
+                const order = await transaction.order.findUnique({ where: { id: current.orderId }, select: { totalAmount: true, refundedAt: true } });
+                if (!order) throw new Error('Refund order not found.');
+                const updatedReturn = await transaction.returnRequest.update({
+                  where: { id },
+                  data: { status: status as ReturnRequestStatus, adminNote, refundTransferReference, refundCompletedBy: adminEmail },
+                  include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+                });
+                await transaction.order.update({
+                  where: { id: current.orderId },
+                  data: { paymentStatus: 'REFUNDED', refundAmount: order.totalAmount, refundedAt: order.refundedAt ?? new Date(), affiliateCommissionStatus: 'CANCELLED' },
+                });
+                await transaction.refundOperation.updateMany({
+                  where: { returnRequestId: id, status: { in: ['PENDING_APPROVAL', 'APPROVED', 'SENT'] } },
+                  data: { status: 'COMPLETED', approvedBy: adminEmail, approvedAt: new Date(), transferReference: refundTransferReference },
+                });
+                return updatedReturn;
+              })
+              : await prisma.returnRequest.update({
+                where: { id },
+                data: {
+                  status: status as ReturnRequestStatus,
+                  adminNote,
+                  ...(status === 'REFUND_APPROVED' ? { refundApprovedBy: adminEmail, refundApprovedAt: new Date() } : {}),
+                  ...(['REFUNDED', 'COMPLETED'].includes(status) ? { refundTransferReference, refundCompletedBy: adminEmail } : {}),
+                },
+                include: { order: { select: { orderCode: true, customerName: true, totalAmount: true } }, compensationVoucher: true },
+              });
+    if (!item) return NextResponse.json({ error: 'Yêu cầu đã được xử lý bởi phiên khác. Vui lòng tải lại danh sách.' }, { status: 409 });
     if (['REPLACEMENT_APPROVED', 'VOUCHER_ISSUED', 'REFUND_APPROVED', 'REFUNDED', 'COMPLETED'].includes(status)) {
       await prisma.order.updateMany({
         where: { id: current.orderId, affiliateCommissionStatus: { in: ['PENDING', 'ELIGIBLE'] } },

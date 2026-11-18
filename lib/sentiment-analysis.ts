@@ -4,10 +4,17 @@ import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { writeAuditLog } from '@/lib/audit-log';
 
-export type SentimentInput = { id: string; kind: 'review' | 'complaint'; text: string };
+export type SentimentInput = { id: string; kind: 'review' | 'complaint'; text: string; rating?: number };
 type SentimentResult = { id: string; urgent: boolean };
 
 const urgentPattern = /mốc|ẩm|mùi lạ|mùi hôi|hôi|khét|dị ứng|ngứa|đau bụng|ngộ độc|vệ sinh|nhiễm bẩn|côn trùng|tóc|sạn|mold|allerg|contaminat|hygiene|smell|odor|poison/i;
+const highRiskReviewPattern = /mốc|ẩm mốc|hỏng|lỗi|lừa đảo|kém chất lượng|ngộ độc|dị ứng|đau bụng|mùi lạ|mold|defect|scam|poor quality|poison|allerg/i;
+
+export function classifyReviewRisk(rating: number, comment: string): 'HIGH_RISK' | 'NEUTRAL' | 'POSITIVE' {
+  if (rating <= 2 || highRiskReviewPattern.test(comment)) return 'HIGH_RISK';
+  if (rating >= 4) return 'POSITIVE';
+  return 'NEUTRAL';
+}
 
 function parseGeminiResults(value: unknown, allowedIds: Set<string>): SentimentResult[] | null {
   if (typeof value !== 'object' || value === null) return null;
@@ -53,11 +60,11 @@ async function classifyWithGemini(items: SentimentInput[]): Promise<SentimentRes
 export async function analyzeNewSentiment(request: Request, adminEmail: string) {
   return withDatabase(async () => {
     const [reviews, complaints] = await Promise.all([
-      prisma.review.findMany({ where: { riskAnalyzedAt: null }, select: { id: true, comment: true }, orderBy: { createdAt: 'asc' }, take: 50 }),
+      prisma.review.findMany({ where: { riskAnalyzedAt: null }, select: { id: true, comment: true, rating: true }, orderBy: { createdAt: 'asc' }, take: 50 }),
       prisma.returnRequest.findMany({ where: { riskAnalyzedAt: null }, select: { id: true, issueType: true, description: true }, orderBy: { createdAt: 'asc' }, take: 50 }),
     ]);
     const inputs: SentimentInput[] = [
-      ...reviews.map((review) => ({ id: `review:${review.id}`, kind: 'review' as const, text: review.comment })),
+      ...reviews.map((review) => ({ id: `review:${review.id}`, kind: 'review' as const, text: review.comment, rating: review.rating })),
       ...complaints.map((complaint) => ({ id: `complaint:${complaint.id}`, kind: 'complaint' as const, text: `${complaint.issueType}. ${complaint.description}` })),
     ];
     if (!inputs.length) return NextResponse.json({ analyzed: 0, urgent: 0, source: process.env.GEMINI_API_KEY ? 'gemini' : 'keyword-fallback' });
@@ -71,14 +78,16 @@ export async function analyzeNewSentiment(request: Request, adminEmail: string) 
         ?? complaints.find((complaint) => `complaint:${complaint.id}` === item.id)?.description
         ?? item.text;
       const urgent = resultById.get(item.id) ?? urgentPattern.test(fallbackText);
-      const riskTag = urgent ? 'URGENT_QUALITY_RISK' : 'ROUTINE';
+      const riskTag = item.kind === 'review'
+        ? urgent ? 'HIGH_RISK' : classifyReviewRisk(item.rating ?? 3, fallbackText)
+        : urgent ? 'URGENT_QUALITY_RISK' : 'ROUTINE';
       const id = item.id.slice(item.id.indexOf(':') + 1);
       if (item.kind === 'review') {
         await prisma.review.update({ where: { id }, data: { riskTag, riskAnalyzedAt: analyzedAt } });
       } else {
         await prisma.returnRequest.update({ where: { id }, data: { riskTag, riskAnalyzedAt: analyzedAt } });
       }
-      return urgent;
+      return item.kind === 'review' ? riskTag === 'HIGH_RISK' : urgent;
     });
     const classifications = await Promise.all(updates);
     const urgent = classifications.filter(Boolean).length;

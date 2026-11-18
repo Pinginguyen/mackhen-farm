@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withDatabase } from '@/lib/api-database';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
-import { calculateShipping } from '@/lib/shipping';
+import { calculateShipping, parseShippingWeightGrams } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
 import { calculateManagedVoucherDiscountAmount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { writeAuditLog } from '@/lib/audit-log';
@@ -12,7 +12,10 @@ import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
 import { calculatePercentageAmount } from '@/lib/money';
 import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
 import { allocateStockFEFO } from '@/lib/services/inventory-ledger';
+import { calculateRealtimeShippingRate } from '@/lib/services/shipping-carrier';
 import { getClientIpHash, isSelfReferral } from '@/lib/affiliate-fraud';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
+import { getEffectivePrice } from '@/lib/pricing';
 
 type CheckoutItemSnapshot = {
   id?: string;
@@ -29,12 +32,13 @@ type CheckoutBody = {
   address?: string;
   discountCode?: string;
   customer?: { name?: string; email?: string; phone?: string };
-  delivery?: { address?: string };
+  delivery?: { address?: string; province?: unknown; district?: unknown };
   paymentMethod?: string;
   note?: string;
   voucherCode?: string;
   affiliateCode?: unknown;
   buyNow?: boolean;
+  useLoyaltyPoints?: unknown;
   items?: unknown;
   price?: unknown;
   totalAmount?: unknown;
@@ -49,9 +53,33 @@ type CreatedOrder = {
   totalAmount: number;
   duplicate?: boolean;
 };
-type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY'; message?: string };
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY' | 'LOYALTY_LOGIN_REQUIRED'; message?: string };
 
 type PricedCheckoutItem = { quantity: number; unitPrice: number };
+type ShippingCartItem = {
+  id: string;
+  productId: string;
+  productVariantId: string | null;
+  quantity: number;
+  product: { weight: number | null; price: number; originalPrice: number | null; flashSaleEndsAt: Date | null };
+  variant: { weight: string; price: number; originalPrice: number | null } | null;
+};
+
+function createShippingCartFingerprint(items: ShippingCartItem[]): string {
+  return items.map((item) => [
+    item.id,
+    item.productId,
+    item.productVariantId ?? '',
+    item.quantity,
+    item.product.weight ?? '',
+    item.variant?.weight ?? '',
+    item.product.price,
+    item.product.originalPrice ?? '',
+    item.product.flashSaleEndsAt?.getTime() ?? '',
+    item.variant?.price ?? '',
+    item.variant?.originalPrice ?? '',
+  ].join(':')).sort().join('|');
+}
 
 function allocateItemDiscount(items: PricedCheckoutItem[], discount: number, subtotal: number): number[] {
   const itemDiscount = Math.min(Math.max(0, discount), subtotal);
@@ -185,8 +213,12 @@ export async function POST(request: Request) {
   const phoneInput = typeof submittedPhone === 'string' ? submittedPhone.trim() : '';
   const phone = phoneInput ? normalizeVietnamesePhone(phoneInput) : null;
   const address = typeof submittedAddress === 'string' ? submittedAddress.trim() : '';
+  const province = typeof body.delivery?.province === 'string' ? body.delivery.province.trim() : '';
+  const district = typeof body.delivery?.district === 'string' ? body.delivery.district.trim() : '';
   const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
-  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR'].includes(paymentMethod)) {
+  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR'].includes(paymentMethod)
+    || (body.useLoyaltyPoints !== undefined && typeof body.useLoyaltyPoints !== 'boolean')
+    || Boolean(province) !== Boolean(district) || province.length > 100 || district.length > 100) {
     return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
   }
   const submittedVoucherCode = body.voucherCode ?? body.discountCode;
@@ -200,6 +232,9 @@ export async function POST(request: Request) {
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
+  if (body.useLoyaltyPoints === true && !session) {
+    return NextResponse.json({ error: { code: 'LOYALTY_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập để sử dụng điểm thưởng.' } }, { status: 401 });
+  }
   const buyerIpHash = getClientIpHash(request);
   if (isManagedVoucher && !session) {
     return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
@@ -233,6 +268,30 @@ export async function POST(request: Request) {
     }
     if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
+    let realtimeShippingFee: number | null = null;
+    let shippingCartState: string | null = null;
+    if (province && district) {
+      const shippingCart = await prisma.cart.findUnique({
+        where: { id: decodeURIComponent(cartId) },
+        include: { items: { include: { product: { select: { weight: true, slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { weight: true, price: true, originalPrice: true } } } } },
+      });
+      if (!shippingCart?.items.length) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
+      shippingCartState = createShippingCartFingerprint(shippingCart.items);
+      const shippingSubtotal = shippingCart.items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
+      const standardShipping = calculateShipping(shippingSubtotal, shippingCart.items.map((item) => item.product.slug), settings.freeShippingThreshold);
+      if (standardShipping === 0) {
+        realtimeShippingFee = 0;
+      } else {
+        const weightGrams = shippingCart.items.reduce((sum, item) => sum + parseShippingWeightGrams(item.product.weight, item.variant?.weight) * item.quantity, 0);
+        try {
+          const rate = await calculateRealtimeShippingRate({ province, district, weightGrams });
+          realtimeShippingFee = rate.fee;
+        } catch {
+          return NextResponse.json({ error: { code: 'SHIPPING_RATE_UNAVAILABLE', message: 'Không thể xác nhận phí vận chuyển. Vui lòng thử lại.' } }, { status: 502 });
+        }
+      }
+    }
+
     let order: CreatedOrder | null | CheckoutRejection;
     try {
       order = await prisma.$transaction(async (transaction) => {
@@ -251,10 +310,13 @@ export async function POST(request: Request) {
           productSlug: item.product.slug,
           variantId: item.productVariantId,
           quantity: item.quantity,
-          price: item.variant?.price ?? item.product.price,
+          price: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
         }));
+        if (shippingCartState && createShippingCartFingerprint(cart.items) !== shippingCartState) {
+          return { rejected: 'PRICE_MISMATCH' as const };
+        }
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
-        const shipping = calculateShipping(subtotal, currentItems.map((item) => item.productSlug), settings.freeShippingThreshold);
+        const shipping = realtimeShippingFee ?? calculateShipping(subtotal, currentItems.map((item) => item.productSlug), settings.freeShippingThreshold);
         const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({
           where: { code: voucherCode },
           select: { id: true, code: true, discountType: true, value: true, maxDiscount: true, minSpend: true, expiresAt: true, isActive: true, usageLimit: true, freeShipping: true, firstOrderOnly: true },
@@ -273,6 +335,16 @@ export async function POST(request: Request) {
           compensationVoucherId = voucher.id;
           compensationVoucherInvalid = voucher.customerPhone !== phone || Boolean(voucher.redeemedAt) || voucher.expiresAt <= new Date();
           discount = calculatePercentageAmount(subtotal, voucher.discountPercent);
+        }
+        let loyaltyPointsSpent = 0;
+        if (body.useLoyaltyPoints === true && session) {
+          const loyaltyAccount = await transaction.user.findUnique({ where: { id: session.userId }, select: { loyaltyPoints: true } });
+          if (!loyaltyAccount) return { rejected: 'LOYALTY_LOGIN_REQUIRED' as const };
+          loyaltyPointsSpent = Math.min(
+            loyaltyAccount.loyaltyPoints,
+            Math.floor(Math.max(0, subtotal + shipping - discount) / 100),
+          );
+          discount += loyaltyPointsSpent * 100;
         }
         const totalAmount = subtotal + shipping - discount;
 
@@ -386,6 +458,7 @@ export async function POST(request: Request) {
             subtotal,
             shippingFee: shipping,
             discountAmount: discount,
+            loyaltyPointsSpent,
             voucherCode: voucherCode || null,
             affiliateCode: attributedAffiliate?.affiliateCode ?? null,
             affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
@@ -401,7 +474,27 @@ export async function POST(request: Request) {
             note: typeof body.note === 'string' ? body.note.trim() || null : null,
           },
         });
-        const pricedItems = cart.items.map((item) => ({ item, unitPrice: item.variant?.price ?? item.product.price }));
+        if (loyaltyPointsSpent > 0 && session) {
+          const pointsClaim = await transaction.user.updateMany({
+            where: { id: session.userId, loyaltyPoints: { gte: loyaltyPointsSpent } },
+            data: { loyaltyPoints: { decrement: loyaltyPointsSpent } },
+          });
+          if (pointsClaim.count !== 1) throw new Error('LOYALTY_BALANCE_CHANGED');
+          await transaction.pointHistory.create({
+            data: {
+              userId: session.userId,
+              orderId: order.id,
+              points: loyaltyPointsSpent,
+              type: 'SPEND',
+              description: `Đổi điểm giảm ${loyaltyPointsSpent * 100}đ cho đơn hàng ${order.orderCode}`,
+              idempotencyKey: `order:${order.id}:spend`,
+            },
+          });
+        }
+        const pricedItems = cart.items.map((item) => ({
+          item,
+          unitPrice: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
+        }));
         const itemDiscounts = allocateItemDiscount(
           pricedItems.map(({ item, unitPrice }) => ({ quantity: item.quantity, unitPrice })),
           managedVoucher?.freeShipping ? 0 : discount,
@@ -415,6 +508,8 @@ export async function POST(request: Request) {
             productName: item.product.name,
             orderId: order.id,
             cartItemId: item.id,
+            destinationProvince: province,
+            destinationDistrict: district,
           });
           const lineTotal = item.quantity * unitPrice;
           const lineDiscounts = allocateItemDiscount(
@@ -499,6 +594,9 @@ export async function POST(request: Request) {
         const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
         return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 400 });
       }
+      if (error instanceof Error && error.message === 'LOYALTY_BALANCE_CHANGED') {
+        return NextResponse.json({ error: { code: 'LOYALTY_BALANCE_CHANGED', message: 'Số điểm vừa thay đổi. Vui lòng tải lại trang thanh toán.' } }, { status: 409 });
+      }
       if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK_LOT:')) {
         const productName = error.message.slice('INSUFFICIENT_STOCK_LOT:'.length);
         return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Các lô còn hạn của ${productName} không đủ số lượng. Vui lòng liên hệ cửa hàng.` } }, { status: 409 });
@@ -543,6 +641,9 @@ export async function POST(request: Request) {
         });
       }
       const invalidVoucher = order.rejected !== 'PRICE_MISMATCH';
+      if (order.rejected === 'LOYALTY_LOGIN_REQUIRED') {
+        return NextResponse.json({ error: { code: order.rejected, message: 'Vui lòng đăng nhập để sử dụng điểm thưởng.' } }, { status: 401 });
+      }
       const voucherErrorMessage = order.rejected === 'VOUCHER_FIRST_ORDER_ONLY'
         ? 'Mã giảm giá này chỉ áp dụng cho đơn hàng đầu tiên của thành viên mới.'
         : order.rejected === 'VOUCHER_PHONE_USED'
@@ -574,6 +675,9 @@ export async function POST(request: Request) {
       }));
     }
     await Promise.all(postCommitTasks);
+    void sendOrderConfirmationIfNeeded(order.id).catch((error) => {
+      console.error('Order confirmation email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+    });
     const response = NextResponse.json({
       success: true,
       orderId: order.id,

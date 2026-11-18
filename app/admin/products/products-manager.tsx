@@ -19,6 +19,7 @@ type ProductDraft = {
   category: 'Khô bò thực vật' | 'Gia vị';
   price: string;
   originalPrice: string;
+  flashSaleEndsAt: string;
   weight: string;
   protein: string;
   stock: string;
@@ -67,6 +68,7 @@ const emptyDraft: ProductDraft = {
   category: 'Khô bò thực vật',
   price: '',
   originalPrice: '',
+  flashSaleEndsAt: '',
   weight: '',
   protein: '',
   stock: '0',
@@ -173,6 +175,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       category: categoryDraftValue(product.category, product.categoryId),
       price: numericString(product.price) || numericString(firstVariant?.price),
       originalPrice: product.originalPrice == null ? '' : String(product.originalPrice),
+      flashSaleEndsAt: product.flashSaleEndsAt ? new Date(product.flashSaleEndsAt).toISOString().slice(0, 16) : '',
       weight: String(weight),
       protein: product.protein ?? '',
       stock: numericString(product.stock) || numericString(firstVariant?.inventory) || '100',
@@ -254,6 +257,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           category: draft.category,
           price: Number(draft.price),
           originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
+          flashSaleEndsAt: draft.flashSaleEndsAt ? new Date(draft.flashSaleEndsAt).toISOString() : null,
           stock: Number(draft.stock) || 0,
           weight: String(draft.weight || '150g').trim(),
           protein: String(draft.protein).trim(),
@@ -406,6 +410,8 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
               }}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select>{fieldErrors.category && <small id="product-category-error" className="admin-product-field-error">{fieldErrors.category}</small>}</label>
               <label className="field">Giá niêm yết (VNĐ)<input data-field="price" aria-invalid={Boolean(fieldErrors.price)} aria-describedby={fieldErrors.price ? 'product-price-error' : undefined} className={fieldErrors.price ? 'border-red-500 ring-1 ring-red-500' : undefined} type="number" min={0} step="any" value={draft.price} onChange={(event) => { setDraft({ ...draft, price: event.target.value }); clearFieldError('price'); }} required />{fieldErrors.price && <small id="product-price-error" className="admin-product-field-error">{fieldErrors.price}</small>}</label>
               <label className="field">Giá gốc (không bắt buộc)<input type="number" min={0} step="any" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
+              <label className="field">Flash sale đến (tùy chọn)<input type="datetime-local" value={draft.flashSaleEndsAt} onChange={(event) => setDraft({ ...draft, flashSaleEndsAt: event.target.value })} /><small>Hết giờ sẽ tự dùng giá gốc nếu đã nhập.</small></label>
+              <label className="field">Flash sale đến (tùy chọn)<input type="datetime-local" value={draft.flashSaleEndsAt} onChange={(event) => setDraft({ ...draft, flashSaleEndsAt: event.target.value })} /><small>Hết giờ sẽ tự dùng giá gốc nếu đã nhập.</small></label>
               <label className="field">Trọng lượng<input data-field="weight" aria-invalid={Boolean(fieldErrors.weight)} aria-describedby={fieldErrors.weight ? 'product-weight-error' : undefined} className={fieldErrors.weight ? 'border-red-500 ring-1 ring-red-500' : undefined} placeholder="150g" value={draft.weight} onChange={(event) => { setDraft({ ...draft, weight: event.target.value }); clearFieldError('weight'); }} required />{fieldErrors.weight && <small id="product-weight-error" className="admin-product-field-error">{fieldErrors.weight}</small>}</label>
               <label className="field">Hàm lượng Protein<input data-field="protein" aria-invalid={Boolean(fieldErrors.protein)} aria-describedby={fieldErrors.protein ? 'product-protein-error' : undefined} className={fieldErrors.protein ? 'border-red-500 ring-1 ring-red-500' : undefined} placeholder="22g/100g" value={draft.protein} onChange={(event) => { setDraft({ ...draft, protein: event.target.value }); clearFieldError('protein'); }} maxLength={80} required={draft.category !== 'Gia vị'} />{fieldErrors.protein && <small id="product-protein-error" className="admin-product-field-error">{fieldErrors.protein}</small>}</label>
               <label className="field">Tồn kho ban đầu<input data-field="stock" aria-invalid={Boolean(fieldErrors.stock)} aria-describedby={fieldErrors.stock ? 'product-stock-error' : undefined} className={fieldErrors.stock ? 'border-red-500 ring-1 ring-red-500' : undefined} type="number" min={0} max={1000000} value={draft.stock} onChange={(event) => { setDraft({ ...draft, stock: event.target.value }); clearFieldError('stock'); }} required />{fieldErrors.stock && <small id="product-stock-error" className="admin-product-field-error">{fieldErrors.stock}</small>}</label>

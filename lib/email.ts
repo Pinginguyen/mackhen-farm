@@ -89,3 +89,104 @@ export async function sendB2bInquiryEmail(input: {
     html: `<div style="font-family:Arial,sans-serif;color:#292524"><h1>Yêu cầu hợp tác B2B mới</h1><p><strong>Công ty:</strong> ${companyName}</p><p><strong>Quốc gia:</strong> ${country}</p><p><strong>Người liên hệ:</strong> ${contactName}</p><p><strong>Email:</strong> ${email}</p><p><strong>Điện thoại:</strong> ${phone}</p><p><strong>MOQ dự kiến:</strong> ${expectedVolume}</p><p><strong>Nội dung:</strong><br>${message.replace(/\n/g, '<br>')}</p></div>`,
   });
 }
+
+type OrderEmailItem = { productName: string; variantLabel?: string | null; quantity: number; unitPrice: number };
+
+function emailLayout(title: string, content: string): string {
+  return `<div style="margin:0;padding:24px 12px;background:#f7f4ed;font-family:Arial,Helvetica,sans-serif;color:#292524"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e7e1d8;border-collapse:separate;border-spacing:0"><tr><td style="padding:24px;background:#1b4332;color:#fff"><p style="margin:0 0 6px;font-size:11px;letter-spacing:1px;color:#e8d7b8">NÔNG SẢN SẤY VỊ TÂY BẮC</p><h1 style="margin:0;font-size:22px;line-height:1.3">Mắc Khén Farm</h1></td></tr><tr><td style="padding:24px 20px"><h2 style="margin:0 0 14px;font-size:20px;line-height:1.35;color:#1b4332">${escapeHtml(title)}</h2>${content}</td></tr><tr><td style="padding:16px 20px;background:#f8f6f1;color:#78716c;font-size:12px;line-height:1.6">Mắc Khén Farm · Đặc sản thủ công từ vùng nguyên liệu Tây Bắc</td></tr></table></div>`;
+}
+
+export async function sendOrderConfirmationEmail(input: {
+  toEmail: string;
+  customerName: string;
+  orderCode: string;
+  paymentMethod: 'COD' | 'VIETQR' | 'MOMO';
+  subtotal: number;
+  shippingFee: number;
+  discountAmount: number;
+  totalAmount: number;
+  items: OrderEmailItem[];
+}) {
+  const { user, transporter } = createEmailTransporter();
+  const orderCode = escapeHtml(input.orderCode);
+  const customerName = escapeHtml(input.customerName);
+  const rows = input.items.map((item) => `<tr><td style="padding:10px 6px;border-bottom:1px solid #eee8df"><strong>${escapeHtml(item.productName)}</strong>${item.variantLabel ? `<br><small style="color:#78716c">${escapeHtml(item.variantLabel)}</small>` : ''}</td><td style="padding:10px 6px;border-bottom:1px solid #eee8df;text-align:center">${item.quantity}</td><td style="padding:10px 6px;border-bottom:1px solid #eee8df;text-align:right;white-space:nowrap">${(item.unitPrice * item.quantity).toLocaleString('vi-VN')}đ</td></tr>`).join('');
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://mackhenfarm.vn').replace(/\/+$/, '');
+  const trackingUrl = `${appUrl}/tra-cuu?orderCode=${encodeURIComponent(input.orderCode)}`;
+  const bankId = process.env.VIETQR_BANK_ID;
+  const accountNumber = process.env.VIETQR_ACCOUNT_NUMBER;
+  const accountName = process.env.VIETQR_ACCOUNT_NAME ?? '';
+  let qrUrl = '';
+  if (input.paymentMethod === 'VIETQR' && bankId && accountNumber) {
+    const qr = new URL(`https://img.vietqr.io/image/${encodeURIComponent(bankId)}-${encodeURIComponent(accountNumber)}-compact2.png`);
+    qr.searchParams.set('amount', String(input.totalAmount));
+    qr.searchParams.set('addInfo', input.orderCode);
+    if (accountName) qr.searchParams.set('accountName', accountName);
+    qrUrl = qr.toString();
+  }
+  const transferBlock = input.paymentMethod === 'VIETQR'
+    ? `<h3 style="margin:22px 0 8px;color:#1b4332;font-size:15px">Thông tin chuyển khoản</h3>${qrUrl ? `<p style="text-align:center;margin:14px 0"><img src="${escapeHtml(qrUrl)}" width="220" height="220" alt="Mã VietQR cho đơn ${orderCode}" style="display:block;width:220px;max-width:100%;height:auto;margin:0 auto"></p>` : ''}<p style="margin:6px 0;line-height:1.6">Ngân hàng: <strong>${escapeHtml(bankId ?? 'MB')}</strong><br>Số tài khoản: <strong>${escapeHtml(accountNumber ?? 'Xem thông tin tại trang thanh toán')}</strong><br>Chủ tài khoản: <strong>${escapeHtml(accountName || 'Mắc Khén Farm')}</strong><br>Nội dung chuyển khoản: <strong>${orderCode}</strong><br>Số tiền: <strong>${input.totalAmount.toLocaleString('vi-VN')}đ</strong></p>`
+    : `<p style="margin:18px 0;padding:12px;background:#f8f6f1;line-height:1.6">${input.paymentMethod === 'COD' ? 'Bạn thanh toán khi nhận hàng.' : 'Phương thức thanh toán đã được ghi nhận cho đơn hàng.'}</p>`;
+  const html = emailLayout('Xác nhận đơn hàng', `<p style="margin:0 0 12px;line-height:1.6">Xin chào ${customerName}, Mắc Khén Farm đã tiếp nhận đơn <strong>${orderCode}</strong>.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px"><thead><tr><th align="left" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Sản phẩm</th><th style="padding:8px 6px;border-bottom:2px solid #d6c9b3">SL</th><th align="right" style="padding:8px 6px;border-bottom:2px solid #d6c9b3">Thành tiền</th></tr></thead><tbody>${rows}</tbody></table><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px;font-size:13px"><tr><td style="padding:4px 0">Tạm tính</td><td align="right">${input.subtotal.toLocaleString('vi-VN')}đ</td></tr><tr><td style="padding:4px 0">Vận chuyển</td><td align="right">${input.shippingFee.toLocaleString('vi-VN')}đ</td></tr>${input.discountAmount ? `<tr><td style="padding:4px 0">Ưu đãi</td><td align="right">−${input.discountAmount.toLocaleString('vi-VN')}đ</td></tr>` : ''}<tr><td style="padding:9px 0;border-top:1px solid #ddd;font-size:16px"><strong>Tổng thanh toán</strong></td><td align="right" style="padding:9px 0;border-top:1px solid #ddd;color:#841e1e;font-size:16px"><strong>${input.totalAmount.toLocaleString('vi-VN')}đ</strong></td></tr></table>${transferBlock}<p style="margin:22px 0;text-align:center"><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Theo dõi đơn hàng</a></p>`);
+
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: `[Mắc Khén Farm] Xác nhận đơn hàng ${input.orderCode}`,
+    text: `Xin chào ${input.customerName}, đơn ${input.orderCode} đã được tiếp nhận. Tổng thanh toán: ${input.totalAmount.toLocaleString('vi-VN')}đ. Tra cứu: ${trackingUrl}`,
+    html,
+  });
+}
+
+export async function sendShippingUpdateEmail(input: {
+  toEmail: string;
+  customerName: string;
+  orderCode: string;
+  carrier: string;
+  trackingCode: string;
+}) {
+  const { user, transporter } = createEmailTransporter();
+  const orderCode = escapeHtml(input.orderCode);
+  const trackingCode = escapeHtml(input.trackingCode);
+  const trackingUrl = `${(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhenfarm.vn').replace(/\/+$/, '')}/tra-cuu?orderCode=${encodeURIComponent(input.orderCode)}`;
+  const html = emailLayout('Đơn hàng đang trên đường đến bạn', `<p style="margin:0 0 12px;line-height:1.6">Xin chào ${escapeHtml(input.customerName)}, đơn <strong>${orderCode}</strong> đã được bàn giao cho đơn vị vận chuyển.</p><p style="margin:16px 0;padding:14px;background:#f8f6f1;line-height:1.7">Đơn vị: <strong>${escapeHtml(input.carrier)}</strong><br>Mã vận đơn: <strong style="font-size:18px;color:#841e1e">${trackingCode}</strong></p><p style="margin:22px 0;text-align:center"><a href="${escapeHtml(trackingUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Tra cứu hành trình</a></p>`);
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: `[Mắc Khén Farm] Đơn ${input.orderCode} đang được giao`,
+    text: `Đơn ${input.orderCode} đang được giao qua ${input.carrier}. Mã vận đơn: ${input.trackingCode}. Tra cứu: ${trackingUrl}`,
+    html,
+  });
+}
+
+export async function sendReviewRequestEmail(input: {
+  toEmail: string;
+  customerName: string;
+  orderCode: string;
+  products: { productName: string; productUrl: string }[];
+}) {
+  const { user, transporter } = createEmailTransporter();
+  const orderCode = escapeHtml(input.orderCode);
+  const products = input.products.map((item) => `<li style="margin:8px 0"><a href="${escapeHtml(item.productUrl)}" style="color:#1b4332;font-weight:bold">${escapeHtml(item.productName)}</a></li>`).join('');
+  const html = emailLayout('Bạn thấy mẻ sấy thế nào?', `<p style="margin:0 0 12px;line-height:1.6">Xin chào ${escapeHtml(input.customerName)}, cảm ơn bạn đã nhận đơn <strong>${orderCode}</strong>. Một đánh giá ngắn sẽ giúp khách hàng khác chọn vị phù hợp.</p><ul style="padding-left:20px;line-height:1.5">${products}</ul><p style="color:#78716c;font-size:12px;line-height:1.6">Email này được gửi một lần cho đơn đã giao. Nếu bạn đã đánh giá, vui lòng bỏ qua lời nhắc này.</p>`);
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: `[Mắc Khén Farm] Mời bạn đánh giá đơn hàng ${input.orderCode}`,
+    text: `Xin chào ${input.customerName}, mời bạn chia sẻ cảm nhận về sản phẩm trong đơn ${input.orderCode}: ${input.products.map((item) => `${item.productName} ${item.productUrl}`).join('\n')}`,
+    html,
+  });
+}
+
+export async function sendMarketingOfferEmail(input: { toEmail: string; voucherCode: string; unsubscribeUrl: string }) {
+  const { user, transporter } = createEmailTransporter();
+  const voucherCode = escapeHtml(input.voucherCode);
+  const storeUrl = `${(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhenfarm.vn').replace(/\/+$/, '')}/products`;
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: '[Mắc Khén Farm] Ưu đãi dành riêng cho bạn',
+    text: `Cảm ơn bạn đã đăng ký nhận tin. Dùng mã ${input.voucherCode} tại ${storeUrl}. Hủy đăng ký: ${input.unsubscribeUrl}`,
+    html: emailLayout('Ưu đãi dành cho bạn', `<p style="line-height:1.6">Cảm ơn bạn đã đồng ý nhận tin từ Mắc Khén Farm. Nhập mã dưới đây khi thanh toán để nhận ưu đãi.</p><p style="padding:16px;border:1px dashed #8b1e1e;text-align:center;font-size:22px;font-weight:bold;color:#8b1e1e">${voucherCode}</p><p style="text-align:center"><a href="${escapeHtml(storeUrl)}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Khám phá sản phẩm</a></p><p style="font-size:12px;color:#78716c">Không muốn nhận email nữa? <a href="${escapeHtml(input.unsubscribeUrl)}" style="color:#57534e">Hủy đăng ký tại đây</a>.</p>`),
+  });
+}

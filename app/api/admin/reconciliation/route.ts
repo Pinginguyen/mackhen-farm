@@ -7,6 +7,7 @@ import { getCachedPaymentStatus } from '@/lib/payment-status-cache';
 import { withDatabase } from '@/lib/api-database';
 import { writeAuditLog } from '@/lib/audit-log';
 import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,11 @@ export async function GET(request: Request) {
 
   return withDatabase(async () => {
     const cutoff = new Date(Date.now() - 5 * 60 * 1000);
-    const orders = await prisma.order.findMany({
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(todayStart.getDate() - ((todayStart.getDay() + 6) % 7));
+    const [orders, bankTransfers, todayTransfers, weekTransfers, todayMatched, weekOrderTotals] = await Promise.all([prisma.order.findMany({
       where: {
         paymentMethod: { in: ['VIETQR', 'MOMO'] },
         createdAt: { lte: cutoff },
@@ -35,7 +40,15 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: 'asc' },
       take: 100,
-    });
+    }), prisma.bankTransfer.findMany({
+      where: { status: { in: ['MISMATCH', 'UNMATCHED'] } },
+      include: { order: { select: { orderCode: true, totalAmount: true, customerName: true } } },
+      orderBy: { receivedAt: 'desc' },
+      take: 100,
+    }), prisma.bankTransfer.aggregate({ where: { receivedAt: { gte: todayStart } }, _sum: { amount: true } }),
+    prisma.bankTransfer.aggregate({ where: { receivedAt: { gte: weekStart } }, _sum: { amount: true } }),
+    prisma.bankTransfer.count({ where: { receivedAt: { gte: todayStart }, status: { in: ['MATCHED', 'MANUALLY_MATCHED'] } } }),
+    prisma.order.aggregate({ where: { createdAt: { gte: weekStart }, paymentStatus: 'PAID' }, _sum: { totalAmount: true } })]);
 
     return NextResponse.json({
       items: orders.map((order) => {
@@ -57,6 +70,13 @@ export async function GET(request: Request) {
           returnRequest: order.returnRequests[0] ?? null,
         };
       }),
+      bankTransfers,
+      summary: {
+        todayReceived: todayTransfers._sum.amount ?? 0,
+        weekReceived: weekTransfers._sum.amount ?? 0,
+        todayMatched,
+        weekPaidOrders: weekOrderTotals._sum.totalAmount ?? 0,
+      },
       providerLookup: 'not-configured',
       message: 'Đối soát chỉ tự xác nhận bằng webhook/payment record đã xác thực; truy vấn số dư ngân hàng/MoMo trực tiếp chưa được cấu hình.',
     });
@@ -81,6 +101,73 @@ export async function POST(request: Request) {
   const adminEmail = getRequestSession(request)?.email ?? 'unknown-admin';
 
   return withDatabase(async () => {
+    if (payload.action === 'MATCH_TRANSFER') {
+      const bankTransferId = typeof payload.bankTransferId === 'string' ? payload.bankTransferId.trim() : '';
+      const reason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
+      if (!bankTransferId || reason.length < 8 || reason.length > 1000) {
+        return NextResponse.json({ error: { message: 'Chọn giao dịch và nhập lý do đối soát thủ công (8–1000 ký tự).' } }, { status: 400 });
+      }
+      const transfer = await prisma.bankTransfer.findUnique({ where: { id: bankTransferId } });
+      if (!transfer || !['MISMATCH', 'UNMATCHED'].includes(transfer.status)) {
+        return NextResponse.json({ error: { message: 'Giao dịch không còn chờ xử lý.' } }, { status: 409 });
+      }
+      const matchedOrder = await prisma.order.findUnique({
+        where: { orderCode },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, paymentStatus: true, reconciled: true, totalAmount: true, phone: true, address: true },
+      });
+      if (!matchedOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng cần khớp.' } }, { status: 404 });
+      if (matchedOrder.orderStatus === 'CANCELLED' || matchedOrder.paymentStatus === 'PAID' && matchedOrder.reconciled) {
+        return NextResponse.json({ error: { message: 'Đơn đã hủy hoặc đã đối soát; không thể gán giao dịch này.' } }, { status: 409 });
+      }
+
+      const matched = await prisma.$transaction(async (transaction) => {
+        const claimed = await transaction.bankTransfer.updateMany({
+          where: { id: bankTransferId, status: transfer.status, orderId: transfer.orderId },
+          data: {
+            orderId: matchedOrder.id,
+            orderCode: matchedOrder.orderCode,
+            status: 'MANUALLY_MATCHED',
+            mismatchReason: `Khớp thủ công bởi ${adminEmail}: ${reason}`,
+          },
+        });
+        if (claimed.count !== 1) return false;
+        await transaction.order.update({
+          where: { id: matchedOrder.id },
+          data: {
+            paymentStatus: 'PAID',
+            orderStatus: ['DELIVERED', 'COMPLETED'].includes(matchedOrder.orderStatus) ? matchedOrder.orderStatus : 'PAID',
+            reconciled: true,
+            reconciliationStatus: 'MANUALLY_MATCHED',
+            reconciliationNote: reason,
+            holdExpiresAt: null,
+            ...(transfer.transactionId ? { sepayTransactionId: transfer.transactionId } : {}),
+          },
+        });
+        const payment = await transaction.payment.findFirst({ where: { orderId: matchedOrder.id }, orderBy: { createdAt: 'desc' } });
+        const paymentData = { status: 'PAID' as const, amount: transfer.amount, externalId: transfer.transactionId ?? transfer.id };
+        if (payment) await transaction.payment.update({ where: { id: payment.id }, data: paymentData });
+        else await transaction.payment.create({ data: { orderId: matchedOrder.id, orderCode: matchedOrder.numericCode, ...paymentData } });
+        return true;
+      });
+      if (!matched) return NextResponse.json({ error: { message: 'Giao dịch đã được cập nhật bởi một phiên khác.' } }, { status: 409 });
+
+      await writeAuditLog(request, {
+        adminEmail,
+        action: 'MANUALLY_MATCH_BANK_TRANSFER',
+        targetEntity: 'BankTransfer',
+        targetId: transfer.transactionId ?? transfer.id,
+        oldValue: { status: transfer.status, orderCode: transfer.orderCode, amount: transfer.amount },
+        newValue: { status: 'MANUALLY_MATCHED', orderCode, orderAmount: matchedOrder.totalAmount, reason },
+      });
+      if (matchedOrder.paymentStatus !== 'PAID') {
+        await notifyPaidOrder({ orderCode: matchedOrder.orderCode, totalAmount: transfer.amount, phone: matchedOrder.phone, address: matchedOrder.address });
+        void sendOrderConfirmationIfNeeded(matchedOrder.id).catch((error) => {
+          console.error('Manual reconciliation email failed.', error instanceof Error ? error.name : 'UnknownError');
+        });
+      }
+      return NextResponse.json({ success: true, orderCode, bankTransferId, status: 'MANUALLY_MATCHED' });
+    }
+
     const order = await prisma.order.findUnique({
       where: { orderCode },
       include: {
@@ -103,7 +190,7 @@ export async function POST(request: Request) {
       if (order.paymentStatus === 'PAID' && order.reconciled) return NextResponse.json({ success: true, alreadyReconciled: true, orderCode });
 
       await prisma.$transaction(async (transaction) => {
-        await transaction.order.update({ where: { id: order.id }, data: { paymentStatus: 'PAID', orderStatus: 'PAID', reconciled: true, holdExpiresAt: null } });
+        await transaction.order.update({ where: { id: order.id }, data: { paymentStatus: 'PAID', orderStatus: 'PAID', reconciled: true, reconciliationStatus: 'MATCHED', reconciliationNote: null, holdExpiresAt: null } });
         if (cachedPayment?.status === 'PAID' && !order.payments.some((payment) => payment.status === 'PAID')) {
           await transaction.payment.upsert({
             where: { orderCode: order.numericCode },

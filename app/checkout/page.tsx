@@ -10,6 +10,7 @@ import CheckoutOrderSummary from './checkout-order-summary';
 import CroEventTracker from '@/components/CroEventTracker';
 import TasteGuarantee from '@/components/checkout/TasteGuarantee';
 import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
+import { FREE_SHIPPING_PRODUCT_SLUG } from '@/lib/shipping';
 
 export default async function CheckoutPage({ searchParams }: { searchParams?: { mode?: string; paymentMethod?: string } }) {
   const buyNow = searchParams?.mode === 'buy_now';
@@ -23,13 +24,14 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
   let profile = null;
   if (session) {
     try {
-      profile = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true } });
+      profile = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true, phone: true, address: true, loyaltyPoints: true } });
     } catch {
       profile = null;
     }
   }
   const initialCustomer = profile ? { ...profile, phone: profile.phone ?? '', address: profile.address ?? '' } : undefined;
-  const freeShippingApplied = cart.freeShippingThreshold > 0 && subtotal >= cart.freeShippingThreshold;
+  const freeShippingApplied = (cart.freeShippingThreshold > 0 && subtotal >= cart.freeShippingThreshold)
+    || cartItems.some((item) => item.productSlug === FREE_SHIPPING_PRODUCT_SLUG);
   const upsellProduct = cartItems.map((item) => item.upsellProduct).find((product): product is CartUpsellProduct => Boolean(product && product.stock > 0 && !cartItems.some((item) => item.productId === product.id)));
   const orderSummary = <CheckoutOrderSummary
     items={cartItems.map((item) => ({ id: `${item.productId}-${item.variantId ?? 'single'}`, name: item.name ?? 'Sản phẩm', quantity: item.quantity ?? 1, total: item.total ?? 0 }))}
@@ -56,7 +58,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams?: { 
             {cartUnavailable || cartItems.length === 0 ? (
               <CheckoutEmptyState unavailable={cartUnavailable} buyNow={buyNow} />
             ) : (
-              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} freeShippingThreshold={cart.freeShippingThreshold} upsellProduct={upsellProduct} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} />
+              <CheckoutForm items={cartItems} initialCustomer={initialCustomer ?? undefined} subtotal={subtotal} shipping={shipping} freeShippingThreshold={cart.freeShippingThreshold} upsellProduct={upsellProduct} buyNow={buyNow} initialPaymentMethod={searchParams?.paymentMethod === 'COD' ? 'COD' : 'VIETQR'} mobileSummary={orderSummary} loyaltyPointsAvailable={profile?.loyaltyPoints ?? 0} />
             )}
           </div>
 

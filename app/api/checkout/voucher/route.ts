@@ -7,6 +7,7 @@ import { calculateShipping } from '@/lib/shipping';
 import { getSystemSettings } from '@/lib/system-settings';
 import { calculateManagedVoucherDiscount, getManagedVoucherValidationError } from '@/lib/vouchers';
 import { calculatePercentageAmount } from '@/lib/money';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
     });
     if (!cart?.items.length) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
-    const subtotal = cart.items.reduce((sum, item) => sum + item.quantity * (item.variant?.price ?? item.product.price), 0);
+    const subtotal = cart.items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
     const shipping = calculateShipping(subtotal, cart.items.map((item) => item.product.slug), settings.freeShippingThreshold);
     if (voucher) {
       const validationError = getManagedVoucherValidationError(voucher, subtotal);

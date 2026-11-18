@@ -6,6 +6,7 @@ export type RecordInventoryMovementInput = {
   variantId?: string | null;
   lotId?: string | null;
   productionLotId?: string | null;
+  warehouseId?: string | null;
   type: InventoryMovementType;
   delta: number;
   idempotencyKey: string;
@@ -31,6 +32,7 @@ export async function recordMovement(
       productId: movement.productId,
       productVariantId: movement.variantId ?? null,
       lotId: movement.lotId ?? movement.productionLotId ?? null,
+      warehouseId: movement.warehouseId ?? null,
       type: movement.type,
       delta: movement.delta,
       idempotencyKey: movement.idempotencyKey,
@@ -46,18 +48,73 @@ export async function recordMovement(
   return savedMovement;
 }
 
+export async function restockOrderItemsForReturn(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+  returnRequestId: string,
+): Promise<number> {
+  const items = await tx.orderItem.findMany({
+    where: { orderId },
+    select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true, lot: { select: { warehouseId: true } } },
+  });
+  for (const item of items) {
+    await recordMovement(tx, {
+      orderId,
+      productId: item.productId,
+      variantId: item.productVariantId,
+      lotId: item.lotId,
+      warehouseId: item.lot?.warehouseId,
+      type: 'RETURN',
+      delta: item.quantity,
+      idempotencyKey: `return-request:${returnRequestId}:item:${item.id}:RETURN`,
+      reference: `Approved return ${returnRequestId}`,
+    });
+    await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+    if (item.productVariantId) {
+      await tx.productVariant.update({ where: { id: item.productVariantId }, data: { inventory: { increment: item.quantity } } });
+    }
+    if (item.lotId) {
+      await tx.productionLot.updateMany({ where: { id: item.lotId }, data: { availableQty: { increment: item.quantity } } });
+    }
+  }
+  return items.reduce((total, item) => total + item.quantity, 0);
+}
+
 export type FEFOAllocation = {
   lotId: string;
   batchCode: string;
   quantity: number;
   expDate: Date;
+  warehouseId: string | null;
 };
+
+function normalizeRegion(value: string | null | undefined): string {
+  return value?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase()
+    .replace(/\b(tinh|thanh pho|tp|quan|q|huyen|thi xa)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim() ?? '';
+}
+
+function compareWarehouseProximity(
+  left: { warehouse: { province: string | null; district: string | null } | null },
+  right: { warehouse: { province: string | null; district: string | null } | null },
+  province: string,
+  district: string,
+): number {
+  const normalizedProvince = normalizeRegion(province);
+  const normalizedDistrict = normalizeRegion(district);
+  const rank = (warehouse: typeof left.warehouse) => {
+    if (!warehouse) return 2;
+    if (normalizeRegion(warehouse.province) === normalizedProvince && normalizeRegion(warehouse.district) === normalizedDistrict) return 0;
+    if (normalizeRegion(warehouse.province) === normalizedProvince) return 1;
+    return 2;
+  };
+  return rank(left.warehouse) - rank(right.warehouse);
+}
 
 export async function allocateStockFEFO(
   tx: Prisma.TransactionClient,
   variantId: string | null,
   requestedQty: number,
-  context: { productId: string; productName: string; orderId: string; cartItemId: string },
+  context: { productId: string; productName: string; orderId: string; cartItemId: string; destinationProvince?: string; destinationDistrict?: string },
 ): Promise<FEFOAllocation[]> {
   if (!Number.isSafeInteger(requestedQty) || requestedQty <= 0) {
     throw new Error('FEFO allocation quantity must be a positive safe integer.');
@@ -70,10 +127,16 @@ export async function allocateStockFEFO(
       status: 'ACTIVE',
       availableQty: { gt: 0 },
       expDate: { gt: now },
+      OR: [{ warehouseId: null }, { warehouse: { is: { active: true } } }],
     },
     orderBy: [{ expDate: 'asc' }, { mfgDate: 'asc' }, { batchCode: 'asc' }],
-    select: { id: true, batchCode: true, availableQty: true, expDate: true },
+    select: { id: true, batchCode: true, availableQty: true, expDate: true, warehouseId: true, warehouse: { select: { province: true, district: true } } },
   });
+  if (context.destinationProvince && context.destinationDistrict) {
+    lots.sort((left, right) => compareWarehouseProximity(left, right, context.destinationProvince!, context.destinationDistrict!)
+      || left.expDate.getTime() - right.expDate.getTime()
+      || left.batchCode.localeCompare(right.batchCode));
+  }
   if (lots.reduce((total, lot) => total + lot.availableQty, 0) < requestedQty) {
     throw new Error(`INSUFFICIENT_STOCK_LOT:${context.productName}`);
   }
@@ -94,12 +157,13 @@ export async function allocateStockFEFO(
       productId: context.productId,
       variantId,
       lotId: lot.id,
+      warehouseId: lot.warehouseId,
       type: 'ALLOCATION',
       delta: -quantity,
       idempotencyKey: `allocation:${context.orderId}:${context.cartItemId}:${lot.id}`,
       reference: `FEFO ${lot.batchCode} for ${context.productName}`,
     });
-    allocations.push({ lotId: lot.id, batchCode: lot.batchCode, quantity, expDate: lot.expDate });
+    allocations.push({ lotId: lot.id, batchCode: lot.batchCode, quantity, expDate: lot.expDate, warehouseId: lot.warehouseId });
     remaining -= quantity;
   }
 

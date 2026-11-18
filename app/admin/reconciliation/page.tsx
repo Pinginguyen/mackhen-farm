@@ -22,9 +22,23 @@ export type ReconciliationItem = {
   returnRequest: { id: string; status: string; refundBankName: string | null; refundAccountNumber: string | null; refundAccountHolder: string | null } | null;
 };
 
+export type BankTransferItem = {
+  id: string;
+  transactionId: string | null;
+  orderCode: string | null;
+  amount: number;
+  content: string;
+  status: string;
+  mismatchReason: string | null;
+  receivedAt: string;
+  order: { orderCode: string; totalAmount: number; customerName: string } | null;
+};
+
+export type ReconciliationSummary = { todayReceived: number; weekReceived: number; todayMatched: number; weekPaidOrders: number };
+
 export default async function AdminReconciliationPage() {
-  const { data, unavailable } = await fetchApiWithFallback<{ items: ReconciliationItem[]; providerLookup: string; message: string }>('/api/admin/reconciliation', {
-    items: [], providerLookup: 'unknown', message: 'Không thể tải dữ liệu đối soát.',
+  const { data, unavailable } = await fetchApiWithFallback<{ items: ReconciliationItem[]; bankTransfers: BankTransferItem[]; summary: ReconciliationSummary; providerLookup: string; message: string }>('/api/admin/reconciliation', {
+    items: [], bankTransfers: [], summary: { todayReceived: 0, weekReceived: 0, todayMatched: 0, weekPaidOrders: 0 }, providerLookup: 'unknown', message: 'Không thể tải dữ liệu đối soát.',
   });
 
   return (
@@ -36,7 +50,7 @@ export default async function AdminReconciliationPage() {
         </div>
         {unavailable && <p className="empty-state" role="status">Không thể tải danh sách đối soát khi cơ sở dữ liệu chưa kết nối.</p>}
         <p className="admin-reconciliation-disclosure">{data.message} Không xác nhận thanh toán chỉ dựa trên số tiền do khách gửi.</p>
-        <ReconciliationManager initialItems={data.items} />
+        <ReconciliationManager initialItems={data.items} initialTransfers={data.bankTransfers} summary={data.summary} />
       </section>
     </main>
   );

@@ -14,9 +14,12 @@ describe('B2B toast translations', () => {
 });
 
 describe('currency formatting', () => {
-  it('converts integer VND into rounded SGD cents', () => {
-    expect(formatCurrency(19000, 'SGD')).toBe('S$ 1.00');
+  it('converts integer VND into rounded SGD and USD cents', () => {
+    expect(formatCurrency(18500, 'SGD')).toBe('S$ 1.00');
+    expect(formatCurrency(19000, 'SGD')).toBe('S$ 1.03');
     expect(formatCurrency(1425, 'SGD')).toBe('S$ 0.08');
-    expect(formatCurrency(65500, 'SGD')).toBe('S$ 3.45');
+    expect(formatCurrency(65500, 'SGD')).toBe('S$ 3.54');
+    expect(formatCurrency(25500, 'USD')).toBe('$ 1.00');
+    expect(formatCurrency(19000, 'USD')).toBe('$ 0.75');
   });
 });

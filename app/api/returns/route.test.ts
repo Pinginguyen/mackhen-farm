@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { orderFindFirst, orderFindUnique, orderUpdate, orderUpdateMany, returnCreate, returnFindMany, returnFindUnique, returnUpdate, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, sendCompensationVoucherEmail, transaction, prismaTransaction } = vi.hoisted(() => {
+const { orderFindFirst, orderFindUnique, orderUpdate, orderUpdateMany, returnCreate, returnFindMany, returnFindUnique, returnUpdate, returnUpdateMany, orderItemFindMany, productUpdate, productVariantUpdate, productionLotUpdateMany, movementCreateMany, movementFindUnique, refundOperationFindFirst, refundOperationCreate, refundOperationUpdateMany, compensationVoucherCreate, voucherFindUnique, voucherFindMany, voucherFindFirst, voucherCreate, requireAdmin, writeAuditLog, sendCompensationVoucherEmail, transaction, prismaTransaction } = vi.hoisted(() => {
   const mocks = {
     orderFindFirst: vi.fn(), orderFindUnique: vi.fn(), orderUpdate: vi.fn(), orderUpdateMany: vi.fn(), returnCreate: vi.fn(), returnFindMany: vi.fn(), returnFindUnique: vi.fn(),
-    returnUpdate: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(), sendCompensationVoucherEmail: vi.fn(),
+    returnUpdate: vi.fn(), returnUpdateMany: vi.fn(), orderItemFindMany: vi.fn(), productUpdate: vi.fn(), productVariantUpdate: vi.fn(), productionLotUpdateMany: vi.fn(), movementCreateMany: vi.fn(), movementFindUnique: vi.fn(),
+    refundOperationFindFirst: vi.fn(), refundOperationCreate: vi.fn(), refundOperationUpdateMany: vi.fn(), compensationVoucherCreate: vi.fn(), voucherFindUnique: vi.fn(), voucherFindMany: vi.fn(), voucherFindFirst: vi.fn(), voucherCreate: vi.fn(), requireAdmin: vi.fn(), writeAuditLog: vi.fn(), sendCompensationVoucherEmail: vi.fn(),
   };
   const transaction = {
     order: { findUnique: mocks.orderFindUnique, update: mocks.orderUpdate, updateMany: mocks.orderUpdateMany },
-    returnRequest: { update: mocks.returnUpdate },
+    returnRequest: { update: mocks.returnUpdate, updateMany: mocks.returnUpdateMany, findUnique: mocks.returnFindUnique },
+    orderItem: { findMany: mocks.orderItemFindMany },
+    product: { update: mocks.productUpdate },
+    productVariant: { update: mocks.productVariantUpdate },
+    productionLot: { updateMany: mocks.productionLotUpdateMany },
+    inventoryMovement: { createMany: mocks.movementCreateMany, findUnique: mocks.movementFindUnique },
+    refundOperation: { findFirst: mocks.refundOperationFindFirst, create: mocks.refundOperationCreate, updateMany: mocks.refundOperationUpdateMany },
     compensationVoucher: { create: mocks.compensationVoucherCreate },
     voucher: { findUnique: mocks.voucherFindUnique, findMany: mocks.voucherFindMany, findFirst: mocks.voucherFindFirst, create: mocks.voucherCreate },
   };
@@ -54,14 +61,24 @@ function makeRequest(method: string, body?: unknown) {
 
 describe('/api/returns', () => {
   beforeEach(() => {
-    orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', phone: '0762 793 244' });
+    orderFindFirst.mockReset().mockResolvedValue({ id: 'order-1', orderCode: 'MKF-123456', phone: '0762 793 244', orderStatus: 'DELIVERED' });
     orderFindUnique.mockReset().mockResolvedValue({ totalAmount: 169000, refundedAt: null });
     orderUpdate.mockReset().mockResolvedValue({});
     orderUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     returnCreate.mockReset().mockResolvedValue({ id: 'return-1', status: 'PENDING' });
     returnFindMany.mockReset().mockResolvedValue([]);
-    returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null });
+    returnFindUnique.mockReset().mockResolvedValue({ status: 'PENDING', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null, order: { orderCode: 'MKF-123456', totalAmount: 169000 } });
     returnUpdate.mockReset().mockResolvedValue({ id: 'return-1', status: 'COMPLETED' });
+    returnUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    orderItemFindMany.mockReset().mockResolvedValue([]);
+    productUpdate.mockReset().mockResolvedValue({});
+    productVariantUpdate.mockReset().mockResolvedValue({});
+    productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementCreateMany.mockReset().mockResolvedValue({ count: 1 });
+    movementFindUnique.mockReset().mockResolvedValue({ id: 'movement-1' });
+    refundOperationFindFirst.mockReset().mockResolvedValue(null);
+    refundOperationCreate.mockReset().mockResolvedValue({ id: 'refund-operation-1', status: 'PENDING_APPROVAL' });
+    refundOperationUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherCreate.mockReset().mockResolvedValue({ id: 'voucher-1', code: 'MKF50-ABCDEF12' });
     voucherFindUnique.mockReset().mockResolvedValue(null);
     voucherFindMany.mockReset().mockResolvedValue([]);
@@ -81,7 +98,7 @@ describe('/api/returns', () => {
     expect(result.item.status).toBe('PENDING');
     expect(orderFindFirst).toHaveBeenCalledWith({
       where: { OR: [{ orderCode: 'MKF-123456' }, { id: 'mkf-123456' }, { numericCode: 123456 }] },
-      select: { id: true, orderCode: true, phone: true },
+      select: { id: true, orderCode: true, phone: true, orderStatus: true },
     });
     expect(returnCreate).toHaveBeenCalledWith({ data: {
       orderId: 'order-1',
@@ -167,8 +184,8 @@ describe('/api/returns', () => {
     expect(orderFindFirst).not.toHaveBeenCalled();
   });
 
-  it('accepts a pending order when the phone uses the 84 country code', async () => {
-    orderFindFirst.mockResolvedValue({ id: 'order-1', phone: '+84 762 793 244', orderStatus: 'PENDING' });
+  it('accepts a delivered order when the phone uses the 84 country code', async () => {
+    orderFindFirst.mockResolvedValue({ id: 'order-1', phone: '+84 762 793 244', orderStatus: 'DELIVERED' });
     const response = await POST(makeRequest('POST', { ...validReturnRequest, customerPhone: '0762793244' }));
 
     expect(response.status).toBe(201);
@@ -283,6 +300,26 @@ describe('/api/returns', () => {
       expect(returnUpdate.mock.calls[0][0].include).not.toHaveProperty('issuedVoucher');
     },
   );
+
+  it('restocks the return lot once and creates a pending refund operation on approval', async () => {
+    returnFindUnique.mockResolvedValueOnce({
+      status: 'PENDING', orderId: 'order-1', customerPhone: '0762793244',
+      refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A',
+      refundApprovedBy: null, refundApprovedAt: null, refundTransferReference: null,
+      order: { orderCode: 'MKF-123456', totalAmount: 169000, user: null, customer: null },
+    });
+    orderItemFindMany.mockResolvedValueOnce([{ id: 'item-1', productId: 'product-1', productVariantId: 'variant-1', quantity: 2, lotId: 'lot-1', lot: { warehouseId: 'warehouse-1' } }]);
+    returnUpdate.mockResolvedValueOnce({ id: 'return-1', status: 'REFUND_APPROVED', order: { orderCode: 'MKF-123456', customerName: 'Buyer', totalAmount: 169000 }, compensationVoucher: null });
+
+    const response = await PATCH(makeRequest('PATCH', { id: 'return-1', status: 'REFUND_APPROVED' }));
+
+    expect(response.status).toBe(200);
+    expect(movementCreateMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ type: 'RETURN', delta: 2, lotId: 'lot-1', warehouseId: 'warehouse-1' })] }));
+    expect(productUpdate).toHaveBeenCalledWith({ where: { id: 'product-1' }, data: { stock: { increment: 2 } } });
+    expect(productVariantUpdate).toHaveBeenCalledWith({ where: { id: 'variant-1' }, data: { inventory: { increment: 2 } } });
+    expect(productionLotUpdateMany).toHaveBeenCalledWith({ where: { id: 'lot-1' }, data: { availableQty: { increment: 2 } } });
+    expect(refundOperationCreate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ orderId: 'order-1', returnRequestId: 'return-1', amount: 169000, status: 'PENDING_APPROVAL' }) }));
+  });
 
   it('requires a transfer reference before confirming a refund', async () => {
     returnFindUnique.mockResolvedValueOnce({ status: 'REFUND_APPROVED', orderId: 'order-1', refundBankName: 'MB', refundAccountNumber: '123', refundAccountHolder: 'A', refundApprovedBy: 'admin@example.com', refundApprovedAt: new Date(), refundTransferReference: null });

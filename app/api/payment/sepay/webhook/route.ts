@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
 import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,12 +64,16 @@ export async function POST(request: Request) {
     const orderCode = getOrderCode(payload);
     const transferAmount = getTransferAmount(payload.transferAmount);
     const transactionId = getTransactionId(payload);
+    const content = [payload.content, payload.description].find((value): value is string => typeof value === 'string')?.slice(0, 1000) ?? '';
     const referenceCode = typeof payload.referenceCode === 'string'
       ? payload.referenceCode.trim().slice(0, 120)
       : '';
-    if (!orderCode || transferAmount === null) return NextResponse.json({ success: true });
+    if (transferAmount === null) return NextResponse.json({ success: true });
+    const idempotencyKey = transactionId
+      ? `sepay:${transactionId}`
+      : `sepay:payload:${createHash('sha256').update(JSON.stringify(body)).digest('hex')}`;
 
-    const order = await prisma.order.findUnique({
+    const order = orderCode ? await prisma.order.findUnique({
       where: { orderCode },
       select: {
         id: true,
@@ -80,41 +86,80 @@ export async function POST(request: Request) {
         paymentStatus: true,
         orderStatus: true,
       },
-    });
-    if (!order || !['VIETQR', 'MOMO'].includes(order.paymentMethod) || transferAmount < order.totalAmount) {
-      return NextResponse.json({ success: true });
-    }
+    }) : null;
+    const eligibleOrder = order && ['VIETQR', 'MOMO'].includes(order.paymentMethod) ? order : null;
+    const exactMatch = Boolean(eligibleOrder && transferAmount === eligibleOrder.totalAmount);
+    const mismatchReason = !orderCode
+      ? 'Không tìm thấy mã đơn trong nội dung chuyển khoản.'
+      : !order
+        ? `Không tìm thấy đơn ${orderCode}.`
+        : !eligibleOrder
+          ? 'Đơn hàng không sử dụng phương thức thanh toán trực tuyến.'
+          : transferAmount < eligibleOrder.totalAmount
+            ? `Thiếu ${eligibleOrder.totalAmount - transferAmount}đ so với tổng đơn.`
+            : transferAmount > eligibleOrder.totalAmount
+              ? `Thừa ${transferAmount - eligibleOrder.totalAmount}đ so với tổng đơn.`
+              : null;
+    const transferStatus = exactMatch ? 'MATCHED' as const : eligibleOrder ? 'MISMATCH' as const : 'UNMATCHED' as const;
 
     try {
       await prisma.$transaction(async (transaction) => {
-        if (order.paymentStatus !== 'PAID') {
+        const insertedTransfer = await transaction.bankTransfer.createMany({
+          data: [{
+            transactionId,
+            idempotencyKey,
+            orderCode,
+            amount: transferAmount,
+            content,
+            status: transferStatus,
+            mismatchReason,
+            orderId: eligibleOrder?.id ?? null,
+          }],
+          skipDuplicates: true,
+        });
+        if (insertedTransfer.count !== 1 || !eligibleOrder) return;
+
+        if (!exactMatch) {
           await transaction.order.update({
-            where: { id: order.id },
+            where: { id: eligibleOrder.id },
+            data: { reconciliationStatus: 'MISMATCH', reconciliationNote: mismatchReason, reconciled: false },
+          });
+          return;
+        }
+
+        if (eligibleOrder.paymentStatus !== 'PAID') {
+          await transaction.order.update({
+            where: { id: eligibleOrder.id },
             data: {
               paymentStatus: 'PAID',
-              orderStatus: ['CANCELLED', 'DELIVERED'].includes(order.orderStatus) ? order.orderStatus : 'PAID',
+              orderStatus: ['CANCELLED', 'DELIVERED'].includes(eligibleOrder.orderStatus) ? eligibleOrder.orderStatus : 'PAID',
               holdExpiresAt: null,
-              ...(transactionId ? { sepayTransactionId: transactionId } : {}),
+              sepayTransactionId: transactionId,
+              reconciliationStatus: 'MATCHED',
+              reconciliationNote: null,
+              reconciled: true,
             },
           });
+        } else {
+          await transaction.order.update({ where: { id: eligibleOrder.id }, data: { reconciliationStatus: 'MATCHED', reconciliationNote: null, reconciled: true } });
         }
 
         const payment = await transaction.payment.findFirst({
-          where: { orderId: order.id },
+          where: { orderId: eligibleOrder.id },
           orderBy: { createdAt: 'desc' },
         });
         const paymentData = {
           status: 'PAID' as const,
           amount: transferAmount,
-          ...(referenceCode ? { externalId: referenceCode } : {}),
+          ...(referenceCode || transactionId ? { externalId: referenceCode || transactionId } : {}),
         };
         if (payment) {
           await transaction.payment.update({ where: { id: payment.id }, data: paymentData });
         } else {
           await transaction.payment.create({
             data: {
-              orderId: order.id,
-              orderCode: order.numericCode,
+              orderId: eligibleOrder.id,
+              orderCode: eligibleOrder.numericCode,
               ...paymentData,
             },
           });
@@ -124,8 +169,11 @@ export async function POST(request: Request) {
       if (isUniqueConstraintError(error)) return NextResponse.json({ success: true });
       throw error;
     }
-    if (order.paymentStatus !== 'PAID') {
-      await notifyPaidOrder({ orderCode: order.orderCode, totalAmount: order.totalAmount, phone: order.phone, address: order.address });
+    if (exactMatch && eligibleOrder && eligibleOrder.paymentStatus !== 'PAID') {
+      await notifyPaidOrder({ orderCode: eligibleOrder.orderCode, totalAmount: eligibleOrder.totalAmount, phone: eligibleOrder.phone, address: eligibleOrder.address });
+      void sendOrderConfirmationIfNeeded(eligibleOrder.id).catch((error) => {
+        console.error('Payment receipt email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+      });
     }
   } catch (error) {
     console.error('SePay payment webhook failed:', error instanceof Error ? error.name : 'UnknownError');

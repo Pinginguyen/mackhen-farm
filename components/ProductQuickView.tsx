@@ -6,11 +6,16 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 import AddToCart from '@/app/products/[slug]/add-to-cart';
+import FlashSaleCountdown, { useFlashSaleStatus } from '@/components/product/FlashSaleCountdown';
 import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import { useLocaleCurrency } from '@/lib/i18n-context';
+import { getEffectivePrice } from '@/lib/pricing';
 
 export default function ProductQuickView({ product, onClose }: { product: CatalogProduct; onClose: () => void }) {
-  const { formatCurrency, translateProductName } = useLocaleCurrency();
+  const { formatCurrency, translateProductName, locale } = useLocaleCurrency();
+  const hasSalePrice = product.originalPrice != null && product.originalPrice > product.price;
+  const saleStatus = useFlashSaleStatus(hasSalePrice ? product.flashSaleEndsAt : null);
+  const currentPrice = getEffectivePrice(product);
   const productName = translateProductName(product.name);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -39,9 +44,11 @@ export default function ProductQuickView({ product, onClose }: { product: Catalo
             <p className="eyebrow">{product.category}</p>
             <h2 id="quick-view-title">{productName}</h2>
             <p className="quick-view-highlight">{product.highlight}</p>
-            <p className="quick-view-price">{formatCurrency(product.price)}{product.originalPrice != null && <del>{formatCurrency(product.originalPrice)}</del>}</p>
+            <p className="quick-view-price">{formatCurrency(currentPrice)}{product.originalPrice != null && !saleStatus.expired && <del>{formatCurrency(product.originalPrice)}</del>}</p>
+            {saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}
             <p className="quick-view-description">{product.description}</p>
-            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={image} price={product.price} variants={[]} />
+            {product.stock > 0 && product.stock <= 5 && <p className="product-low-stock">🔥 Chỉ còn lại {product.stock} sản phẩm trong kho!</p>}
+            <AddToCart productId={product.id} productSlug={product.slug} name={product.name} image={image} price={product.price} originalPrice={product.originalPrice} flashSaleEndsAt={product.flashSaleEndsAt} stock={product.stock} variants={[]} />
           </div>
         </div>
       </section>

@@ -45,6 +45,18 @@ describe('POST /api/reviews', () => {
       select: { id: true, customerName: true, phone: true, orderStatus: true, items: { select: { productId: true } } },
     });
     expect(reviewCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ orderId: 'order-1', productId: 'product-1' }) });
+    expect(reviewCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ riskTag: 'POSITIVE', riskAnalyzedAt: expect.any(Date) }) });
+  });
+
+  it('marks a quality or fraud complaint as high risk as the review is saved', async () => {
+    const response = await POST(new Request('https://mackhen.example/api/reviews', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ productId: 'product-1', orderCode: 'MKF-123456', phone: '0762793244', rating: 1, comment: 'Sản phẩm bị mốc, rất kém chất lượng.' }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(reviewCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ riskTag: 'HIGH_RISK' }) });
   });
 
   it('returns a specific error when the phone does not match', async () => {

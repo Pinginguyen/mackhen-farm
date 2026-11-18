@@ -158,6 +158,14 @@ function normalizeOptionalText(value: unknown): string | null | undefined {
   return value.trim() || null;
 }
 
+function parseFlashSaleEnd(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') return undefined;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : undefined;
+}
+
 type VariantInput = {
   id?: string;
   title: string;
@@ -247,6 +255,7 @@ export async function POST(request: Request) {
   const productDefaults = productVariantDefaults(variants, { price: basePrice, originalPrice: baseOriginalPrice, stock: baseStock, weight: baseWeight });
   const price = productDefaults.price;
   const originalPrice = productDefaults.originalPrice;
+  const flashSaleEndsAt = parseFlashSaleEnd(body.flashSaleEndsAt);
   const weightInput = productDefaults.weight;
   const weightMatch = weightInput.match(/^(\d+)\s*(?:g|gram)?$/i);
   const weight = weightMatch ? Number(weightMatch[1]) : null;
@@ -281,6 +290,8 @@ export async function POST(request: Request) {
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
     || !Number.isInteger(spiciness) || spiciness! < 1 || spiciness! > 5 || !Number.isInteger(chewiness) || chewiness! < 1 || chewiness! > 5 || !Number.isInteger(aroma) || aroma! < 1 || aroma! > 5
     || !labelAxis1 || !labelAxis2 || !labelAxis3 || !isValidAxisValue(valueAxis1) || !isValidAxisValue(valueAxis2) || !isValidAxisValue(valueAxis3)
+    || (body.flashSaleEndsAt !== undefined && flashSaleEndsAt === undefined)
+    || (body.flashSaleEndsAt !== undefined && flashSaleEndsAt === undefined)
     || !isValidSensoryProfile(body.sensoryProfile) || !isValidPairingGuide(body.pairingGuide)
     || !isValidOptionalText(body.originRegion, 200) || !isValidOptionalText(body.waxSealCode, 100)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
@@ -302,6 +313,8 @@ export async function POST(request: Request) {
         category,
         price,
         originalPrice,
+        ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
+        ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
         unit: `${weight}g`,
         weight,
         protein: protein || null,
@@ -336,6 +349,13 @@ export async function POST(request: Request) {
       } satisfies Prisma.ProductCreateInput,
       ...(variants?.length ? { include: { variants: true } } : {}),
     });
+    await writeAuditLog(request, {
+      adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
+      action: 'CREATE_PRODUCT',
+      targetEntity: 'Product',
+      targetId: product.id,
+      newValue: { name: product.name, price: product.price, originalPrice: product.originalPrice, stock: product.stock, flashSaleEndsAt: product.flashSaleEndsAt },
+    });
     revalidateTag('products');
     return NextResponse.json({ product }, { status: 201 });
   }, 'Admin product creation failed');
@@ -366,6 +386,7 @@ export async function PATCH(request: Request) {
   const productDefaults = productVariantDefaults(variants, { price: basePrice, originalPrice: baseOriginalPrice, stock: baseStock, weight: baseWeight });
   const price = productDefaults.price;
   const originalPrice = productDefaults.originalPrice;
+  const flashSaleEndsAt = parseFlashSaleEnd(body.flashSaleEndsAt);
   const weightInput = productDefaults.weight;
   const weightMatch = weightInput.match(/^(\d+)\s*(?:g|gram)?$/i);
   const weight = weightMatch ? Number(weightMatch[1]) : null;
@@ -408,6 +429,7 @@ export async function PATCH(request: Request) {
     || !isValidAxisValue(valueAxis1)
     || !isValidAxisValue(valueAxis2)
     || !isValidAxisValue(valueAxis3)
+    || (body.flashSaleEndsAt !== undefined && flashSaleEndsAt === undefined)
     || !isValidSensoryProfile(body.sensoryProfile) || !isValidPairingGuide(body.pairingGuide)
     || !isValidOptionalText(body.originRegion, 200) || !isValidOptionalText(body.waxSealCode, 100)
     || (body.badgeText != null && (typeof body.badgeText !== 'string' || body.badgeText.trim().length > 80))
@@ -418,7 +440,7 @@ export async function PATCH(request: Request) {
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, labelAxis1: true, labelAxis2: true, labelAxis3: true, valueAxis1: true, valueAxis2: true, valueAxis3: true, badgeText: true, upsellProductId: true, sensoryProfile: true, pairingGuide: true, originRegion: true, waxSealCode: true, variants: { select: { id: true } } } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { price: true, originalPrice: true, flashSaleEndsAt: true, stock: true, active: true, spiciness: true, chewiness: true, aroma: true, labelAxis1: true, labelAxis2: true, labelAxis3: true, valueAxis1: true, valueAxis2: true, valueAxis3: true, badgeText: true, upsellProductId: true, sensoryProfile: true, pairingGuide: true, originRegion: true, waxSealCode: true, variants: { select: { id: true } } } });
     if (!previous) return NextResponse.json({ error: { message: 'Không tìm thấy sản phẩm.' } }, { status: 404 });
     if (upsellProductId) {
       if (upsellProductId === productId) return NextResponse.json({ error: { message: 'Sản phẩm không thể tự gợi ý chính nó.' } }, { status: 400 });
@@ -435,6 +457,7 @@ export async function PATCH(request: Request) {
         category,
         price,
         originalPrice,
+        ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
         unit: `${weight}g`,
         weight,
         protein: protein || null,
@@ -468,11 +491,11 @@ export async function PATCH(request: Request) {
     revalidatePath('/', 'layout');
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
-      action: previous.price !== product.price ? 'UPDATE_PRICE' : 'ADJUST_STOCK',
+      action: previous.price !== product.price || previous.flashSaleEndsAt?.getTime() !== product.flashSaleEndsAt?.getTime() ? 'UPDATE_PRICE' : previous.stock !== product.stock ? 'ADJUST_STOCK' : 'UPDATE_PRODUCT',
       targetEntity: 'Product',
       targetId: product.id,
       oldValue: previous,
-      newValue: { price: product.price, stock: product.stock, active: product.active, spiciness: product.spiciness, chewiness: product.chewiness, aroma: product.aroma, labelAxis1: product.labelAxis1, labelAxis2: product.labelAxis2, labelAxis3: product.labelAxis3, valueAxis1: product.valueAxis1, valueAxis2: product.valueAxis2, valueAxis3: product.valueAxis3, badgeText: product.badgeText, upsellProductId: product.upsellProductId },
+      newValue: { price: product.price, originalPrice: product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt, stock: product.stock, active: product.active, spiciness: product.spiciness, chewiness: product.chewiness, aroma: product.aroma, labelAxis1: product.labelAxis1, labelAxis2: product.labelAxis2, labelAxis3: product.labelAxis3, valueAxis1: product.valueAxis1, valueAxis2: product.valueAxis2, valueAxis3: product.valueAxis3, badgeText: product.badgeText, upsellProductId: product.upsellProductId },
     });
     revalidateTag('products');
     return NextResponse.json({ product });
@@ -489,6 +512,8 @@ export async function DELETE(request: Request) {
   }
 
   return withDatabase(async () => {
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true, price: true, stock: true, active: true } });
+    if (!previous?.active) return NextResponse.json({ success: false, message: 'Không tìm thấy sản phẩm cần xóa.' }, { status: 404 });
     const result = await prisma.product.updateMany({
       where: { id: productId, active: true },
       data: { active: false },
@@ -496,6 +521,14 @@ export async function DELETE(request: Request) {
     if (!result.count) {
       return NextResponse.json({ success: false, message: 'Không tìm thấy sản phẩm cần xóa.' }, { status: 404 });
     }
+    await writeAuditLog(request, {
+      adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
+      action: 'DELETE_PRODUCT',
+      targetEntity: 'Product',
+      targetId: productId,
+      oldValue: previous,
+      newValue: { ...previous, active: false },
+    });
     revalidateTag('products');
     return NextResponse.json({ success: true, message: 'Đã xóa sản phẩm thành công.' });
   }, 'Admin product deletion failed');
