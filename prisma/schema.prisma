@@ -120,6 +120,7 @@ model Product {
   name          String
   category      String
   price         Int
+  unitCost      Int?
   originalPrice Int?
   flashSaleEndsAt DateTime?
   unit          String?
@@ -261,10 +262,17 @@ model Warehouse {
   @@index([active, province, district])
 }
 model Cart {
-  id        String     @id
-  items     CartItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id                         String     @id
+  email                      String?
+  checkoutCompletedAt        DateTime?
+  abandonmentEmailClaimedAt  DateTime?
+  abandonmentEmailSentAt     DateTime?
+  abandonmentVoucherCode     String?
+  items                      CartItem[]
+  createdAt                  DateTime   @default(now())
+  updatedAt                  DateTime   @updatedAt
+
+  @@index([checkoutCompletedAt, abandonmentEmailSentAt, updatedAt])
 }
 
 model CartItem {
@@ -274,6 +282,7 @@ model CartItem {
   productVariantId String?
   quantity         Int
   unitPrice        Int
+  unitCostSnapshot Int?
   productName      String
   cart             Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -390,6 +399,7 @@ model Order {
   lotCode       String?
   grossAmount   Float                 @default(0)
   netAmount     Float                 @default(0)
+  costOfGoods   Int?
   reconciled    Boolean               @default(false)
   reconciliationStatus String         @default("PENDING")
   reconciliationNote String?

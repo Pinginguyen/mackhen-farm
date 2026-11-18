@@ -17519,6 +17519,205 @@ a.audit-target-chip:hover {
   }
 }
 
+.product-recommendation-shelf {
+  margin: 24px 0;
+  padding: 22px 0;
+  border-top: 1px solid #e7e5e4;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.product-recommendation-shelf > header {
+  margin-bottom: 16px;
+}
+
+.product-recommendation-shelf > header h2 {
+  margin: 4px 0;
+  color: var(--forest);
+  font-size: 1.4rem;
+}
+
+.product-recommendation-shelf > header > p:last-child {
+  margin: 0;
+  color: #78716c;
+  font-size: 0.9rem;
+}
+
+.product-recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.product-recommendation-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-recommendation-image {
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  background: #f5f5f4;
+}
+
+.product-recommendation-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.product-recommendation-image:hover img {
+  transform: scale(1.035);
+}
+
+.product-recommendation-copy small {
+  color: #78716c;
+  font-size: 0.72rem;
+}
+
+.product-recommendation-copy h3 {
+  margin: 4px 0;
+  font-size: 0.94rem;
+  line-height: 1.4;
+}
+
+.product-recommendation-copy h3 a {
+  color: #292524;
+  text-decoration: none;
+}
+
+.product-recommendation-copy > strong {
+  color: #841e1e;
+}
+
+.product-recommendation-add {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: auto;
+  border: 1px solid #1b4332;
+  border-radius: 5px;
+  background: #fff;
+  color: #1b4332;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.product-recommendation-add:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.admin-report-panel {
+  margin: 22px 0;
+  padding: 22px 0;
+  border-top: 1px solid #e7e5e4;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.admin-report-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-report-panel-header h3 {
+  margin: 3px 0 0;
+  color: var(--forest);
+  font-size: 1.15rem;
+}
+
+.admin-report-panel-header > span {
+  color: #78716c;
+  font-size: 0.85rem;
+}
+
+.admin-report-kpis .stat-card small {
+  display: block;
+  margin-top: 6px;
+  color: #78716c;
+  font-size: 0.78rem;
+}
+
+.revenue-trend-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #d6d3d1;
+  border-radius: 6px;
+  background: #fafaf9;
+}
+
+.revenue-trend-switch button {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #57534e;
+  font-size: 0.8rem;
+}
+
+.revenue-trend-switch button[aria-pressed="true"] {
+  background: #1b4332;
+  color: #fff;
+}
+
+.revenue-trend-scroll {
+  overflow-x: auto;
+}
+
+.revenue-trend-scroll svg {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+}
+
+.revenue-trend-scroll svg text {
+  fill: #78716c;
+  font-size: 10px;
+}
+
+.admin-stock-forecast-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-stock-forecast-table th,
+.admin-stock-forecast-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.admin-stock-forecast-table th {
+  color: #57534e;
+  font-size: 0.78rem;
+}
+
+.admin-stock-forecast-table .is-forecast-warning {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+@media (max-width: 760px) {
+  .product-recommendation-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 12px;
+  }
+
+  .admin-report-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 @media (hover: none), (max-width: 767px) {
   .home-page > .catalog-section .artisan-quick-add {
     display: none;

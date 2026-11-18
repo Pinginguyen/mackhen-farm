@@ -38,7 +38,11 @@ export async function POST(request: Request) {
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
   const id = cartId ? decodeURIComponent(cartId) : crypto.randomUUID();
   const outcome = await prisma.$transaction(async (transaction) => {
-    await transaction.cart.upsert({ where: { id }, create: { id }, update: {} });
+    await transaction.cart.upsert({
+      where: { id },
+      create: { id },
+      update: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null },
+    });
     if (buyNow) await transaction.cartItem.deleteMany({ where: { cartId: id } });
     const existing = await transaction.cartItem.findFirst({
       where: { cartId: id, productId: product.id, productVariantId: variant?.id ?? null },
@@ -125,6 +129,7 @@ export async function PATCH(request: Request) {
           data: { quantity: duplicate.quantity + quantity, unitPrice },
         });
         await transaction.cartItem.delete({ where: { id: current.id } });
+        await transaction.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
         return { item };
       }
 
@@ -137,6 +142,7 @@ export async function PATCH(request: Request) {
           unitPrice,
         },
       });
+      await transaction.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
       return { item };
     });
 
@@ -170,6 +176,7 @@ export async function DELETE(request: Request) {
     const settings = await getSystemSettings();
     const deleted = await prisma.cartItem.deleteMany({ where: { id: body.itemId, cartId: decodedCartId } });
     if (!deleted.count) return NextResponse.json({ error: { code: 'CART_ITEM_NOT_FOUND', message: 'Không tìm thấy sản phẩm trong giỏ hàng' } }, { status: 404 });
+    await prisma.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
 
     const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
     const subtotal = items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);

@@ -16,6 +16,8 @@ import NutriGradeBadge from '@/components/product/NutriGradeBadge';
 import ProductEditorialDetails from '@/components/product/ProductEditorialDetails';
 import { getSystemSettings } from '@/lib/system-settings';
 import { getEffectivePrice } from '@/lib/pricing';
+import { getProductRecommendations } from '@/lib/product-recommendations';
+import ProductRecommendationShelf from '@/components/ProductRecommendationShelf';
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
@@ -122,6 +124,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   const effectivePrice = getEffectivePrice(product);
+  const recommendations = await getProductRecommendations([product.id]);
   const structuredData = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
@@ -225,6 +228,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
           </div>
         </div>
       </section>
+      <ProductRecommendationShelf products={recommendations} />
       <ProductReviewsSection
         productId={product.id}
         productName={product.name}

@@ -46,20 +46,19 @@ export async function GET(request: Request) {
     const now = new Date();
     const currentPeriodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const previousPeriodStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const stockForecastStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const trendStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const partialMetrics: string[] = [];
     const paidSummaryFallback: PaidSummary = { _sum: { totalAmount: null, grossAmount: null, netAmount: null }, _count: 0, _avg: { totalAmount: null } };
     const revenueFallback: RevenueSummary = { _sum: { totalAmount: null } };
     const refundFallback: RefundSummary = { _sum: { amount: null } };
-    const [grossSalesSummary, paidSummary, cancelledFinancials, refunds, orderStatusCounts, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, recentOrders] = await Promise.all([
+    const [grossSalesSummary, paidSummary, cancelledFinancials, refunds, orderStatusCounts, lowStockProducts, currentPeriodRevenue, previousPeriodRevenue, recentOrders, revenueTrendOrders, repeatCustomerGroups, stockForecastProducts, stockSales, costSummary] = await Promise.all([
       loadMetric<RevenueSummary>('gross-sales', () => prisma.order.aggregate({
         where: { orderStatus: { not: 'CANCELLED' } },
         _sum: { totalAmount: true },
       }), revenueFallback, partialMetrics),
       loadMetric<PaidSummary>('paid-summary', () => prisma.order.aggregate({
-        where: { OR: [
-          { paymentStatus: 'PAID', orderStatus: { not: 'CANCELLED' } },
-          { paymentStatus: 'REFUNDED' },
-        ] },
+        where: { paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] } },
         _sum: { totalAmount: true, grossAmount: true, netAmount: true },
         _count: true,
         _avg: { totalAmount: true },
@@ -94,6 +93,31 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: { orderCode: true, customerName: true, phone: true, totalAmount: true, orderStatus: true, paymentMethod: true, paymentStatus: true, createdAt: true },
       }), [], partialMetrics),
+      loadMetric('revenue-trend', () => prisma.order.findMany({
+        where: { paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] }, createdAt: { gte: trendStart } },
+        select: { totalAmount: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+        take: 20_000,
+      }), [], partialMetrics),
+      loadMetric('repeat-customers', () => prisma.order.groupBy({
+        by: ['phone'],
+        where: { paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] } },
+        _count: { _all: true },
+      }), [], partialMetrics),
+      loadMetric('stock-forecast-products', () => prisma.product.findMany({
+        where: { active: true },
+        select: { id: true, name: true, stock: true, unit: true },
+      }), [], partialMetrics),
+      loadMetric('stock-sales-30-days', () => prisma.orderItem.groupBy({
+        by: ['productId'],
+        where: { order: { is: { paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] }, createdAt: { gte: stockForecastStart } } } },
+        _sum: { quantity: true },
+      }), [], partialMetrics),
+      loadMetric('cost-coverage', () => prisma.order.aggregate({
+        where: { paymentStatus: 'PAID', orderStatus: { notIn: ['CANCELLED', 'RETURNED'] }, costOfGoods: { not: null } },
+        _sum: { costOfGoods: true },
+        _count: true,
+      }), { _sum: { costOfGoods: null }, _count: 0 }, partialMetrics),
     ]);
 
     const statusCounts = new Map(orderStatusCounts.map((item) => [item.orderStatus, item._count._all]));
@@ -112,7 +136,51 @@ export async function GET(request: Request) {
     const cancelledDeductions = cancelledFinancials._sum.totalAmount ?? 0;
     const refundDeductions = refunds._sum.amount ?? 0;
     const marketplaceFees: number | null = null;
-    const netRevenue = Math.max(0, Math.min(grossSales, revenue - refundDeductions));
+    const netRevenue = Math.max(0, revenue - refundDeductions);
+    const costCoveragePercent = paidSummary._count ? Number((costSummary._count / paidSummary._count * 100).toFixed(2)) : 0;
+    const costOfGoods = costSummary._sum.costOfGoods ?? 0;
+    const grossProfit = paidSummary._count > 0 && costCoveragePercent === 100 ? netRevenue - costOfGoods : null;
+    const grossMarginPercent = grossProfit !== null && netRevenue > 0 ? Number((grossProfit / netRevenue * 100).toFixed(2)) : null;
+    const uniqueCustomers = repeatCustomerGroups.length;
+    const repeatCustomers = repeatCustomerGroups.filter((group) => group._count._all > 1).length;
+    const repeatCustomerRate = uniqueCustomers ? Number((repeatCustomers / uniqueCustomers * 100).toFixed(2)) : null;
+
+    const monthlyBuckets = Array.from({ length: 12 }, (_, index) => {
+      const month = new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
+      return { key: `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`, label: month.toLocaleDateString('vi-VN', { month: 'short', year: '2-digit' }), revenue: 0 };
+    });
+    const monthlyByKey = new Map(monthlyBuckets.map((bucket) => [bucket.key, bucket]));
+    const weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const weeklyBuckets = Array.from({ length: 12 }, (_, index) => {
+      const start = new Date(weekStart);
+      start.setDate(start.getDate() - (11 - index) * 7);
+      return { key: start.toISOString().slice(0, 10), label: start.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }), revenue: 0 };
+    });
+    const weeklyByKey = new Map(weeklyBuckets.map((bucket) => [bucket.key, bucket]));
+    for (const order of revenueTrendOrders) {
+      const monthKey = `${order.createdAt.getFullYear()}-${String(order.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      const month = monthlyByKey.get(monthKey);
+      if (month) month.revenue += order.totalAmount;
+      const monday = new Date(order.createdAt);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      const week = weeklyByKey.get(monday.toISOString().slice(0, 10));
+      if (week) week.revenue += order.totalAmount;
+    }
+    const stockSalesByProduct = new Map(stockSales.map((item) => [item.productId, item._sum.quantity ?? 0]));
+    const stockForecast = stockForecastProducts.map((product) => {
+      const unitsSold30Days = stockSalesByProduct.get(product.id) ?? 0;
+      const averageDailyUnits = unitsSold30Days / 30;
+      return {
+        ...product,
+        unitsSold30Days,
+        averageDailyUnits: Number(averageDailyUnits.toFixed(2)),
+        daysRemaining: averageDailyUnits > 0 ? Math.floor(product.stock / averageDailyUnits) : null,
+      };
+    }).filter((product) => product.unitsSold30Days > 0)
+      .sort((left, right) => (left.daysRemaining ?? Number.MAX_SAFE_INTEGER) - (right.daysRemaining ?? Number.MAX_SAFE_INTEGER));
 
     return NextResponse.json({
       revenue,
@@ -121,10 +189,18 @@ export async function GET(request: Request) {
       refundDeductions,
       marketplaceFees,
       netRevenue,
+      grossProfit,
+      grossMarginPercent,
+      costCoveragePercent,
       orders,
       pending,
       paidOrders: paidSummary._count,
       averageOrderValue: Math.round(paidSummary._avg.totalAmount ?? 0),
+      repeatCustomerRate,
+      repeatCustomers,
+      uniqueCustomers,
+      revenueTrend: { weekly: weeklyBuckets, monthly: monthlyBuckets },
+      stockForecast,
       gmvGrowthPercent,
       deliverySuccessRate,
       cancelledRate,

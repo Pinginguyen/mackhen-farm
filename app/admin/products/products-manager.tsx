@@ -9,7 +9,7 @@ import type { CatalogProduct } from '@/components/ProductCatalogFilter';
 import StockControl from './stock-control';
 
 type AdminVariant = { id: string; title: string; price: number; originalPrice: number | null; weight: string; inventory: number; sku: string | null };
-type AdminProduct = CatalogProduct & { active: boolean; weight?: number | string | null; categoryId?: string | null; variants?: AdminVariant[] };
+type AdminProduct = CatalogProduct & { active: boolean; weight?: number | string | null; unitCost?: number | null; categoryId?: string | null; variants?: AdminVariant[] };
 type VariantDraft = { id?: string; title: string; price: string; originalPrice: string; weight: string; inventory: string; sku: string };
 type ProductField = 'name' | 'category' | 'price' | 'weight' | 'stock' | 'description' | 'protein';
 type ProductFieldErrors = Partial<Record<ProductField, string>>;
@@ -18,6 +18,7 @@ type ProductDraft = {
   name: string;
   category: 'Khô bò thực vật' | 'Gia vị';
   price: string;
+  unitCost: string;
   originalPrice: string;
   flashSaleEndsAt: string;
   weight: string;
@@ -67,6 +68,7 @@ const emptyDraft: ProductDraft = {
   name: '',
   category: 'Khô bò thực vật',
   price: '',
+  unitCost: '',
   originalPrice: '',
   flashSaleEndsAt: '',
   weight: '',
@@ -174,6 +176,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
       name: product.name,
       category: categoryDraftValue(product.category, product.categoryId),
       price: numericString(product.price) || numericString(firstVariant?.price),
+      unitCost: numericString(product.unitCost),
       originalPrice: product.originalPrice == null ? '' : String(product.originalPrice),
       flashSaleEndsAt: product.flashSaleEndsAt ? new Date(product.flashSaleEndsAt).toISOString().slice(0, 16) : '',
       weight: String(weight),
@@ -256,6 +259,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           name: String(draft.name).trim(),
           category: draft.category,
           price: Number(draft.price),
+          unitCost: draft.unitCost.trim() ? Number(draft.unitCost) : null,
           originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
           flashSaleEndsAt: draft.flashSaleEndsAt ? new Date(draft.flashSaleEndsAt).toISOString() : null,
           stock: Number(draft.stock) || 0,
@@ -409,6 +413,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 clearFieldError('category');
               }}><option value="Khô bò thực vật">Khô bò thực vật</option><option value="Gia vị">Gia vị</option></select>{fieldErrors.category && <small id="product-category-error" className="admin-product-field-error">{fieldErrors.category}</small>}</label>
               <label className="field">Giá niêm yết (VNĐ)<input data-field="price" aria-invalid={Boolean(fieldErrors.price)} aria-describedby={fieldErrors.price ? 'product-price-error' : undefined} className={fieldErrors.price ? 'border-red-500 ring-1 ring-red-500' : undefined} type="number" min={0} step="any" value={draft.price} onChange={(event) => { setDraft({ ...draft, price: event.target.value }); clearFieldError('price'); }} required />{fieldErrors.price && <small id="product-price-error" className="admin-product-field-error">{fieldErrors.price}</small>}</label>
+              <label className="field">Giá vốn mỗi gói (VNĐ)<input type="number" min={0} max={100000000} step={1} value={draft.unitCost} onChange={(event) => setDraft({ ...draft, unitCost: event.target.value })} /><small>Dùng để tính biên lợi nhuận trên các đơn mới.</small></label>
               <label className="field">Giá gốc (không bắt buộc)<input type="number" min={0} step="any" value={draft.originalPrice} onChange={(event) => setDraft({ ...draft, originalPrice: event.target.value })} /></label>
               <label className="field">Flash sale đến (tùy chọn)<input type="datetime-local" value={draft.flashSaleEndsAt} onChange={(event) => setDraft({ ...draft, flashSaleEndsAt: event.target.value })} /><small>Hết giờ sẽ tự dùng giá gốc nếu đã nhập.</small></label>
               <label className="field">Flash sale đến (tùy chọn)<input type="datetime-local" value={draft.flashSaleEndsAt} onChange={(event) => setDraft({ ...draft, flashSaleEndsAt: event.target.value })} /><small>Hết giờ sẽ tự dùng giá gốc nếu đã nhập.</small></label>

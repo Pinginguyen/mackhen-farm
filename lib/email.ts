@@ -96,6 +96,30 @@ function emailLayout(title: string, content: string): string {
   return `<div style="margin:0;padding:24px 12px;background:#f7f4ed;font-family:Arial,Helvetica,sans-serif;color:#292524"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e7e1d8;border-collapse:separate;border-spacing:0"><tr><td style="padding:24px;background:#1b4332;color:#fff"><p style="margin:0 0 6px;font-size:11px;letter-spacing:1px;color:#e8d7b8">NÔNG SẢN SẤY VỊ TÂY BẮC</p><h1 style="margin:0;font-size:22px;line-height:1.3">Mắc Khén Farm</h1></td></tr><tr><td style="padding:24px 20px"><h2 style="margin:0 0 14px;font-size:20px;line-height:1.35;color:#1b4332">${escapeHtml(title)}</h2>${content}</td></tr><tr><td style="padding:16px 20px;background:#f8f6f1;color:#78716c;font-size:12px;line-height:1.6">Mắc Khén Farm · Đặc sản thủ công từ vùng nguyên liệu Tây Bắc</td></tr></table></div>`;
 }
 
+export async function sendAbandonedCartEmail(input: {
+  toEmail: string;
+  voucherCode: string;
+  expiresAt: Date;
+  cartUrl: string;
+  items: { name: string; quantity: number; unitPrice: number }[];
+}) {
+  const { user, transporter } = createEmailTransporter();
+  const items = input.items.map((item) => `${item.name} × ${item.quantity} · ${(item.unitPrice * item.quantity).toLocaleString('vi-VN')}đ`).join('\n');
+  const rows = input.items.map((item) => `<tr><td style="padding:9px 5px;border-bottom:1px solid #eee8df">${escapeHtml(item.name)}</td><td style="padding:9px 5px;border-bottom:1px solid #eee8df;text-align:center">${item.quantity}</td><td style="padding:9px 5px;border-bottom:1px solid #eee8df;text-align:right">${(item.unitPrice * item.quantity).toLocaleString('vi-VN')}đ</td></tr>`).join('');
+  const voucherCode = escapeHtml(input.voucherCode);
+  const cartUrl = escapeHtml(input.cartUrl);
+  const expiry = input.expiresAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const html = emailLayout('Giỏ hàng của bạn vẫn đang chờ', `<p style="margin:0 0 14px;line-height:1.6">Bạn đã để lại một số sản phẩm trong giỏ hàng. Giỏ hàng được lưu để bạn tiếp tục khi thuận tiện.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:13px"><tbody>${rows}</tbody></table><p style="margin:20px 0;padding:14px;background:#f8f6f1;line-height:1.6">Mã ưu đãi một lần: <strong style="color:#841e1e">${voucherCode}</strong><br>Giảm 10% tối đa 30.000đ cho đơn từ 100.000đ. Hạn dùng đến ${escapeHtml(expiry)}.</p><p style="margin:24px 0;text-align:center"><a href="${cartUrl}" style="display:inline-block;padding:12px 20px;background:#7c1d1d;color:#fff;text-decoration:none;font-weight:bold">Quay lại giỏ hàng</a></p>`);
+
+  await transporter.sendMail({
+    from: `"Mắc Khén Farm" <${user}>`,
+    to: input.toEmail,
+    subject: '[Mắc Khén Farm] Giỏ hàng của bạn đang chờ',
+    text: `Các sản phẩm đang chờ trong giỏ hàng:\n${items}\n\nMã ưu đãi một lần: ${input.voucherCode}. Giảm 10% tối đa 30.000đ cho đơn từ 100.000đ, có hạn đến ${expiry}. Tiếp tục tại: ${input.cartUrl}`,
+    html,
+  });
+}
+
 export async function sendOrderConfirmationEmail(input: {
   toEmail: string;
   customerName: string;

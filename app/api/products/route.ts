@@ -249,6 +249,7 @@ export async function POST(request: Request) {
   const variantsProvided = body.variants !== undefined;
   const variants = variantsProvided ? parseVariants(body.variants) : null;
   const basePrice = numberValue(body.price);
+  const unitCost = body.unitCost == null || body.unitCost === '' ? null : numberValue(body.unitCost);
   const baseOriginalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
   const baseStock = numberValue(body.stock ?? 0);
   const baseWeight = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
@@ -285,7 +286,7 @@ export async function POST(request: Request) {
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = productDefaults.stock;
 
-  if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
+  if (!name || name.length > 160 || price === null || price <= 0 || (body.unitCost != null && body.unitCost !== '' && (unitCost === null || unitCost < 0 || unitCost > 100_000_000)) || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || ingredients === undefined || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants) || variants?.some((variant) => variant.id)
     || !Number.isInteger(spiciness) || spiciness! < 1 || spiciness! > 5 || !Number.isInteger(chewiness) || chewiness! < 1 || chewiness! > 5 || !Number.isInteger(aroma) || aroma! < 1 || aroma! > 5
@@ -312,6 +313,7 @@ export async function POST(request: Request) {
         name,
         category,
         price,
+        unitCost,
         originalPrice,
         ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
         ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
@@ -380,6 +382,7 @@ export async function PATCH(request: Request) {
   const variantsProvided = body.variants !== undefined;
   const variants = variantsProvided ? parseVariants(body.variants) : null;
   const basePrice = numberValue(body.price);
+  const unitCost = body.unitCost == null || body.unitCost === '' ? null : numberValue(body.unitCost);
   const baseOriginalPrice = body.originalPrice == null || body.originalPrice === '' ? null : numberValue(body.originalPrice);
   const baseStock = numberValue(body.stock ?? 0);
   const baseWeight = typeof body.weight === 'string' || typeof body.weight === 'number' ? String(body.weight).trim() : '150g';
@@ -417,7 +420,7 @@ export async function PATCH(request: Request) {
   const nutritionFacts = body.nutritionFacts == null ? null : normalizeNutritionFacts(body.nutritionFacts);
   const stock = productDefaults.stock;
 
-  if (!name || name.length > 160 || price === null || price <= 0 || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
+  if (!name || name.length > 160 || price === null || price <= 0 || (body.unitCost !== undefined && body.unitCost != null && body.unitCost !== '' && (unitCost === null || unitCost < 0 || unitCost > 100_000_000)) || (originalPrice !== null && (originalPrice < price || originalPrice < 0))
     || weight === null || weight <= 0 || (!protein && category !== 'Gia vị Tây Bắc') || protein.length > 80 || !category || description.length > 2000 || (body.ingredients != null && typeof body.ingredients !== 'string') || (ingredients?.length ?? 0) > 5000
     || !image || stock === null || stock < 0 || stock > 1000000 || (variantsProvided && !variants)
     || !isValidTasteScore(spiciness)
@@ -456,6 +459,7 @@ export async function PATCH(request: Request) {
         name,
         category,
         price,
+        ...(body.unitCost !== undefined ? { unitCost } : {}),
         originalPrice,
         ...(flashSaleEndsAt !== undefined ? { flashSaleEndsAt } : {}),
         unit: `${weight}g`,

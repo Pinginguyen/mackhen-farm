@@ -308,6 +308,13 @@ export async function POST(request: Request) {
           include: { items: { include: { product: true, variant: true } } },
         });
         if (!cart?.items.length) return null;
+        const contactEmail = typeof body.customer?.email === 'string' ? body.customer.email.trim().toLowerCase() : '';
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) && contactEmail.length <= 254) {
+          await transaction.cart.update({
+            where: { id: cart.id },
+            data: { email: contactEmail, checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null },
+          });
+        }
         if (cart.items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
           return { rejected: 'INVALID_QUANTITY' as const };
         }
@@ -550,6 +557,7 @@ export async function POST(request: Request) {
             skuSnapshot: item.variant?.sku ?? item.product.slug,
             quantity: allocation.quantity,
             unitPrice,
+            unitCostSnapshot: item.product.unitCost,
             discountAllocated: lineDiscounts[allocationIndex],
             finalPrice: allocation.quantity * unitPrice - lineDiscounts[allocationIndex],
             lineTotal: allocation.quantity * unitPrice,
@@ -560,6 +568,11 @@ export async function POST(request: Request) {
           firstBatchCode ??= allocations[0]?.batchCode ?? null;
         }
         if (firstBatchCode) await transaction.order.update({ where: { id: order.id }, data: { lotCode: firstBatchCode } });
+        const costOfGoods = cart.items.every((item) => item.product.unitCost !== null)
+          ? cart.items.reduce((sum, item) => sum + (item.product.unitCost ?? 0) * item.quantity, 0)
+          : null;
+        await transaction.order.update({ where: { id: order.id }, data: { costOfGoods } });
+        await transaction.cart.update({ where: { id: cart.id }, data: { checkoutCompletedAt: new Date(), abandonmentEmailClaimedAt: null } });
         return order;
       }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {

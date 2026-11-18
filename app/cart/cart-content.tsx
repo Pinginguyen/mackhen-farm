@@ -10,6 +10,8 @@ import { calculateShipping } from '@/lib/shipping';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import CartUpsell from '@/components/cart/CartUpsell';
 import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
+import ProductRecommendationShelf from '@/components/ProductRecommendationShelf';
+import type { RecommendedProduct } from '@/lib/product-recommendations';
 
 type CartVariant = { id: string; label: string; price: number; weight: string; stock: number };
 type CartItem = {
@@ -110,7 +112,7 @@ function CartItemRow({
   );
 }
 
-export default function CartContent({ initialItems, freeShippingThreshold }: { initialItems: CartItem[]; freeShippingThreshold: number }) {
+export default function CartContent({ initialItems, freeShippingThreshold, recommendations }: { initialItems: CartItem[]; freeShippingThreshold: number; recommendations: RecommendedProduct[] }) {
   const { currency, formatCurrency } = useLocaleCurrency();
   const router = useRouter();
   const isEN = currency !== 'VND';
@@ -197,6 +199,7 @@ export default function CartContent({ initialItems, freeShippingThreshold }: { i
         {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}${freeShippingApplied ? ' is-goal-reached' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? (isEN ? 'Congratulations! You unlocked FREE SHIPPING!' : 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.') : (isEN ? `Add ${formatCurrency(remaining)} more to get free nationwide shipping.` : `Mua thêm ${remaining.toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`)}</p></div><div className="free-shipping-track" role="progressbar" aria-label={isEN ? 'Free shipping progress' : 'Tiến trình đạt miễn phí vận chuyển'} aria-valuemin={0} aria-valuemax={freeShippingThreshold} aria-valuenow={Math.min(subtotal, freeShippingThreshold)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, freeShippingThreshold))} / {formatCurrency(freeShippingThreshold)}</small></section>}
         {upsellProduct && <CartUpsell product={upsellProduct} onAdded={() => router.refresh()} />}
         {items.length ? items.map((item) => <CartItemRow key={item.id} item={item} onUpdate={updateItem} />) : <p className="empty-state">{isEN ? 'Your cart is empty.' : 'Giỏ hàng của bạn đang trống.'}</p>}
+        {items.length > 0 && <ProductRecommendationShelf products={recommendations} />}
       </div>
       <aside className="summary-card">
         <h3>{isEN ? 'Order Summary' : 'Tổng thanh toán'}</h3>
