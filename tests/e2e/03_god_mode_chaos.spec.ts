@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { expect, request, test, type APIRequestContext } from '@playwright/test';
 import { prisma } from '../../lib/prisma';
 
-const baseURL = process.env.AUDIT_BASE_URL || 'http://localhost:3000';
+const baseURL = process.env.E2E_BASE_URL || process.env.AUDIT_BASE_URL || 'http://localhost:3000';
 const base = new URL(baseURL);
 const databaseIsLocal = (() => {
   try { return ['localhost', '127.0.0.1', '::1'].includes(new URL(process.env.DATABASE_URL || '').hostname); }

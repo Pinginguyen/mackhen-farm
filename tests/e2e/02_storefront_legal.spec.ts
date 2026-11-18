@@ -7,7 +7,7 @@ import { convertVndToSgdCents, formatSgdCents } from '../../lib/money';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const baseURL = process.env.AUDIT_BASE_URL || 'http://localhost:3000';
+const baseURL = process.env.E2E_BASE_URL || process.env.AUDIT_BASE_URL || 'http://localhost:3000';
 const base = new URL(baseURL);
 const adminEmail = process.env.AUDIT_ADMIN_EMAIL || 'admin@mackhenfarm.vn';
 const adminPassword = process.env.AUDIT_ADMIN_PASSWORD || '';
