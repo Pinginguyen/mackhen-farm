@@ -6447,6 +6447,55 @@ textarea {
   margin: 0 auto;
 }
 
+.referral-share-card {
+  margin: 24px 0;
+  padding: 18px 0;
+  border-top: 1px solid rgba(36, 82, 61, 0.18);
+  border-bottom: 1px solid rgba(36, 82, 61, 0.18);
+  text-align: left;
+}
+
+.referral-share-card .eyebrow,
+.referral-share-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.referral-share-card h2 {
+  margin: 8px 0;
+  color: var(--forest);
+  font-size: 1.15rem;
+}
+
+.referral-share-card > p:not(.eyebrow) {
+  margin: 0 0 14px;
+}
+
+.referral-share-actions {
+  flex-wrap: wrap;
+}
+
+.referral-share-actions code {
+  padding: 8px 10px;
+  border: 1px solid rgba(36, 82, 61, 0.2);
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.referral-share-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+@media (max-width: 520px) {
+  .referral-share-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .auth-card h1 {
   color: var(--forest);
 }

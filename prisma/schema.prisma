@@ -93,7 +93,9 @@ model User {
   loyaltyPoints Int @default(0)
   lifetimePoints Int @default(0)
   membershipTier String @default("MEMBER")
+  referralCode String? @unique
   orders    Order[]
+  referredOrders Order[] @relation("CustomerReferrals")
   affiliate Affiliate?
   reviewReplies ReviewReply[]
   pointHistory PointHistory[]
@@ -360,6 +362,7 @@ model Order {
   orderCode     String               @unique
   numericCode   Int                  @unique @default(autoincrement())
   userId        String?
+  referredByUserId String?
   customerId    String?
   customerName  String
   phone         String
@@ -399,6 +402,7 @@ model Order {
   carrier       ShippingCarrier?
   customer      Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  referrer      User?                 @relation("CustomerReferrals", fields: [referredByUserId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   inventoryMovements InventoryMovement[]
   payments      Payment[]
@@ -419,6 +423,7 @@ model Order {
   @@index([orderStatus, createdAt])
   @@index([customerId, createdAt])
   @@index([userId, createdAt])
+  @@index([referredByUserId, createdAt])
   @@index([phone, createdAt])
   @@index([affiliateCode, createdAt])
   @@index([checkoutFingerprint, createdAt])

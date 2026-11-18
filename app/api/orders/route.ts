@@ -14,6 +14,7 @@ import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
 import { allocateStockFEFO } from '@/lib/services/inventory-ledger';
 import { calculateRealtimeShippingRate } from '@/lib/services/shipping-carrier';
 import { getClientIpHash, isSelfReferral } from '@/lib/affiliate-fraud';
+import { normalizeCustomerReferralCode } from '@/lib/referral';
 import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
 import { getEffectivePrice } from '@/lib/pricing';
 
@@ -37,6 +38,7 @@ type CheckoutBody = {
   note?: string;
   voucherCode?: string;
   affiliateCode?: unknown;
+  referralCode?: unknown;
   buyNow?: boolean;
   useLoyaltyPoints?: unknown;
   items?: unknown;
@@ -53,7 +55,7 @@ type CreatedOrder = {
   totalAmount: number;
   duplicate?: boolean;
 };
-type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY' | 'LOYALTY_LOGIN_REQUIRED'; message?: string };
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY' | 'LOYALTY_LOGIN_REQUIRED' | 'INVALID_REFERRAL_CODE'; message?: string };
 
 type PricedCheckoutItem = { quantity: number; unitPrice: number };
 type ShippingCartItem = {
@@ -195,6 +197,12 @@ export async function POST(request: Request) {
     : normalizeAffiliateCode(body.affiliateCode);
   if (body.affiliateCode !== undefined && body.affiliateCode !== null && body.affiliateCode !== '' && !affiliateCode) {
     return NextResponse.json({ error: { code: 'INVALID_AFFILIATE_CODE', message: 'Mã giới thiệu không hợp lệ.' } }, { status: 400 });
+  }
+  const referralCode = body.referralCode === undefined || body.referralCode === null || body.referralCode === ''
+    ? null
+    : normalizeCustomerReferralCode(body.referralCode);
+  if (body.referralCode !== undefined && body.referralCode !== null && body.referralCode !== '' && !referralCode) {
+    return NextResponse.json({ error: { code: 'INVALID_REFERRAL_CODE', message: 'Mã giới thiệu bạn bè không hợp lệ.' } }, { status: 400 });
   }
   if (body.items === null || (Array.isArray(body.items) && body.items.length === 0)) {
     return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Đơn hàng không có sản phẩm.' } }, { status: 400 });
@@ -440,6 +448,19 @@ export async function POST(request: Request) {
           affiliatePhone: affiliate.user?.phone ?? null,
           affiliateIpHash: affiliate.user?.signupIpHash ?? null,
         }) ? affiliate : null;
+        const referrer = referralCode ? await transaction.user.findUnique({
+          where: { referralCode },
+          select: { id: true, role: true, phone: true, signupIpHash: true },
+        }) : null;
+        const attributedReferrer = referrer?.role === 'CUSTOMER' && !isSelfReferral({
+          buyerUserId: session?.userId ?? null,
+          buyerPhone: phone,
+          buyerIpHash,
+          affiliateUserId: referrer.id,
+          affiliatePhone: referrer.phone,
+          affiliateIpHash: referrer.signupIpHash,
+        }) ? referrer : null;
+        if (referralCode && !attributedReferrer) return { rejected: 'INVALID_REFERRAL_CODE' as const };
         const numericCode = randomInt(100000, 1000000);
         const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
 
@@ -448,6 +469,7 @@ export async function POST(request: Request) {
             orderCode,
             numericCode,
             userId: session?.userId,
+            referredByUserId: attributedReferrer?.id ?? null,
             customerId: customer.id,
             customerName: name,
             phone,
@@ -631,6 +653,9 @@ export async function POST(request: Request) {
     }
 
     if (order && 'rejected' in order) {
+      if (order.rejected === 'INVALID_REFERRAL_CODE') {
+        return NextResponse.json({ error: { code: order.rejected, message: 'Mã giới thiệu không hợp lệ hoặc không thể tự giới thiệu.' } }, { status: 400 });
+      }
       if (order.rejected === 'PRICE_MISMATCH') {
         await writeAuditLog(request, {
           adminEmail: 'system:checkout',

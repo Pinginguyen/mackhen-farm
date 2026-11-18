@@ -10,6 +10,7 @@ import { writeAuditLog } from '@/lib/audit-log';
 import { orderMovementKey, recordMovement } from '@/lib/services/inventory-ledger';
 import { pushOrderToCarrierShipment } from '@/lib/services/shipping-carrier';
 import { awardOrderLoyaltyPoints } from '@/lib/loyalty';
+import { awardReferralPoints } from '@/lib/referral';
 import { sendOrderConfirmationIfNeeded, sendShippingUpdateIfNeeded } from '@/lib/order-email-notifications';
 import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
 import type { Prisma, ShippingCarrier } from '@prisma/client';
@@ -145,7 +146,7 @@ export async function PATCH(request: Request) {
       trackingCode = `SPX${Date.now().toString().slice(-8)}${randomInt(100, 1000)}`;
     }
     return withDatabase(async () => {
-      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderCode: true, userId: true, orderStatus: true, paymentStatus: true, paymentMethod: true, totalAmount: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, affiliateCode: true, affiliateCommissionStatus: true, affiliateCommissionEligibleAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true, lot: { select: { warehouseId: true } } } } } });
+      const currentOrder = await prisma.order.findUnique({ where: { orderCode }, select: { id: true, orderCode: true, userId: true, referredByUserId: true, orderStatus: true, paymentStatus: true, paymentMethod: true, totalAmount: true, phone: true, address: true, note: true, carrier: true, trackingCode: true, deliveredAt: true, updatedAt: true, affiliateCode: true, affiliateCommissionStatus: true, affiliateCommissionEligibleAt: true, items: { select: { id: true, productId: true, productVariantId: true, quantity: true, lotId: true, lot: { select: { warehouseId: true } } } } } });
       if (!currentOrder) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
       const targetStatus = requestedStatus ?? currentOrder.orderStatus;
       const nextStatuses: readonly string[] = allowedTransitions[currentOrder.orderStatus];
@@ -249,6 +250,7 @@ export async function PATCH(request: Request) {
         });
         if (isDelivered && !wasDelivered) {
           await awardOrderLoyaltyPoints(transaction, { userId: currentOrder.userId, orderId: currentOrder.id, amountVnd: currentOrder.totalAmount });
+          await awardReferralPoints(transaction, { orderId: currentOrder.id, orderCode: currentOrder.orderCode, referrerUserId: currentOrder.referredByUserId });
         }
         return updatedOrder;
       }));

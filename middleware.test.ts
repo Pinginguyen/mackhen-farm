@@ -74,6 +74,13 @@ describe('RBAC middleware', () => {
     expect(preference && JSON.parse(decodeURIComponent(preference))).toEqual({ locale: 'en', currency: 'SGD' });
   });
 
+  it('sets English and SGD defaults for visitors outside Vietnam', async () => {
+    const response = await middleware(makeRequest('/', undefined, { 'x-vercel-ip-country': 'FR' }));
+    const preference = response.cookies.get('mackhen_locale_currency')?.value;
+
+    expect(preference && JSON.parse(decodeURIComponent(preference))).toEqual({ locale: 'en', currency: 'SGD' });
+  });
+
   it('does not replace a visitor-selected currency with the geo default', async () => {
     const preference = encodeURIComponent(JSON.stringify({ locale: 'vi', currency: 'VND' }));
     const response = await middleware(makeRequest('/', undefined, {

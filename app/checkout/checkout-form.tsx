@@ -13,6 +13,7 @@ import { useLocaleCurrency } from '@/lib/i18n-context';
 import { formatApproxVnd } from '@/lib/translations';
 import CheckoutEmptyState from '@/components/CheckoutEmptyState';
 import { getStoredAffiliateCode } from '@/lib/affiliate-attribution';
+import { clearStoredCustomerReferralCode, getStoredCustomerReferralCode } from '@/lib/referral-attribution';
 import { FREE_SHIPPING_PRODUCT_SLUG } from '@/lib/shipping';
 import CartUpsell from '@/components/cart/CartUpsell';
 import type { CartUpsellProduct } from '@/components/cart/CartUpsell';
@@ -293,6 +294,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         voucherCode: appliedVoucher,
         useLoyaltyPoints,
         affiliateCode: getStoredAffiliateCode(),
+        referralCode: getStoredCustomerReferralCode(),
         items: checkoutItems.map((item) => ({
           id: item.id,
           productId: item.productId,
@@ -346,6 +348,7 @@ export default function CheckoutForm({ items: receivedItems, initialCustomer, su
         if (result.success !== true || !result.orderId || !result.orderCode || !result.redirectUrl) {
           throw new Error('Checkout response did not confirm a persisted order.');
         }
+        clearStoredCustomerReferralCode();
 
         const destination = new URL(result.redirectUrl, window.location.origin);
         if (destination.origin !== window.location.origin) {

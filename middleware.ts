@@ -100,7 +100,7 @@ function geoPreference(request: NextRequest): LocalePreference | null {
 
   const country = request.headers.get('x-vercel-ip-country')?.toUpperCase();
   const firstLanguage = request.headers.get('accept-language')?.split(',')[0]?.split(';')[0]?.trim().toLowerCase();
-  if (country === 'SG' || country === 'US' || firstLanguage?.startsWith('en')) {
+  if ((country && country !== 'VN') || firstLanguage?.startsWith('en')) {
     return { locale: 'en', currency: 'SGD' };
   }
   return null;

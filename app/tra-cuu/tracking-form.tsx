@@ -44,11 +44,12 @@ function formatImpactValue(value: number, locale: string): string {
 
 const steps = [
   { label: 'Đã nhận đơn', icon: Check },
-  { label: 'Đang đóng gói', icon: Box },
+  { label: 'Đã thanh toán', icon: PackageCheck },
+  { label: 'Đang xử lý', icon: Box },
   { label: 'Đang vận chuyển', icon: Truck },
-  { label: 'Giao thành công', icon: House },
+  { label: 'Hoàn tất', icon: House },
 ];
-const englishSteps = ['Order received', 'Preparing order', 'In transit', 'Delivered'];
+const englishSteps = ['Order received', 'Paid', 'Processing', 'Shipping', 'Completed'];
 
 function normalizeOrder(value: unknown): TrackedOrder | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
@@ -97,9 +98,10 @@ function normalizeOrders(value: unknown): TrackedOrder[] {
 }
 
 function activeStep(status: string): number {
-  if (['DELIVERED', 'COMPLETED'].includes(status)) return 3;
-  if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(status)) return 2;
-  if (['CONFIRMED', 'PAID', 'PROCESSING'].includes(status)) return 1;
+  if (['DELIVERED', 'COMPLETED'].includes(status)) return 4;
+  if (['HANDED_OFF', 'IN_TRANSIT', 'SHIPPING'].includes(status)) return 3;
+  if (status === 'PROCESSING') return 2;
+  if (['CONFIRMED', 'PAID'].includes(status)) return 1;
   return 0;
 }
 

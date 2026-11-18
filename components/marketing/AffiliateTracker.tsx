@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { hasAffiliateConsent, normalizeAffiliateCode, storeAffiliateCode } from '@/lib/affiliate-attribution';
+import { storeCustomerReferralCode } from '@/lib/referral-attribution';
 
 export default function AffiliateTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const ref = searchParams.get('ref');
+  const referral = searchParams.get('referral');
   const [notice, setNotice] = useState('');
   const [consentRevision, setConsentRevision] = useState(0);
   const trackedCode = useRef<string | null>(null);
@@ -43,6 +45,10 @@ export default function AffiliateTracker() {
     const timeout = window.setTimeout(() => setNotice(''), 6500);
     return () => window.clearTimeout(timeout);
   }, [pathname, ref, consentRevision]);
+
+  useEffect(() => {
+    if (!pathname.startsWith('/admin') && referral) storeCustomerReferralCode(referral);
+  }, [pathname, referral]);
 
   if (!notice || pathname.startsWith('/admin')) return null;
   return <div className="affiliate-attribution-notice" role="status">🎉 Bạn đang nhận ưu đãi đặc quyền qua liên kết của đối tác {notice}!</div>;
