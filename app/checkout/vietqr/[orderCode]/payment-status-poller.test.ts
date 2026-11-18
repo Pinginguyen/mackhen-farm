@@ -70,8 +70,9 @@ describe('PaymentStatusPoller', () => {
       await Promise.resolve();
     });
 
-    expect(routerPush).toHaveBeenCalledWith('/cam-on?orderCode=MKF-123456');
-  expect(celebratePayment).toHaveBeenCalledWith('MKF-123456');
+    expect(fetch).toHaveBeenCalledWith('/api/orders/MKF-123456/clear-cart', { method: 'POST' });
+    expect(routerPush).toHaveBeenCalledWith('/order-success?orderCode=MKF-123456');
+    expect(celebratePayment).toHaveBeenCalledWith('MKF-123456');
 
     await act(async () => root.unmount());
   });

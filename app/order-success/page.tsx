@@ -7,8 +7,8 @@ import ReferralShareCard from '@/components/ReferralShareCard';
 
 export const dynamic = 'force-dynamic';
 
-export default async function OrderSuccessPage({ searchParams }: { searchParams: { orderId?: string } }) {
-  const orderId = searchParams.orderId?.trim() ?? '';
+export default async function OrderSuccessPage({ searchParams }: { searchParams: { orderId?: string; orderCode?: string } }) {
+  const orderId = searchParams.orderId?.trim() || searchParams.orderCode?.trim() || '';
   let orderCode = orderId;
   let referralCode: string | null = null;
 

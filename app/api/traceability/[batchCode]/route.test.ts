@@ -53,6 +53,7 @@ describe('GET /api/traceability/[batchCode]', () => {
     });
 
     expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, error: 'Mã lô không tồn tại hoặc đã hết hạn.' });
   });
 
   it('rejects malformed batch codes without querying the database', async () => {

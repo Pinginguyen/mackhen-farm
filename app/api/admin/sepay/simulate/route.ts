@@ -25,16 +25,40 @@ export async function POST(request: Request) {
   }
 
   const secret = process.env.SEPAY_WEBHOOK_SECRET;
-  if (!secret) return NextResponse.json({ error: { message: 'Webhook SePay chưa được cấu hình.' } }, { status: 503 });
+  if (!secret && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: { message: 'Mô phỏng thanh toán chỉ khả dụng khi webhook chưa được cấu hình ở môi trường nội bộ.' } }, { status: 403 });
+  }
 
   try {
     const order = await prisma.order.findUnique({
       where: { orderCode },
-      select: { orderCode: true, totalAmount: true, paymentMethod: true, paymentStatus: true, orderStatus: true },
+      select: { id: true, numericCode: true, orderCode: true, totalAmount: true, paymentMethod: true, paymentStatus: true, orderStatus: true },
     });
     if (!order) return NextResponse.json({ error: { message: 'Không tìm thấy đơn hàng.' } }, { status: 404 });
     if (order.paymentMethod !== 'VIETQR' || order.paymentStatus !== 'PENDING' || !['PENDING', 'CONFIRMED'].includes(order.orderStatus)) {
       return NextResponse.json({ error: { message: 'Chỉ có thể giả lập đơn VietQR chưa thanh toán.' } }, { status: 409 });
+    }
+
+    if (!secret) {
+      const simulated = await prisma.$transaction(async (transaction) => {
+        const claimed = await transaction.order.updateMany({
+          where: { id: order.id, paymentMethod: 'VIETQR', paymentStatus: 'PENDING', orderStatus: { in: ['PENDING', 'CONFIRMED'] } },
+          data: { paymentStatus: 'PAID', orderStatus: 'PAID', holdExpiresAt: null, reconciled: false, reconciliationStatus: 'PENDING', reconciliationNote: 'Admin-only payment simulation; not verified against a bank transfer.' },
+        });
+        if (claimed.count !== 1) return false;
+
+        const payment = await transaction.payment.findFirst({ where: { orderId: order.id }, orderBy: { createdAt: 'desc' } });
+        if (payment) {
+          await transaction.payment.update({ where: { id: payment.id }, data: { status: 'PAID', amount: order.totalAmount } });
+        } else {
+          await transaction.payment.create({
+            data: { orderId: order.id, orderCode: order.numericCode, amount: order.totalAmount, status: 'PAID' },
+          });
+        }
+        return true;
+      });
+      if (!simulated) return NextResponse.json({ error: { message: 'Đơn hàng vừa thay đổi trạng thái; hãy tải lại và thử lại.' } }, { status: 409 });
+      return NextResponse.json({ success: true, paymentStatus: 'PAID', status: 'PAID', simulated: true });
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL

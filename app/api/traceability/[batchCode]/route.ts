@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: { batchCode: 
     });
     if (!lot) {
       return NextResponse.json(
-        { success: false, error: 'Mã lô không tồn tại hoặc chưa được phát hành trên hệ thống.' },
+        { success: false, error: 'Mã lô không tồn tại hoặc đã hết hạn.' },
         { status: 404 },
       );
     }

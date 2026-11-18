@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { cartFindUnique, cartUpdate, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userFindUnique, userUpdate, userUpdateMany, pointHistoryCreate, calculateRealtimeShippingRate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotCreate, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
+const { cartFindUnique, cartUpdate, productFindMany, productUpdateMany, productVariantUpdateMany, customerUpsert, customerCreate, userFindUnique, userUpdate, userUpdateMany, pointHistoryCreate, calculateRealtimeShippingRate, orderFindUnique, orderFindMany, orderCount, orderFindFirst, orderCreate, orderUpdate, orderItemCreateMany, cartItemDeleteMany, productionLotFindFirst, productionLotFindMany, productionLotCreate, productionLotUpdateMany, movementCreateMany, movementFindUnique, compensationVoucherFindUnique, compensationVoucherUpdateMany, voucherFindUnique, voucherUpdateMany, affiliateFindUnique, transaction, prisma } = vi.hoisted(() => {
   const mocks = {
-    cartFindUnique: vi.fn(), cartUpdate: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
+    cartFindUnique: vi.fn(), cartUpdate: vi.fn(), productFindMany: vi.fn(), productUpdateMany: vi.fn(), productVariantUpdateMany: vi.fn(), customerUpsert: vi.fn(), customerCreate: vi.fn(),
     orderFindUnique: vi.fn(), orderFindMany: vi.fn(), orderCount: vi.fn(), orderFindFirst: vi.fn(), orderCreate: vi.fn(), orderUpdate: vi.fn(), orderItemCreateMany: vi.fn(), cartItemDeleteMany: vi.fn(), productionLotFindFirst: vi.fn(), productionLotFindMany: vi.fn(),
     userFindUnique: vi.fn(), userUpdate: vi.fn(), userUpdateMany: vi.fn(), pointHistoryCreate: vi.fn(), calculateRealtimeShippingRate: vi.fn(),
     productionLotCreate: vi.fn(), productionLotUpdateMany: vi.fn(),
@@ -13,7 +13,7 @@ const { cartFindUnique, cartUpdate, productUpdateMany, productVariantUpdateMany,
   };
   const tx = {
     cart: { findUnique: mocks.cartFindUnique, update: mocks.cartUpdate },
-    product: { updateMany: mocks.productUpdateMany },
+    product: { findMany: mocks.productFindMany, updateMany: mocks.productUpdateMany },
     productVariant: { updateMany: mocks.productVariantUpdateMany },
     customer: { upsert: mocks.customerUpsert, create: mocks.customerCreate },
     user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate, updateMany: mocks.userUpdateMany },
@@ -26,7 +26,7 @@ const { cartFindUnique, cartUpdate, productUpdateMany, productVariantUpdateMany,
     voucher: { findUnique: mocks.voucherFindUnique, updateMany: mocks.voucherUpdateMany },
     affiliate: { findUnique: mocks.affiliateFindUnique },
   };
-  return { ...mocks, transaction: tx, prisma: { cart: { findUnique: mocks.cartFindUnique }, order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
+  return { ...mocks, transaction: tx, prisma: { cart: { findUnique: mocks.cartFindUnique }, product: { findMany: mocks.productFindMany }, order: { findUnique: mocks.orderFindUnique, findFirst: mocks.orderFindFirst }, user: { update: mocks.userUpdate }, $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)), cartItem: { deleteMany: mocks.cartItemDeleteMany } } };
 });
 
 vi.mock('@/lib/prisma', () => ({ prisma, reportPrismaConnectivityIssue: vi.fn() }));
@@ -51,6 +51,7 @@ describe('POST /api/orders checkout', () => {
       }],
     });
     cartUpdate.mockReset().mockResolvedValue({ id: 'cart-1' });
+    productFindMany.mockReset().mockResolvedValue([]);
     productUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     productVariantUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     customerUpsert.mockReset().mockResolvedValue({ id: 'customer-1' });
@@ -556,23 +557,28 @@ describe('POST /api/orders checkout', () => {
     expect(orderCreate).not.toHaveBeenCalled();
   });
 
-  it('checks out only from the isolated buy-now cart and expires its cookie', async () => {
+  it('checks out direct Buy Now items without requiring a Cart row', async () => {
+    productFindMany.mockResolvedValueOnce([{
+      id: 'spice-1', name: 'Hạt Dổi', slug: 'hat-doi-rung-nep-thuong-hang', price: 169000,
+      originalPrice: null, flashSaleEndsAt: null, stock: 5, active: true, weight: 150, variants: [],
+    }]);
     const response = await POST(new Request('https://mackhen.example/api/checkout', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: 'bohoch_cart=regular-cart; bohoch_buy_now=quick-cart' },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         customer: { name: 'A', phone: '0762793244' },
         delivery: { address: 'Lai Chau' },
         paymentMethod: 'COD',
         buyNow: true,
-        items: [{ id: 'cart-item-1', quantity: 1 }],
+        items: [{ id: 'product-page-item', productId: 'spice-1', productSlug: 'hat-doi-rung-nep-thuong-hang', variantId: null, quantity: 1, price: 1 }],
       }),
     }));
 
     expect(response.status).toBe(201);
-    expect(cartFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'quick-cart' } }));
-    expect(cartItemDeleteMany).toHaveBeenCalledWith({ where: { cartId: 'quick-cart' } });
-    expect(response.headers.get('set-cookie')).toContain('bohoch_buy_now=');
+    expect(cartFindUnique).not.toHaveBeenCalled();
+    expect(productFindMany).toHaveBeenCalledWith({ where: { id: { in: ['spice-1'] } }, include: { variants: true } });
+    expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ productId: 'spice-1', unitPrice: 169000, quantity: 1 })] });
+    expect(cartItemDeleteMany).not.toHaveBeenCalled();
   });
 
   it('rejects checkout when stock changed before the transaction', async () => {
@@ -743,7 +749,7 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
       code: 'DATABASE_SCHEMA_OUT_OF_DATE',
-      message: 'Cơ sở dữ liệu cần cập nhật migration.',
+      message: 'The column `Product.originalPrice` does not exist.',
     });
     expect(orderCreate).not.toHaveBeenCalled();
   });

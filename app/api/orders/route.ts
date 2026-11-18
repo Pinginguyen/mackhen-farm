@@ -1,4 +1,5 @@
 import { createHash, randomInt } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
 import { prisma } from '@/lib/prisma';
@@ -26,6 +27,18 @@ type CheckoutItemSnapshot = {
   variantId?: string | null;
   quantity: number;
   price?: number;
+};
+type DirectBuyNowItem = CheckoutItemSnapshot & { productId: string; variantId: string | null };
+type ProductWithVariants = Prisma.ProductGetPayload<{ include: { variants: true } }>;
+type ResolvedBuyNowItem = {
+  id: string;
+  productId: string;
+  productVariantId: string | null;
+  quantity: number;
+  unitPrice: number;
+  productName: string;
+  product: ProductWithVariants;
+  variant: ProductWithVariants['variants'][number] | null;
 };
 
 type CheckoutBody = {
@@ -148,6 +161,42 @@ function isCheckoutItemSnapshot(value: unknown): value is CheckoutItemSnapshot {
     && (typeof value.variantId === 'string' || value.variantId === null);
 }
 
+function isDirectBuyNowItem(value: unknown): value is DirectBuyNowItem {
+  return isRecord(value)
+    && typeof value.productId === 'string'
+    && value.productId.length > 0
+    && (value.variantId === undefined || value.variantId === null || (typeof value.variantId === 'string' && value.variantId.length > 0))
+    && Number.isSafeInteger(value.quantity)
+    && Number(value.quantity) >= 1
+    && Number(value.quantity) <= 20;
+}
+
+function resolveDirectBuyNowItems(
+  submitted: DirectBuyNowItem[],
+  products: ProductWithVariants[],
+): ResolvedBuyNowItem[] | null {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const resolved: ResolvedBuyNowItem[] = [];
+
+  for (const [index, item] of submitted.entries()) {
+    const product = productsById.get(item.productId);
+    const variantId = item.variantId ?? null;
+    const variant = variantId ? product?.variants.find((candidate) => candidate.id === variantId) ?? null : null;
+    if (!product?.active || (variantId && !variant)) return null;
+    resolved.push({
+      id: `buy-now:${product.id}:${variant?.id ?? 'base'}:${index}`,
+      productId: product.id,
+      productVariantId: variant?.id ?? null,
+      quantity: item.quantity,
+      unitPrice: getEffectivePrice({ price: variant?.price ?? product.price, originalPrice: variant?.originalPrice ?? product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt }),
+      productName: product.name,
+      product,
+      variant,
+    });
+  }
+  return resolved;
+}
+
 function sameCartContents(
   submitted: unknown,
   current: Array<{ id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; price: number }>,
@@ -243,6 +292,11 @@ export async function POST(request: Request) {
   }
   const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
   const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
+  const rawDirectBuyNowItems = body.buyNow === true && Array.isArray(body.items) ? body.items : null;
+  if (rawDirectBuyNowItems && !rawDirectBuyNowItems.every(isDirectBuyNowItem)) {
+    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Danh sách sản phẩm Mua ngay không hợp lệ.' } }, { status: 400 });
+  }
+  const directBuyNowItems = rawDirectBuyNowItems as DirectBuyNowItem[] | null;
   const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
   const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
   if (body.useLoyaltyPoints === true && !session) {
@@ -283,23 +337,28 @@ export async function POST(request: Request) {
         return response;
       }
     }
-    if (!cartId) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
+    if (!cartId && !directBuyNowItems) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
 
     let realtimeShippingFee: number | null = null;
     let shippingCartState: string | null = null;
     if (province && district) {
-      const shippingCart = await prisma.cart.findUnique({
-        where: { id: decodeURIComponent(cartId) },
-        include: { items: { include: { product: { select: { weight: true, slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { weight: true, price: true, originalPrice: true } } } } },
-      });
-      if (!shippingCart?.items.length) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
-      shippingCartState = createShippingCartFingerprint(shippingCart.items);
-      const shippingSubtotal = shippingCart.items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
-      const standardShipping = calculateShipping(shippingSubtotal, shippingCart.items.map((item) => item.product.slug), settings.freeShippingThreshold);
+      const shippingCartItems = directBuyNowItems
+        ? resolveDirectBuyNowItems(directBuyNowItems, await prisma.product.findMany({
+          where: { id: { in: [...new Set(directBuyNowItems.map((item) => item.productId))] } },
+          include: { variants: true },
+        }))
+        : (await prisma.cart.findUnique({
+          where: { id: decodeURIComponent(cartId!) },
+          include: { items: { include: { product: { select: { weight: true, slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { weight: true, price: true, originalPrice: true } } } } },
+        }))?.items ?? null;
+      if (!shippingCartItems?.length) return NextResponse.json({ error: { code: directBuyNowItems ? 'PRICE_MISMATCH' : 'EMPTY_CART', message: directBuyNowItems ? 'Sản phẩm Mua ngay không còn khả dụng.' : 'Giỏ hàng đang trống.' } }, { status: directBuyNowItems ? 409 : 400 });
+      shippingCartState = createShippingCartFingerprint(shippingCartItems);
+      const shippingSubtotal = shippingCartItems.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
+      const standardShipping = calculateShipping(shippingSubtotal, shippingCartItems.map((item) => item.product.slug), settings.freeShippingThreshold);
       if (standardShipping === 0) {
         realtimeShippingFee = 0;
       } else {
-        const weightGrams = shippingCart.items.reduce((sum, item) => sum + parseShippingWeightGrams(item.product.weight, item.variant?.weight) * item.quantity, 0);
+        const weightGrams = shippingCartItems.reduce((sum, item) => sum + parseShippingWeightGrams(item.product.weight, item.variant?.weight) * item.quantity, 0);
         try {
           const rate = await calculateRealtimeShippingRate({ province, district, weightGrams });
           realtimeShippingFee = rate.fee;
@@ -312,22 +371,21 @@ export async function POST(request: Request) {
     let order: CreatedOrder | null | CheckoutRejection;
     try {
       order = await prisma.$transaction(async (transaction) => {
-        const cart = await transaction.cart.findUnique({
-          where: { id: decodeURIComponent(cartId) },
-          include: { items: { include: { product: true, variant: true } } },
-        });
-        if (!cart?.items.length) return null;
-        const contactEmail = typeof body.customer?.email === 'string' ? body.customer.email.trim().toLowerCase() : '';
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) && contactEmail.length <= 254) {
-          await transaction.cart.update({
-            where: { id: cart.id },
-          });
-        }
-        if (cart.items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
+        const cartItems = directBuyNowItems
+          ? resolveDirectBuyNowItems(directBuyNowItems, await transaction.product.findMany({
+            where: { id: { in: [...new Set(directBuyNowItems.map((item) => item.productId))] } },
+            include: { variants: true },
+          }))
+          : (await transaction.cart.findUnique({
+            where: { id: decodeURIComponent(cartId!) },
+            include: { items: { include: { product: true, variant: true } } },
+          }))?.items ?? null;
+        if (!cartItems?.length) return directBuyNowItems ? { rejected: 'PRICE_MISMATCH' as const } : null;
+        if (cartItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
           return { rejected: 'INVALID_QUANTITY' as const };
         }
 
-        const currentItems = cart.items.map((item) => ({
+        const currentItems = cartItems.map((item) => ({
           id: item.id,
           productId: item.productId,
           productSlug: item.product.slug,
@@ -335,7 +393,7 @@ export async function POST(request: Request) {
           quantity: item.quantity,
           price: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
         }));
-        if (shippingCartState && createShippingCartFingerprint(cart.items) !== shippingCartState) {
+        if (shippingCartState && createShippingCartFingerprint(cartItems) !== shippingCartState) {
           return { rejected: 'PRICE_MISMATCH' as const };
         }
         const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -377,7 +435,15 @@ export async function POST(request: Request) {
         }
         const amountDue = totalAmount - walletAmountSpent;
 
-        if (!sameCartContents(body.items, currentItems)) {
+        const submittedItemsMatch = directBuyNowItems
+          ? directBuyNowItems.length === currentItems.length && directBuyNowItems.every((item, index) => {
+            const current = currentItems[index];
+            return item.productId === current.productId
+              && (item.variantId ?? null) === current.variantId
+              && item.quantity === current.quantity;
+          })
+          : sameCartContents(body.items, currentItems);
+        if (!submittedItemsMatch) {
           console.warn('Checkout quantity or cart state mismatch rejected.');
           return { rejected: 'PRICE_MISMATCH' as const };
         }
@@ -445,7 +511,7 @@ export async function POST(request: Request) {
           }
         }
 
-        for (const item of cart.items) {
+        for (const item of cartItems) {
           const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
           if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
           if (item.variant) {
@@ -539,7 +605,7 @@ export async function POST(request: Request) {
             },
           });
         }
-        const pricedItems = cart.items.map((item) => ({
+        const pricedItems = cartItems.map((item) => ({
           item,
           unitPrice: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
         }));
@@ -675,7 +741,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: {
           code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : transactionExpired ? 'CHECKOUT_TRANSACTION_TIMEOUT' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
-          message: schemaMismatch ? 'Cơ sở dữ liệu cần cập nhật migration.' : (error.message || 'Kết nối đặt hàng đang gián đoạn.'),
+          message: error.message || 'Lỗi xử lý đơn hàng',
         },
       }, { status: 503, headers: { 'retry-after': '30' } });
     }
@@ -717,7 +783,7 @@ export async function POST(request: Request) {
     }
     if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
     const postCommitTasks: Promise<unknown>[] = [];
-    if (order.paymentMethod === 'COD' || order.paymentMethod === 'WALLET') postCommitTasks.push(
+    if (cartId && (order.paymentMethod === 'COD' || order.paymentMethod === 'WALLET')) postCommitTasks.push(
       prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } }).catch((error) => {
         console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
       }),

@@ -15,24 +15,25 @@ export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initi
 
   useEffect(() => {
     if (!paid) return;
-    void fetch(`/api/orders/${encodeURIComponent(orderCode)}/clear-cart`, { method: 'POST' }).then((response) => {
-      if (!response.ok) return;
+    let active = true;
+    void fetch(`/api/orders/${encodeURIComponent(orderCode)}/clear-cart`, { method: 'POST' }).then(() => {
       try {
         window.localStorage.removeItem('bohoch_cart_quantities');
         window.sessionStorage.removeItem('buy_now_item');
+        window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: 0 } }));
       } catch {
-        return;
+        // Storage can be disabled; the server-side cart clear still runs.
       }
-    }).catch(() => undefined);
-  }, [orderCode, paid]);
+    }).catch(() => undefined).finally(() => {
+      if (!active) return;
+      celebratePayment(orderCode);
+      router.push(`/order-success?orderCode=${encodeURIComponent(orderCode)}`);
+    });
+    return () => { active = false; };
+  }, [orderCode, paid, router]);
 
   useEffect(() => {
-    if (paid) {
-      celebratePayment(orderCode);
-      router.push(`/cam-on?orderCode=${encodeURIComponent(orderCode)}`);
-      return;
-    }
-    if (!canPoll) return;
+    if (paid || !canPoll) return;
 
     let active = true;
     const checkStatus = async () => {
