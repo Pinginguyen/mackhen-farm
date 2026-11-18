@@ -578,7 +578,6 @@ export async function POST(request: Request) {
             skuSnapshot: item.variant?.sku ?? item.product.slug,
             quantity: allocation.quantity,
             unitPrice,
-            unitCostSnapshot: item.product.unitCost,
             discountAllocated: lineDiscounts[allocationIndex],
             finalPrice: allocation.quantity * unitPrice - lineDiscounts[allocationIndex],
             lineTotal: allocation.quantity * unitPrice,
@@ -589,11 +588,6 @@ export async function POST(request: Request) {
           firstBatchCode ??= allocations[0]?.batchCode ?? null;
         }
         if (firstBatchCode) await transaction.order.update({ where: { id: order.id }, data: { lotCode: firstBatchCode } });
-        const costOfGoods = cart.items.every((item) => item.product.unitCost !== null)
-          ? cart.items.reduce((sum, item) => sum + (item.product.unitCost ?? 0) * item.quantity, 0)
-          : null;
-        await transaction.order.update({ where: { id: order.id }, data: { costOfGoods } });
-        await transaction.cart.update({ where: { id: cart.id }, data: { checkoutCompletedAt: new Date(), abandonmentEmailClaimedAt: null } });
         return order;
       }, { isolationLevel: 'Serializable', timeout: 8_000 });
     } catch (error) {
@@ -682,11 +676,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: {
           code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : transactionExpired ? 'CHECKOUT_TRANSACTION_TIMEOUT' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
-          message: schemaMismatch
-            ? 'Cơ sở dữ liệu cần được cập nhật migration trước khi nhận đơn.'
-            : transactionExpired
-              ? 'Giao dịch ghi nhận đơn vượt quá thời gian xử lý. Vui lòng thử lại; hệ thống sẽ kiểm tra theo cùng mã yêu cầu để tránh tạo trùng.'
-              : 'Kết nối đặt hàng đang gián đoạn. Vui lòng thử lại; giỏ hàng vẫn được giữ.',
+          message: schemaMismatch ? 'Cơ sở dữ liệu cần cập nhật migration.' : (error.message || 'Kết nối đặt hàng đang gián đoạn.'),
         },
       }, { status: 503, headers: { 'retry-after': '30' } });
     }

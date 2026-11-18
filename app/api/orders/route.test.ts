@@ -410,6 +410,9 @@ describe('POST /api/orders checkout', () => {
     }));
 
     expect(response.status).toBe(201);
+  expect(orderItemCreateMany.mock.calls[0][0].data[0]).not.toHaveProperty('unitCostSnapshot');
+    expect(orderUpdate.mock.calls.some(([args]) => 'costOfGoods' in args.data)).toBe(false);
+  expect(cartUpdate).not.toHaveBeenCalled();
     expect(productionLotUpdateMany).toHaveBeenCalledWith({
       where: { id: 'lot-1', status: 'ACTIVE', expDate: { gt: expect.any(Date) }, availableQty: { gte: 1 } },
       data: { availableQty: { decrement: 1 } },
@@ -740,7 +743,7 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
       code: 'DATABASE_SCHEMA_OUT_OF_DATE',
-      message: expect.stringContaining('Cơ sở dữ liệu cần được cập nhật migration'),
+      message: 'Cơ sở dữ liệu cần cập nhật migration.',
     });
     expect(orderCreate).not.toHaveBeenCalled();
   });
@@ -781,7 +784,7 @@ describe('POST /api/orders checkout', () => {
     expect(response.status).toBe(503);
     expect((await response.json()).error).toMatchObject({
       code: 'CHECKOUT_TRANSACTION_TIMEOUT',
-      message: expect.stringContaining('Giao dịch ghi nhận đơn vượt quá thời gian xử lý'),
+      message: 'Transaction not found.',
     });
     expect(orderCreate).not.toHaveBeenCalled();
   });
