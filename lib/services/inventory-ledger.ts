@@ -143,7 +143,7 @@ export async function allocateStockFEFO(
 
     const receivedAt = new Date();
     const expDate = new Date(receivedAt);
-    expDate.setFullYear(expDate.getFullYear() + 1);
+    expDate.setFullYear(expDate.getFullYear() + 2);
     const fallbackLot = await tx.productionLot.create({
       data: {
         batchCode: `LOT-DEFAULT-${context.productId.slice(-4)}-${Date.now()}`,
@@ -152,8 +152,8 @@ export async function allocateStockFEFO(
         productVariantId: variantId,
         mfgDate: receivedAt,
         expDate,
-        receivedQty: 999,
-        availableQty: 999,
+        receivedQty: 500,
+        availableQty: 500,
         status: 'ACTIVE',
       },
       select: { id: true, batchCode: true, availableQty: true, expDate: true, warehouseId: true, warehouse: { select: { province: true, district: true } } },

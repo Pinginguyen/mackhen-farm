@@ -60,7 +60,7 @@ describe('POST /api/orders checkout', () => {
     orderFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindFirst.mockReset().mockResolvedValue(null);
     productionLotFindMany.mockReset().mockResolvedValue([{ id: 'lot-default', batchCode: 'LOT-MKF-2026-001', availableQty: 100, expDate: new Date('2027-01-01T00:00:00.000Z') }]);
-    productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-generated', batchCode: 'LOT-DEFAULT-ice-123', availableQty: 999, expDate: new Date('2027-11-18T00:00:00.000Z'), warehouseId: null, warehouse: null });
+    productionLotCreate.mockReset().mockResolvedValue({ id: 'lot-generated', batchCode: 'LOT-DEFAULT-ice-123', availableQty: 500, expDate: new Date('2028-11-18T00:00:00.000Z'), warehouseId: null, warehouse: null });
     productionLotUpdateMany.mockReset().mockResolvedValue({ count: 1 });
     compensationVoucherFindUnique.mockReset().mockResolvedValue(null);
     compensationVoucherUpdateMany.mockReset().mockResolvedValue({ count: 1 });
@@ -474,7 +474,7 @@ describe('POST /api/orders checkout', () => {
 
     expect(response.status).toBe(201);
     expect(productionLotCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ productId: 'spice-1', productVariantId: null, receivedQty: 999, availableQty: 999, status: 'ACTIVE' }),
+      data: expect.objectContaining({ productId: 'spice-1', productVariantId: null, receivedQty: 500, availableQty: 500, status: 'ACTIVE' }),
     }));
     expect(orderItemCreateMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ lotId: 'lot-generated', lotCode: 'LOT-DEFAULT-ice-123', quantity: 1 })] });
   });

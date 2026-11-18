@@ -106,9 +106,9 @@ describe('recordMovement', () => {
 
   it('creates and allocates a default lot when checkout has already confirmed aggregate stock', async () => {
     const expiry = new Date();
-    expiry.setFullYear(expiry.getFullYear() + 1);
+    expiry.setFullYear(expiry.getFullYear() + 2);
     lotCreate.mockResolvedValueOnce({
-      id: 'lot-default', batchCode: 'LOT-DEFAULT-duct-1795000000000', availableQty: 999,
+      id: 'lot-default', batchCode: 'LOT-DEFAULT-duct-1795000000000', availableQty: 500,
       expDate: expiry, warehouseId: null, warehouse: null,
     });
 
@@ -121,11 +121,13 @@ describe('recordMovement', () => {
         batchCode: expect.stringMatching(/^LOT-DEFAULT-duct-\d+$/),
         qrToken: expect.any(String),
         productId: 'product',
-        receivedQty: 999,
-        availableQty: 999,
+        receivedQty: 500,
+        availableQty: 500,
         status: 'ACTIVE',
       }),
     }));
+    const lotData = lotCreate.mock.calls[0][0].data;
+    expect(lotData.expDate.getFullYear()).toBe(lotData.mfgDate.getFullYear() + 2);
     expect(allocations).toMatchObject([{ lotId: 'lot-default', quantity: 2 }]);
     expect(lotUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: 'lot-default', availableQty: { gte: 2 } }),

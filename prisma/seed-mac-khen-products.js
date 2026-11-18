@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const { randomUUID } = require('node:crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -101,13 +102,40 @@ async function main() {
       });
 
       await transaction.productVariant.deleteMany({
-        where: { productId: savedProduct.id, label: { not: product.unit } },
+        where: { productId: savedProduct.id, title: { not: product.unit } },
       });
 
-      await transaction.productVariant.upsert({
-        where: { productId_label: { productId: savedProduct.id, label: product.unit } },
-        create: { productId: savedProduct.id, label: product.unit, price: product.price, weight: `${product.weight}g`, stock: product.stock },
-        update: { price: product.price, weight: `${product.weight}g`, stock: product.stock },
+      const savedVariant = await transaction.productVariant.upsert({
+        where: { productId_title: { productId: savedProduct.id, title: product.unit } },
+        create: { productId: savedProduct.id, title: product.unit, price: product.price, weight: `${product.weight}g`, inventory: product.stock },
+        update: { price: product.price, weight: `${product.weight}g`, inventory: product.stock },
+      });
+      const mfgDate = new Date();
+      const expDate = new Date(mfgDate);
+      expDate.setFullYear(expDate.getFullYear() + 2);
+      const batchCode = `LOT-${savedProduct.slug.toUpperCase().slice(0, 8)}-2026`;
+      await transaction.productionLot.upsert({
+        where: { batchCode },
+        create: {
+          batchCode,
+          qrToken: randomUUID(),
+          productId: savedProduct.id,
+          productVariantId: savedVariant.id,
+          mfgDate,
+          expDate,
+          receivedQty: 500,
+          availableQty: 500,
+          status: 'ACTIVE',
+        },
+        update: {
+          productId: savedProduct.id,
+          productVariantId: savedVariant.id,
+          mfgDate,
+          expDate,
+          receivedQty: 500,
+          availableQty: 500,
+          status: 'ACTIVE',
+        },
       });
       results.push({ name: savedProduct.name, slug: savedProduct.slug, price: savedProduct.price, unit: savedProduct.unit, stock: savedProduct.stock });
     }
