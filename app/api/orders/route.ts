@@ -321,7 +321,6 @@ export async function POST(request: Request) {
         if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail) && contactEmail.length <= 254) {
           await transaction.cart.update({
             where: { id: cart.id },
-            data: { email: contactEmail, checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null },
           });
         }
         if (cart.items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
