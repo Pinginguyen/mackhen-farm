@@ -100,7 +100,7 @@ export default async function HomePage() {
 
       <section className="home-promo-banner-wrap">
         <div className="home-promo-banner">
-          <img src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
+          <img className="w-full h-full rounded-2xl object-cover object-center" src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
           <span className="home-promo-banner-copy">
             <span className="promo-deal-badge">COMBO TIẾT KIỆM</span>
             <strong>{contentSettings.homePromoTitle}</strong>
@@ -139,7 +139,7 @@ export default async function HomePage() {
           <p className="eyebrow"><LocalizedText text="Vì sao lựa chọn Mắc Khén Farm?" /></p>
           <h2><LocalizedText text="Tận dụng trọn nguyên liệu, giữ trọn vị ngon." /></h2>
         </div>
-        <img className="story-section-image" src={distinctStoryImageUrl} alt="Hạt dổi bản địa được thu hoạch thủ công tại vùng cao" />
+        <img className="story-section-image w-full h-full rounded-2xl object-cover object-center" src={distinctStoryImageUrl} alt="Hạt dổi bản địa được thu hoạch thủ công tại vùng cao" />
         <div className="story-grid">
           {[
             'Mô hình Upcycled Food biến bã đậu nành sau sản xuất thành nguồn đạm thực vật cho món ăn vặt.',

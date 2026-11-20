@@ -117,7 +117,7 @@ export default function SiteAssetManager({ initialItems, unavailable }: { initia
           </header>
           <div className="admin-media-preview">
             {asset.imageUrl
-              ? <img src={asset.imageUrl} alt={asset.altText ?? asset.label} />
+              ? <img className="object-cover object-center" src={asset.imageUrl} alt={asset.altText ?? asset.label} />
               : <div className="admin-media-empty"><ImageUp size={28} aria-hidden="true" /><span>Chưa có logo</span></div>}
           </div>
           <p className="admin-media-dimensions">Kích thước gợi ý <strong>{recommendedDimensions[asset.key] ?? 'Theo tỉ lệ vị trí hiển thị'}</strong></p>

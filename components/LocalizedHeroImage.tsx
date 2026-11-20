@@ -7,6 +7,6 @@ export default function LocalizedHeroImage({ imageUrl, mobileImageUrl }: { image
   const { locale } = useLocaleCurrency();
   return <picture className="hero-image-frame">
     <source media="(max-width: 640px)" srcSet={mobileImageUrl} />
-    <img className="hero-image object-cover object-center transition-transform duration-700 hover:scale-105" src={imageUrl} alt={translateContent('Món ăn vặt khô và gia vị Tây Bắc', locale)} />
+    <img className="hero-image w-full h-full rounded-2xl object-cover object-center transition-transform duration-700 hover:scale-105" src={imageUrl} alt={translateContent('Món ăn vặt khô và gia vị Tây Bắc', locale)} />
   </picture>;
 }
