@@ -81,7 +81,7 @@ export default async function HomePage() {
           </div>
         </div>
         <div className="hero-media">
-          <div className="photo-card animate-float">
+          <div className="photo-card animate-float rounded-2xl overflow-hidden shadow-lg">
             <LocalizedHeroImage imageUrl={heroImageUrl} mobileImageUrl={heroImageMobileUrl} />
           </div>
         </div>
