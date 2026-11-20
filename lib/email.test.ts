@@ -54,14 +54,46 @@ describe('sendPasswordResetEmail', () => {
     expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ auth: { user: 'legacy@example.com', pass: 'legacy-app-password' } }));
   });
 
-  it('fails clearly when Gmail credentials are missing', async () => {
+  it('supports SMTP_PASS as a password alias', async () => {
+    vi.stubEnv('SMTP_PASSWORD', '');
+    vi.stubEnv('SMTP_PASS', 'smtp-pass-alias');
+
+    await sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset');
+
+    expect(createTransport).toHaveBeenCalledWith(expect.objectContaining({ auth: { user: 'shop@example.com', pass: 'smtp-pass-alias' } }));
+  });
+
+  it('simulates delivery and returns false when SMTP credentials are missing', async () => {
     vi.stubEnv('SMTP_USER', '');
     vi.stubEnv('SMTP_PASSWORD', '');
+    vi.stubEnv('SMTP_PASS', '');
     vi.stubEnv('EMAIL_USER', '');
     vi.stubEnv('EMAIL_PASS', '');
-    await expect(sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset'))
-      .rejects.toThrow('SMTP_USER and SMTP_PASSWORD must be configured.');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset')).resolves.toBe(false);
+    expect(log).toHaveBeenCalledWith(
+      '[DEV_EMAIL_SIMULATOR] To:',
+      'customer@example.com',
+      'Subject:',
+      '[Mắc Khén Farm] Yêu cầu đặt lại mật khẩu',
+      'Link/Content:',
+      expect.stringContaining('https://mackhenfarm.vn/reset'),
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[EMAIL_CONFIG_MISSING]'));
     expect(createTransport).not.toHaveBeenCalled();
+    log.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('returns false and logs the Nodemailer error when sending fails', async () => {
+    sendMail.mockRejectedValueOnce(new Error('SMTP connection refused'));
+    const logError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(sendPasswordResetEmail('customer@example.com', 'https://mackhenfarm.vn/reset')).resolves.toBe(false);
+
+    expect(logError).toHaveBeenCalledWith('[EMAIL_SEND_FAILED]', 'SMTP connection refused');
+    logError.mockRestore();
   });
 });
 

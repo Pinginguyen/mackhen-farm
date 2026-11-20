@@ -45,9 +45,12 @@ export async function POST(request: Request) {
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin).replace(/\/$/, '');
     const resetLink = `${baseUrl}/dat-lai-mat-khau?token=${encodeURIComponent(token)}`;
     try {
-      await sendPasswordResetEmail(user.email, resetLink);
-    } catch {
-      console.error('Password reset email delivery failed.');
+      const emailSent = await sendPasswordResetEmail(user.email, resetLink);
+      if (!emailSent) {
+        await prisma.passwordResetToken.deleteMany({ where: { email, token: tokenHash } });
+      }
+    } catch (error) {
+      console.error('[EMAIL_SEND_FAILED]', error instanceof Error ? error.message : error);
       await prisma.passwordResetToken.deleteMany({ where: { email, token: tokenHash } });
     }
     return genericResponse();

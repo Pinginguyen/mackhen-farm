@@ -22,7 +22,7 @@ async function getOrder(orderId: string): Promise<NotifiableOrder | null> {
   }) as Promise<NotifiableOrder | null>;
 }
 
-async function sendOnce(orderId: string, field: SentField, send: (order: NotifiableOrder, recipient: string) => Promise<void>): Promise<boolean> {
+async function sendOnce(orderId: string, field: SentField, send: (order: NotifiableOrder, recipient: string) => Promise<boolean>): Promise<boolean> {
   const claimedAt = new Date();
   const claim = await prisma.order.updateMany({
     where: { id: orderId, [field]: null } as Prisma.OrderWhereInput,
@@ -37,7 +37,11 @@ async function sendOnce(orderId: string, field: SentField, send: (order: Notifia
       await prisma.order.updateMany({ where: { id: orderId, [field]: claimedAt } as Prisma.OrderWhereInput, data: { [field]: null } as Prisma.OrderUpdateManyMutationInput });
       return false;
     }
-    await send(order, recipient);
+    const sent = await send(order, recipient);
+    if (!sent) {
+      await prisma.order.updateMany({ where: { id: orderId, [field]: claimedAt } as Prisma.OrderWhereInput, data: { [field]: null } as Prisma.OrderUpdateManyMutationInput });
+      return false;
+    }
     return true;
   } catch (error) {
     await prisma.order.updateMany({ where: { id: orderId, [field]: claimedAt } as Prisma.OrderWhereInput, data: { [field]: null } as Prisma.OrderUpdateManyMutationInput }).catch(() => undefined);
@@ -63,7 +67,7 @@ export function sendOrderConfirmationIfNeeded(orderId: string): Promise<boolean>
 export function sendShippingUpdateIfNeeded(orderId: string): Promise<boolean> {
   return sendOnce(orderId, 'shippingUpdateEmailSentAt', async (order, toEmail) => {
     if (!order.trackingCode || !order.carrier) throw new Error('SHIPPING_EMAIL_REQUIRES_TRACKING');
-    await sendShippingUpdateEmail({
+    return sendShippingUpdateEmail({
       toEmail,
       customerName: order.customerName,
       orderCode: order.orderCode,
@@ -75,7 +79,7 @@ export function sendShippingUpdateIfNeeded(orderId: string): Promise<boolean> {
 
 export function sendReviewRequestIfNeeded(orderId: string): Promise<boolean> {
   return sendOnce(orderId, 'reviewRequestEmailSentAt', async (order, toEmail) => {
-    await sendReviewRequestEmail({
+    return sendReviewRequestEmail({
       toEmail,
       customerName: order.customerName,
       orderCode: order.orderCode,
