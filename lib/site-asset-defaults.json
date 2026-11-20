@@ -10,8 +10,8 @@
     "key": "HERO_BANNER_MOBILE",
     "label": "Ảnh bìa Hero cho điện thoại",
     "category": "HOME",
-    "imageUrl": "/products/xe-soi.jpg",
-    "altText": "Khô bò thực vật Mắc Khén Farm xé sợi"
+    "imageUrl": "/products/hat-mac-khen.jpg",
+    "altText": "Hạt mắc khén Tây Bắc Mắc Khén Farm"
   },
   {
     "key": "PROMO_BANNER_HOME",
@@ -24,8 +24,22 @@
     "key": "STORY_SECTION_IMAGE",
     "label": "Ảnh Câu chuyện thương hiệu / Nông trại",
     "category": "HOME",
-    "imageUrl": "/products/xe-soi.jpg",
+    "imageUrl": "/products/hat-doi.jpg",
     "altText": "Câu chuyện thương hiệu Mắc Khén Farm"
+  },
+  {
+    "key": "BEFORE_AFTER_ORIGINAL",
+    "label": "Ảnh nguyên liệu Before/After (Bã đậu nành)",
+    "category": "HOME",
+    "imageUrl": "/products/soy-pulp.svg",
+    "altText": "Bã đậu nành thô, nguyên liệu upcycled"
+  },
+  {
+    "key": "BEFORE_AFTER_RESULT",
+    "label": "Ảnh thành phẩm Before/After (Khô bò xé sợi)",
+    "category": "HOME",
+    "imageUrl": "/products/xe-soi.jpg",
+    "altText": "Khô bò thực vật Mắc Khén thành phẩm"
   },
   {
     "key": "LOGO_HEADER",
@@ -45,21 +59,21 @@
     "key": "BADGE_BCT",
     "label": "Huy hiệu Đã thông báo Bộ Công Thương",
     "category": "BRANDING",
-    "imageUrl": "",
+    "imageUrl": "/badge-bct.svg",
     "altText": "Đã thông báo Bộ Công Thương"
   },
   {
     "key": "OG_IMAGE",
     "label": "Ảnh chia sẻ Facebook / Zalo (OpenGraph 1200x630)",
     "category": "BRANDING",
-    "imageUrl": "/products/xe-soi.jpg",
+    "imageUrl": "/products/combo.jpg",
     "altText": "Mắc Khén Farm - Khô bò thực vật vị Tây Bắc"
   },
   {
     "key": "B2B_HERO_BANNER",
     "label": "Banner trang Hợp tác B2B",
     "category": "SPECIAL",
-    "imageUrl": "/products/xe-soi.jpg",
+    "imageUrl": "/products/combo.jpg",
     "altText": "Sản phẩm thực vật Mắc Khén Farm mang hương vị Tây Bắc"
   },
   {
@@ -68,5 +82,26 @@
     "category": "SPECIAL",
     "imageUrl": "/products/soy-pulp.svg",
     "altText": "Chuỗi cung ứng thực phẩm Upcycled"
+  },
+  {
+    "key": "BADGE_FEATURE_1",
+    "label": "Icon tính năng: Bã đậu nành địa phương",
+    "category": "SPECIAL",
+    "imageUrl": "/products/soy-pulp.svg",
+    "altText": "Bã đậu nành địa phương"
+  },
+  {
+    "key": "BADGE_FEATURE_2",
+    "label": "Icon tính năng: Đóng gói vận chuyển",
+    "category": "SPECIAL",
+    "imageUrl": "/products/combo.jpg",
+    "altText": "Sản phẩm được đóng gói cẩn thận"
+  },
+  {
+    "key": "BADGE_FEATURE_3",
+    "label": "Icon tính năng: Hương vị Tây Bắc",
+    "category": "SPECIAL",
+    "imageUrl": "/products/hat-mac-khen.jpg",
+    "altText": "Gia vị mắc khén Tây Bắc"
   }
 ]

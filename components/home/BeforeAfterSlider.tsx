@@ -6,7 +6,7 @@ import { ArrowLeftRight } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
-export default function BeforeAfterSlider() {
+export default function BeforeAfterSlider({ originalImageUrl, resultImageUrl }: { originalImageUrl: string; resultImageUrl: string }) {
   const [position, setPosition] = useState(50);
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
@@ -36,10 +36,10 @@ export default function BeforeAfterSlider() {
       </div>
       <div className="before-after-frame" onPointerDown={startPointerDrag} onPointerMove={movePointerDrag} style={{ '--split': `${position}%` } as React.CSSProperties}>
         <div className="before-after-image before-after-raw">
-          <img src="/products/soy-pulp.svg" alt={text('Bã đậu nành thô, nguyên liệu upcycled')} />
+          <img src={originalImageUrl} alt={text('Bã đậu nành thô, nguyên liệu upcycled')} />
         </div>
         <div className="before-after-image before-after-finished">
-          <img src="/products/xe-soi.jpg" alt={text('Khô bò thực vật Mắc Khén thành phẩm')} />
+          <img src={resultImageUrl} alt={text('Khô bò thực vật Mắc Khén thành phẩm')} />
         </div>
         <span className="before-after-label before-after-label-raw">{text('NGUYÊN LIỆU')}</span>
         <span className="before-after-label before-after-label-finished">{text('THÀNH PHẨM')}</span>

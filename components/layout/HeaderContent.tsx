@@ -17,6 +17,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
   const [announcement, setAnnouncement] = useState<{ enabled: boolean; text: string }>({ enabled: false, text: '' });
   const { locale, t } = useLocaleCurrency();
   const initials = activeUser?.name.trim().split(/\s+/).slice(-2).map((part) => part.charAt(0)).join('').toLocaleUpperCase('vi') ?? '';
+  const isAdmin = activeUser?.role === 'ADMIN';
 
   useEffect(() => {
     let active = true;
@@ -77,7 +78,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
           </>
         ) : (
           <>
-            {activeUser.role === 'ADMIN' && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#841E1E] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#6F1717]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
+            {isAdmin && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#841E1E] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#6F1717]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
             <details className="account-menu">
               <summary className="!h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white" aria-label={`${locale === 'en' ? 'Account' : 'Tài khoản'} ${activeUser.name}`} title={activeUser.name}>
                 <span className="account-avatar !h-9 !w-9 !rounded-lg !text-stone-700" aria-hidden="true">{initials || 'MK'}</span>
@@ -87,7 +88,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
                 <span className="account-dropdown-divider" />
                 <Link href="/tai-khoan">{locale === 'en' ? 'Account details' : 'Thông tin tài khoản'}</Link>
                 <Link href="/tai-khoan?tab=orders">{locale === 'en' ? 'Orders' : 'Đơn mua'}</Link>
-                {activeUser.role === 'ADMIN' && <Link href="/admin">{locale === 'en' ? 'Admin area' : 'Khu vực quản trị'}</Link>}
+                {isAdmin && <Link href="/admin">{locale === 'en' ? 'Admin area' : 'Khu vực quản trị'}</Link>}
                 <LogoutButton />
               </div>
             </details>

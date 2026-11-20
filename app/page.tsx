@@ -24,11 +24,16 @@ const homeRevealGroups = [
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, contentSettings] = await Promise.all([
+  const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, beforeAfterOriginalUrl, beforeAfterResultUrl, featureImage1, featureImage2, featureImage3, contentSettings] = await Promise.all([
     getSiteAsset('HERO_BANNER_MAIN', '/products/xe-soi.jpg'),
-    getSiteAsset('HERO_BANNER_MOBILE', '/products/xe-soi.jpg'),
+    getSiteAsset('HERO_BANNER_MOBILE', '/products/hat-mac-khen.jpg'),
     getSiteAsset('PROMO_BANNER_HOME', '/products/combo.jpg'),
     getSiteAsset('STORY_SECTION_IMAGE', '/products/hat-doi.jpg'),
+    getSiteAsset('BEFORE_AFTER_ORIGINAL', '/products/soy-pulp.svg'),
+    getSiteAsset('BEFORE_AFTER_RESULT', '/products/xe-soi.jpg'),
+    getSiteAsset('BADGE_FEATURE_1', '/products/soy-pulp.svg'),
+    getSiteAsset('BADGE_FEATURE_2', '/products/combo.jpg'),
+    getSiteAsset('BADGE_FEATURE_3', '/products/hat-mac-khen.jpg'),
     getCoreContentSettings(),
   ]);
   const distinctStoryImageUrl = storyImageUrl === promoBannerUrl ? '/products/hat-doi.jpg' : storyImageUrl;
@@ -81,7 +86,7 @@ export default async function HomePage() {
           </div>
         </div>
         <div className="hero-media">
-          <div className="photo-card animate-float rounded-2xl overflow-hidden shadow-lg">
+          <div className="photo-card home-hero-photo">
             <LocalizedHeroImage imageUrl={heroImageUrl} mobileImageUrl={heroImageMobileUrl} />
           </div>
         </div>
@@ -114,7 +119,7 @@ export default async function HomePage() {
 
       <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
 
-      <BeforeAfterSlider />
+      <BeforeAfterSlider originalImageUrl={beforeAfterOriginalUrl} resultImageUrl={beforeAfterResultUrl} />
 
       <section className="comparison-section">
         <div className="section-heading home-section-heading"><div><p className="eyebrow"><LocalizedText text="So sánh lựa chọn" /></p><h2><LocalizedText text="Đậm vị thực vật, chi phí tối ưu" /></h2></div></div>
@@ -132,7 +137,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HomeTransparencyTabs />
+      <HomeTransparencyTabs featureImageUrls={[featureImage1, featureImage2, featureImage3]} />
 
       <section className="story-block">
         <div>

@@ -19,7 +19,7 @@ const packagingLayers = [
   { title: 'Màng xốp bảo vệ', detail: 'Giảm va đập trên hành trình giao hàng.' },
 ];
 
-export default function HomeTransparencyTabs() {
+export default function HomeTransparencyTabs({ featureImageUrls }: { featureImageUrls: [string, string, string] }) {
   const [activeTab, setActiveTab] = useState<'production' | 'packaging'>('production');
   const { locale } = useLocaleCurrency();
   const text = (value: string) => translateContent(value, locale);
@@ -47,6 +47,16 @@ export default function HomeTransparencyTabs() {
           </li>
         ))}
       </ol>
+      <div className="home-feature-badges" aria-label={text('Điểm nổi bật của Mắc Khén Farm')}>
+        {[
+          { imageUrl: featureImageUrls[0], label: 'Bã đậu nành địa phương' },
+          { imageUrl: featureImageUrls[1], label: 'Đóng gói cẩn thận' },
+          { imageUrl: featureImageUrls[2], label: 'Hương vị Tây Bắc' },
+        ].map((feature) => <div className="home-feature-badge" key={feature.label}>
+          <img src={feature.imageUrl} alt="" />
+          <span>{text(feature.label)}</span>
+        </div>)}
+      </div>
     </section>
   );
 }

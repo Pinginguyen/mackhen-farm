@@ -1,0 +1,41 @@
+# BÁO CÁO TOÀN DIỆN VỀ HÌNH ẢNH (IMAGE AUDIT REPORT)
+Tổng số ảnh tĩnh trong thư mục public: 9 file
+Tổng số vị trí quản lý CMS (SiteAsset): 14 slot
+Tổng số ảnh sản phẩm trong Database: 8 sản phẩm
+
+## 1. DANH SÁCH ẢNH TRONG THƯ MỤC PUBLIC/ (9 ảnh)
+1. public/products/cham-cheo.jpg (1008 KB)
+2. public/products/chay-toi.jpg (124 KB)
+3. public/products/combo.jpg (128 KB)
+4. public/products/hat-doi.jpg (352 KB)
+5. public/products/hat-mac-khen.jpg (153 KB)
+6. public/products/mieng-deo.jpg (132 KB)
+7. public/products/muoi-cham-cheo.jpg (108 KB)
+8. public/products/soy-pulp.svg (3 KB)
+9. public/products/xe-soi.jpg (124 KB)
+
+## 2. HIỆN TRẠNG CÁC VỊ TRÍ CMS (SITE_ASSETS TRANG ADMIN)
+- [BADGE_UPCYCLED] Điểm nhấn Upcycled Food: /products/soy-pulp.svg
+- [PROMO_BANNER_HOME] Banner khuyến mãi trang chủ: /products/combo.jpg
+- [B2B_HERO_BANNER] Banner trang Hợp tác B2B: /products/xe-soi.jpg
+- [OG_IMAGE] Ảnh chia sẻ Facebook / Zalo (OpenGraph 1200x630): /products/xe-soi.jpg
+- [BADGE_BCT] Huy hiệu Đã thông báo Bộ Công Thương: CHƯA CÓ ẢNH (ĐANG ĐỂ TRỐNG)
+- [HERO_BANNER_MOBILE] Ảnh bìa Hero cho điện thoại: /products/xe-soi.jpg
+- [BADGE_FEATURE_2] Icon Đóng gói vận chuyển: /products/combo.jpg
+- [BADGE_FEATURE_1] Icon Đậu nành địa phương: /products/soy-pulp.svg
+- [BADGE_FEATURE_3] Icon Mùi vị đặc trưng Tây Bắc: /products/hat-mac-khen.jpg
+- [STORY_SECTION_IMAGE] Ảnh Câu chuyện thương hiệu / Nông trại: /products/xe-soi.jpg
+- [TRACEABILITY_BANNER] Banner trang Truy xuất nguồn gốc: https://m6jpfrmppdklbyn5.public.blob.vercel-storage.com/site-assets/fb6065d1-3516-4fa9-81a6-8acfffb481f6.png
+- [HERO_BANNER_MAIN] Ảnh bìa Hero trang chủ: https://m6jpfrmppdklbyn5.public.blob.vercel-storage.com/site-assets/9a9f1d01-3230-4ec1-aeed-9166b5babffb.png
+- [LOGO_HEADER] Logo Header: https://m6jpfrmppdklbyn5.public.blob.vercel-storage.com/site-assets/c2074a25-9e88-44c4-9281-c17170badd60.png
+- [LOGO_FOOTER] Logo Footer (chữ trắng nền tối): https://m6jpfrmppdklbyn5.public.blob.vercel-storage.com/site-assets/af6e1ba5-9fd9-4933-8614-bf5fe7c2b478.png
+
+## 3. ẢNH ĐẠI DIỆN CÁC SẢN PHẨM (8 sản phẩm)
+- [Mắc Khén Xé Sợi Cay Nồng]: /products/xe-soi.jpg (Ảnh phụ: 1)
+- [Mắc Khén Cháy Tỏi Giòn Cay]: /products/chay-toi.jpg (Ảnh phụ: 1)
+- [Mắc Khén Miếng Dẻo Tiêu Rừng]: /products/mieng-deo.jpg (Ảnh phụ: 1)
+- [Chẳm Chéo Ướt Chuẩn Vị Điện Biên]: /products/cham-cheo.jpg (Ảnh phụ: 1)
+- [Hạt Mắc Khén Rừng Sao Khô Sơn La]: /products/hat-mac-khen.jpg (Ảnh phụ: 1)
+- [Muối Chẳm Chéo Hạt Dổi Rang Khô]: /products/muoi-cham-cheo.jpg (Ảnh phụ: 1)
+- [Hạt Dổi Rừng Nếp Thượng Hạng]: /products/hat-doi.jpg (Ảnh phụ: 1)
+- [Combo Bộ Ba Nhậu Xanh]: /products/combo.jpg (Ảnh phụ: 1)

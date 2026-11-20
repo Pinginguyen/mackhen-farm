@@ -26,7 +26,7 @@ export default function B2BPartnershipClientPage() {
 
   useEffect(() => {
     let active = true;
-    fetchPublicSiteAsset('B2B_HERO_BANNER', '/products/xe-soi.jpg')
+    fetchPublicSiteAsset('B2B_HERO_BANNER', '/products/combo.jpg')
       .then((url) => { if (active) setHeroBannerUrl(url); });
     return () => { active = false; };
   }, []);

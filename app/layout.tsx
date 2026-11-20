@@ -15,6 +15,7 @@ import CartDrawer from '@/components/cart/CartDrawer';
 import MobileBottomDock from '@/components/layout/MobileBottomDock';
 import CookieConsent from '@/components/common/CookieConsent';
 import CartSync from '@/components/cart/CartSync';
+import { getSiteAsset } from '@/lib/site-assets';
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
@@ -26,15 +27,23 @@ const beVietnamPro = Be_Vietnam_Pro({
 const title = 'Mắc Khén Farm - Khô bò thực vật High-Protein chuẩn vị Tây Bắc';
 const description = 'Dự án thực phẩm sinh thái Upcycled Food từ bã đậu nành. Dai ngon chuẩn vị thịt bò, giàu đạm, không cholesterol. Giao hàng toàn quốc.';
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhen-farm.vercel.app'),
-  title,
-  description,
-  openGraph: { type: 'website', locale: 'vi_VN', siteName: 'Mắc Khén Farm', title, description, images: [{ url: '/products/xe-soi.jpg', alt: 'Mắc Khén Farm - Khô bò thực vật vị Tây Bắc' }] },
-  twitter: { card: 'summary_large_image', title, description, images: ['/products/xe-soi.jpg'] },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const ogImageUrl = await getSiteAsset('OG_IMAGE', '/products/combo.jpg');
+  return {
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://mackhen-farm.vercel.app'),
+    title,
+    description,
+    openGraph: { type: 'website', locale: 'vi_VN', siteName: 'Mắc Khén Farm', title, description, images: [{ url: ogImageUrl, alt: 'Mắc Khén Farm - Khô bò thực vật vị Tây Bắc' }] },
+    twitter: { card: 'summary_large_image', title, description, images: [ogImageUrl] },
+  };
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [footerLogoUrl, bctBadgeUrl] = await Promise.all([
+    getSiteAsset('LOGO_FOOTER', ''),
+    getSiteAsset('BADGE_BCT', '/badge-bct.svg'),
+  ]);
+
   return (
     <html lang="vi">
       <body className={beVietnamPro.className}>
@@ -53,7 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Header />
             </SiteHeaderVisibility>
             {children}
-            <SiteFooter />
+            <SiteFooter footerLogoUrl={footerLogoUrl} bctBadgeUrl={bctBadgeUrl} />
             <FloatingContact />
             <ExitIntentPopup />
             <CartDrawer />

@@ -5,11 +5,16 @@ import { getSiteAsset } from '@/lib/site-assets';
 export const dynamic = 'force-dynamic';
 
 const publicAssetFallbacks = {
-  B2B_HERO_BANNER: '/products/xe-soi.jpg',
+  B2B_HERO_BANNER: '/products/combo.jpg',
   LOGO_HEADER: '',
   LOGO_FOOTER: '',
-  BADGE_BCT: '',
+  BADGE_BCT: '/badge-bct.svg',
   TRACEABILITY_BANNER: '/products/soy-pulp.svg',
+  BEFORE_AFTER_ORIGINAL: '/products/soy-pulp.svg',
+  BEFORE_AFTER_RESULT: '/products/xe-soi.jpg',
+  BADGE_FEATURE_1: '/products/soy-pulp.svg',
+  BADGE_FEATURE_2: '/products/combo.jpg',
+  BADGE_FEATURE_3: '/products/hat-mac-khen.jpg',
 } as const;
 
 export async function GET(request: Request) {

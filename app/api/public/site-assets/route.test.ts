@@ -15,11 +15,25 @@ describe('/api/public/site-assets', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ url: 'https://blob.example/banner.webp' });
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(getSiteAsset).toHaveBeenCalledWith('B2B_HERO_BANNER', '/products/xe-soi.jpg');
+    expect(getSiteAsset).toHaveBeenCalledWith('B2B_HERO_BANNER', '/products/combo.jpg');
+  });
+
+  it('uses the local notification badge when no uploaded BCT badge is available', async () => {
+    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=BADGE_BCT'));
+
+    expect(response.status).toBe(200);
+    expect(getSiteAsset).toHaveBeenCalledWith('BADGE_BCT', '/badge-bct.svg');
+  });
+
+  it('serves configurable feature badge slots', async () => {
+    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=BADGE_FEATURE_1'));
+
+    expect(response.status).toBe(200);
+    expect(getSiteAsset).toHaveBeenCalledWith('BADGE_FEATURE_1', '/products/soy-pulp.svg');
   });
 
   it('rejects unknown asset keys', async () => {
-    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=LOGO_FOOTER'));
+    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=BADGE_FEATURE_4'));
 
     expect(response.status).toBe(400);
     expect(getSiteAsset).not.toHaveBeenCalled();
