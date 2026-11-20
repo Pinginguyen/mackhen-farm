@@ -14,7 +14,9 @@ const mediaGroups: { id: MediaGroupId; label: string; keys: string[] }[] = [
 
 const filters: { id: MediaFilter; label: string }[] = [
   { id: 'all', label: 'Tất cả' },
-  ...mediaGroups.map(({ id, label }) => ({ id, label })),
+  { id: 'campaign', label: 'Trang chủ' },
+  { id: 'identity', label: 'Nhận diện' },
+  { id: 'special', label: 'Chuyên biệt' },
 ];
 
 const recommendedDimensions: Record<string, string> = {
@@ -33,24 +35,6 @@ const recommendedDimensions: Record<string, string> = {
   BADGE_FEATURE_1: '256 x 256 px',
   BADGE_FEATURE_2: '256 x 256 px',
   BADGE_FEATURE_3: '256 x 256 px',
-};
-
-const previewRatios: Record<string, string> = {
-  HERO_BANNER_MAIN: '16 / 9',
-  HERO_BANNER_MOBILE: '4 / 5',
-  PROMO_BANNER_HOME: '16 / 5',
-  BEFORE_AFTER_ORIGINAL: '4 / 3',
-  BEFORE_AFTER_RESULT: '4 / 3',
-  STORY_SECTION_IMAGE: '4 / 3',
-  LOGO_HEADER: '16 / 5',
-  LOGO_FOOTER: '16 / 5',
-  OG_IMAGE: '40 / 21',
-  BADGE_BCT: '8 / 3',
-  B2B_HERO_BANNER: '32 / 15',
-  TRACEABILITY_BANNER: '96 / 35',
-  BADGE_FEATURE_1: '1 / 1',
-  BADGE_FEATURE_2: '1 / 1',
-  BADGE_FEATURE_3: '1 / 1',
 };
 
 const assetGuidance: Record<string, string> = {
@@ -131,61 +115,64 @@ export default function SiteAssetManager({ initialItems, unavailable }: { initia
   }
 
   const managedItems = items.filter((asset) => managedAssetKeys.includes(asset.key));
-  const visibleGroups = mediaGroups.filter((group) => activeFilter === 'all' || group.id === activeFilter);
+  const visibleItems = activeFilter === 'all'
+    ? managedItems
+    : managedItems.filter((asset) => mediaGroups.find((group) => group.id === activeFilter)?.keys.includes(asset.key));
 
   return <section className="admin-media-manager">
     {unavailable && <p className="empty-state" role="status">Không thể tải vị trí hình ảnh từ cơ sở dữ liệu.</p>}
     {feedback && <p className={`admin-media-feedback is-${feedback.type}`} role={feedback.type === 'error' ? 'alert' : 'status'}>{feedback.text}</p>}
     <div className="admin-media-filters" role="tablist" aria-label="Lọc vị trí hình ảnh">
-      {filters.map((filter) => <button
-        key={filter.id}
-        type="button"
-        role="tab"
-        aria-selected={activeFilter === filter.id}
-        className={activeFilter === filter.id ? 'is-active' : ''}
-        onClick={() => setActiveFilter(filter.id)}
-      >{filter.label}</button>)}
+      {filters.map((filter) => {
+        const count = filter.id === 'all'
+          ? managedItems.length
+          : managedItems.filter((asset) => mediaGroups.find((group) => group.id === filter.id)?.keys.includes(asset.key)).length;
+        return <button
+          key={filter.id}
+          type="button"
+          role="tab"
+          aria-selected={activeFilter === filter.id}
+          className={activeFilter === filter.id ? 'is-active' : ''}
+          onClick={() => setActiveFilter(filter.id)}
+        >{filter.label} <span>({count})</span></button>;
+      })}
     </div>
-    <div className="admin-media-groups">
-      {visibleGroups.map((group) => <section className="admin-media-group" key={group.id}>
-        <h2 className="admin-media-group-heading">{group.label}</h2>
-        <div className="admin-media-grid">
-      {group.keys.flatMap((key) => {
-        const asset = managedItems.find((item) => item.key === key);
-        if (!asset) return [];
+    <div className="admin-media-grid">
+      {visibleItems.map((asset) => {
         const busy = busyKey === asset.key;
         const uploading = busyKey !== null;
         const containImage = ['LOGO_HEADER', 'LOGO_FOOTER', 'BADGE_BCT', 'BADGE_FEATURE_1', 'BADGE_FEATURE_2', 'BADGE_FEATURE_3'].includes(asset.key);
+        const dimensions = recommendedDimensions[asset.key] ?? 'Theo tỉ lệ vị trí hiển thị';
         return <article className="admin-media-card" key={asset.key}>
           <header className="admin-media-card-heading">
             <div><span className="admin-media-category">{categoryLabel(asset.key)}</span><h2>{asset.label}</h2></div>
             <code>{asset.key}</code>
           </header>
-          <div className={`admin-media-preview${containImage ? ' is-contained' : ''}`} style={{ aspectRatio: previewRatios[asset.key] ?? '16 / 9' }}>
+          <div className={`admin-media-preview${containImage ? ' is-contained' : ''}`}>
             {asset.imageUrl
               ? <img className="object-cover object-center" src={asset.imageUrl} alt={asset.altText ?? asset.label} />
               : <div className="admin-media-empty"><ImageUp size={28} aria-hidden="true" /><span>Chưa có hình ảnh</span></div>}
           </div>
-          <p className="admin-media-dimensions"><span>Kích thước khuyên dùng</span><strong>{recommendedDimensions[asset.key] ?? 'Theo tỉ lệ vị trí hiển thị'}</strong></p>
           <p className="admin-media-guidance">{assetGuidance[asset.key] ?? 'Chọn ảnh rõ nét, đúng nội dung vị trí hiển thị.'}</p>
-          <label
-            className={`admin-media-dropzone${busy ? ' is-busy' : ''}`}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => { event.preventDefault(); if (!uploading && !unavailable) void uploadAsset(asset, event.dataTransfer.files[0]); }}
-          >
-            {busy ? <LoaderCircle size={18} className="admin-media-spinner" aria-hidden="true" /> : <Upload size={18} aria-hidden="true" />}
-            <span>{busy ? 'Đang tải và lưu...' : 'Tải ảnh thay thế'}</span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploading || unavailable}
-              onChange={(event) => { void uploadAsset(asset, event.target.files?.[0]); event.currentTarget.value = ''; }}
-            />
-          </label>
+          <div className="admin-media-card-footer">
+            <span className="admin-media-dimension-badge">{dimensions.replace(/ x /g, '×').replace(' px', '')}</span>
+            <label
+              className={`admin-media-upload-button${busy ? ' is-busy' : ''}`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => { event.preventDefault(); if (!uploading && !unavailable) void uploadAsset(asset, event.dataTransfer.files[0]); }}
+            >
+              {busy ? <LoaderCircle size={14} className="admin-media-spinner" aria-hidden="true" /> : <Upload size={14} aria-hidden="true" />}
+              <span>{busy ? 'Đang tải...' : 'Tải ảnh mới'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={uploading || unavailable}
+                onChange={(event) => { void uploadAsset(asset, event.target.files?.[0]); event.currentTarget.value = ''; }}
+              />
+            </label>
+          </div>
         </article>;
       })}
-        </div>
-      </section>)}
     </div>
   </section>;
 }
