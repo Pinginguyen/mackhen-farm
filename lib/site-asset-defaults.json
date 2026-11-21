@@ -80,28 +80,7 @@
     "key": "TRACEABILITY_BANNER",
     "label": "Banner trang Truy xuất nguồn gốc",
     "category": "SPECIAL",
-    "imageUrl": "/products/soy-pulp.svg",
+    "imageUrl": "/products/hat-doi.jpg",
     "altText": "Chuỗi cung ứng thực phẩm Upcycled"
-  },
-  {
-    "key": "BADGE_FEATURE_1",
-    "label": "Icon tính năng: Bã đậu nành địa phương",
-    "category": "SPECIAL",
-    "imageUrl": "/products/soy-pulp.svg",
-    "altText": "Bã đậu nành địa phương"
-  },
-  {
-    "key": "BADGE_FEATURE_2",
-    "label": "Icon tính năng: Đóng gói vận chuyển",
-    "category": "SPECIAL",
-    "imageUrl": "/products/combo.jpg",
-    "altText": "Sản phẩm được đóng gói cẩn thận"
-  },
-  {
-    "key": "BADGE_FEATURE_3",
-    "label": "Icon tính năng: Hương vị Tây Bắc",
-    "category": "SPECIAL",
-    "imageUrl": "/products/hat-mac-khen.jpg",
-    "altText": "Gia vị mắc khén Tây Bắc"
   }
 ]

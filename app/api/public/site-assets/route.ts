@@ -9,12 +9,9 @@ const publicAssetFallbacks = {
   LOGO_HEADER: '',
   LOGO_FOOTER: '',
   BADGE_BCT: '/badge-bct.svg',
-  TRACEABILITY_BANNER: '/products/soy-pulp.svg',
+  TRACEABILITY_BANNER: '/products/hat-doi.jpg',
   BEFORE_AFTER_ORIGINAL: '/products/soy-pulp.svg',
   BEFORE_AFTER_RESULT: '/products/xe-soi.jpg',
-  BADGE_FEATURE_1: '/products/soy-pulp.svg',
-  BADGE_FEATURE_2: '/products/combo.jpg',
-  BADGE_FEATURE_3: '/products/hat-mac-khen.jpg',
 } as const;
 
 export async function GET(request: Request) {

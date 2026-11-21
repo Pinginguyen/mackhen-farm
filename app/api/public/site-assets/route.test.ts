@@ -25,15 +25,8 @@ describe('/api/public/site-assets', () => {
     expect(getSiteAsset).toHaveBeenCalledWith('BADGE_BCT', '/badge-bct.svg');
   });
 
-  it('serves configurable feature badge slots', async () => {
-    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=BADGE_FEATURE_1'));
-
-    expect(response.status).toBe(200);
-    expect(getSiteAsset).toHaveBeenCalledWith('BADGE_FEATURE_1', '/products/soy-pulp.svg');
-  });
-
   it('rejects unknown asset keys', async () => {
-    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=BADGE_FEATURE_4'));
+    const response = await GET(new Request('https://mackhen.example/api/public/site-assets?key=UNKNOWN_ASSET'));
 
     expect(response.status).toBe(400);
     expect(getSiteAsset).not.toHaveBeenCalled();

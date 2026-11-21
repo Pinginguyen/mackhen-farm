@@ -34,11 +34,11 @@ export default function TraceabilityPage() {
   const [batch, setBatch] = useState<TraceabilityData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [heroBannerUrl, setHeroBannerUrl] = useState('/products/soy-pulp.svg');
+  const [heroBannerUrl, setHeroBannerUrl] = useState('/products/hat-doi.jpg');
 
   useEffect(() => {
     let active = true;
-    fetchPublicSiteAsset('TRACEABILITY_BANNER', '/products/soy-pulp.svg')
+    fetchPublicSiteAsset('TRACEABILITY_BANNER', '/products/hat-doi.jpg')
       .then((url) => { if (active) setHeroBannerUrl(url); });
     return () => { active = false; };
   }, []);

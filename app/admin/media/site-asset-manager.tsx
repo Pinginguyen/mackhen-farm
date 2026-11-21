@@ -7,16 +7,16 @@ type MediaGroupId = 'campaign' | 'identity' | 'special';
 type MediaFilter = 'all' | MediaGroupId;
 
 const mediaGroups: { id: MediaGroupId; label: string; keys: string[] }[] = [
-  { id: 'campaign', label: 'TRANG CHỦ & HERO', keys: ['HERO_BANNER_MAIN', 'HERO_BANNER_MOBILE', 'PROMO_BANNER_HOME', 'BEFORE_AFTER_ORIGINAL', 'BEFORE_AFTER_RESULT', 'STORY_SECTION_IMAGE'] },
-  { id: 'identity', label: 'NHẬN DIỆN & MẠNG XÃ HỘI', keys: ['LOGO_HEADER', 'LOGO_FOOTER', 'OG_IMAGE', 'BADGE_BCT'] },
-  { id: 'special', label: 'TRANG CHUYÊN BIỆT', keys: ['B2B_HERO_BANNER', 'TRACEABILITY_BANNER', 'BADGE_FEATURE_1', 'BADGE_FEATURE_2', 'BADGE_FEATURE_3'] },
+  { id: 'campaign', label: 'Trang chủ & Hero', keys: ['HERO_BANNER_MAIN', 'HERO_BANNER_MOBILE', 'PROMO_BANNER_HOME', 'BEFORE_AFTER_ORIGINAL', 'BEFORE_AFTER_RESULT', 'STORY_SECTION_IMAGE'] },
+  { id: 'identity', label: 'Nhận diện & Mạng xã hội', keys: ['LOGO_HEADER', 'LOGO_FOOTER', 'OG_IMAGE', 'BADGE_BCT'] },
+  { id: 'special', label: 'Trang chuyên biệt', keys: ['B2B_HERO_BANNER', 'TRACEABILITY_BANNER'] },
 ];
 
 const filters: { id: MediaFilter; label: string }[] = [
   { id: 'all', label: 'Tất cả' },
-  { id: 'campaign', label: 'Trang chủ' },
-  { id: 'identity', label: 'Nhận diện' },
-  { id: 'special', label: 'Chuyên biệt' },
+  { id: 'campaign', label: 'Trang chủ & Hero' },
+  { id: 'identity', label: 'Nhận diện & Mạng xã hội' },
+  { id: 'special', label: 'Trang chuyên biệt' },
 ];
 
 const recommendedDimensions: Record<string, string> = {
@@ -32,9 +32,6 @@ const recommendedDimensions: Record<string, string> = {
   BADGE_BCT: '200 x 75 px',
   B2B_HERO_BANNER: '1920 x 900 px',
   TRACEABILITY_BANNER: '1920 x 700 px',
-  BADGE_FEATURE_1: '256 x 256 px',
-  BADGE_FEATURE_2: '256 x 256 px',
-  BADGE_FEATURE_3: '256 x 256 px',
 };
 
 const assetGuidance: Record<string, string> = {
@@ -50,9 +47,6 @@ const assetGuidance: Record<string, string> = {
   BADGE_BCT: 'Dùng đúng biểu tượng xác nhận của Bộ Công Thương được cấp cho website.',
   B2B_HERO_BANNER: 'Ảnh nguyên liệu, sản phẩm hoặc đóng gói phù hợp đối tác bán sỉ.',
   TRACEABILITY_BANNER: 'Gợi hình vùng nguyên liệu, lô sản xuất hoặc chuỗi truy xuất.',
-  BADGE_FEATURE_1: 'Biểu tượng hoặc ảnh minh họa nguồn nguyên liệu bã đậu nành địa phương.',
-  BADGE_FEATURE_2: 'Biểu tượng hoặc ảnh minh họa đóng gói và bảo vệ đơn hàng.',
-  BADGE_FEATURE_3: 'Biểu tượng hoặc ảnh minh họa hương vị mắc khén Tây Bắc.',
 };
 
 const managedAssetKeys = mediaGroups.flatMap(({ keys }) => keys);
@@ -125,8 +119,8 @@ export default function SiteAssetManager({ initialItems, unavailable }: { initia
     <div className="admin-media-filters" role="tablist" aria-label="Lọc vị trí hình ảnh">
       {filters.map((filter) => {
         const count = filter.id === 'all'
-          ? managedItems.length
-          : managedItems.filter((asset) => mediaGroups.find((group) => group.id === filter.id)?.keys.includes(asset.key)).length;
+          ? managedAssetKeys.length
+          : mediaGroups.find((group) => group.id === filter.id)?.keys.length ?? 0;
         return <button
           key={filter.id}
           type="button"
@@ -141,7 +135,7 @@ export default function SiteAssetManager({ initialItems, unavailable }: { initia
       {visibleItems.map((asset) => {
         const busy = busyKey === asset.key;
         const uploading = busyKey !== null;
-        const containImage = ['LOGO_HEADER', 'LOGO_FOOTER', 'BADGE_BCT', 'BADGE_FEATURE_1', 'BADGE_FEATURE_2', 'BADGE_FEATURE_3'].includes(asset.key);
+        const containImage = ['LOGO_HEADER', 'LOGO_FOOTER', 'BADGE_BCT'].includes(asset.key);
         const dimensions = recommendedDimensions[asset.key] ?? 'Theo tỉ lệ vị trí hiển thị';
         return <article className="admin-media-card" key={asset.key}>
           <header className="admin-media-card-heading">
