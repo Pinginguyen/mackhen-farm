@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Gift, Search, UserRound } from 'lucide-react';
+import { Gift, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import LogoutButton from '@/app/logout-button';
 import LiveProductSearch from './LiveProductSearch';
@@ -57,15 +57,14 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
         </span>
       </Link>
       <nav className="main-nav" aria-label={locale === 'en' ? 'Main menu' : 'Menu chính'}>
-        <Link href="/">{t('home')}</Link>
-        <Link href="/products">{t('products')}</Link>
-        <Link className="header-promo-link" href="/khuyen-mai"><Gift size={15} aria-hidden="true" /> {t('deals')} <span aria-label="Hot">Hot</span></Link>
-        <Link href="/cart">{t('cart')}</Link>
-        <Link href="/tra-cuu">{t('trackOrder')}</Link>
+        <Link className="whitespace-nowrap text-sm" href="/">{t('home')}</Link>
+        <Link className="whitespace-nowrap text-sm" href="/products">{t('products')}</Link>
+        <Link className="header-promo-link whitespace-nowrap text-sm" href="/khuyen-mai"><Gift size={15} aria-hidden="true" /> {t('deals')} <span aria-label="Hot">Hot</span></Link>
+        <Link className="whitespace-nowrap text-sm" href="/cart">{t('cart')}</Link>
+        <Link className="whitespace-nowrap text-sm" href="/tra-cuu">{t('trackOrder')}</Link>
       </nav>
       <LiveProductSearch />
-      <div className="site-header-actions !gap-3">
-        <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
+      <div className="site-header-actions !gap-2">
         <CartLink />
         <SoundEffect />
         <LocaleCurrencySwitcher />
@@ -79,7 +78,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
           </>
         ) : (
           <>
-            {isAdmin && <Link className="admin-header-link !h-9 !min-h-0 !px-3 !py-0 !rounded-lg !bg-[#841E1E] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#6F1717]" href="/admin">{locale === 'en' ? 'Admin' : 'Vào trang Quản trị'}</Link>}
+            {isAdmin && <Link className="admin-header-link !h-9 !min-h-0 !px-2 !py-0 !rounded-lg !bg-[#841E1E] !text-xs !font-semibold !text-white !shadow-xs transition-all duration-300 hover:!bg-[#6F1717]" href="/admin">{locale === 'en' ? 'Admin' : 'Quản trị'}</Link>}
             <details className="account-menu">
               <summary className="!h-9 !w-9 !rounded-lg !border-stone-200/70 !bg-white" aria-label={`${locale === 'en' ? 'Account' : 'Tài khoản'} ${activeUser.name}`} title={activeUser.name}>
                 <span className="account-avatar !h-9 !w-9 !rounded-lg !text-stone-700" aria-hidden="true">{initials || 'MK'}</span>

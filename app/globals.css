@@ -269,67 +269,6 @@ textarea {
   cursor: pointer;
 }
 
-.live-search-dropdown {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 0;
-  right: 0;
-  z-index: 80;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 16px 36px rgba(41, 29, 20, 0.14);
-}
-
-.live-search-dropdown > a {
-  display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.live-search-dropdown > a:hover {
-  background: #f6f2eb;
-}
-
-.live-search-dropdown img {
-  width: 46px;
-  height: 46px;
-  border-radius: 7px;
-  object-fit: cover;
-}
-
-.live-search-dropdown a > span {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.live-search-dropdown strong {
-  overflow: hidden;
-  font-size: 0.79rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.live-search-dropdown small {
-  width: fit-content;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #f1ece4;
-  color: var(--muted);
-  font-size: 0.65rem;
-}
-
-.live-search-dropdown b {
-  color: var(--primary);
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
 .live-search-empty {
   margin: 0;
   padding: 14px;
@@ -992,42 +931,6 @@ textarea {
   color: var(--muted);
   font-weight: 600;
 
-.live-search-product-pricing {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-}
-
-.live-search-product-pricing > span {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.live-search-product-pricing del {
-  color: #a8a29e;
-  font-size: 0.64rem;
-}
-
-.live-search-product-pricing > small {
-  width: auto;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  font-size: 0.62rem;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.live-search-product-pricing > small.in-stock {
-  color: var(--forest);
-}
-
-.live-search-product-pricing > small.out-of-stock {
-  color: var(--primary);
-}
   padding: 14px;
   box-shadow: var(--shadow);
 }
@@ -17755,6 +17658,26 @@ a.audit-target-chip:hover {
     flex-basis: 11rem;
     width: 11rem;
     max-width: 11rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .desktop-single-row .site-header-inner {
+    gap: 8px;
+  }
+
+  .desktop-single-row .site-header-inner > .main-nav {
+    gap: 8px;
+  }
+
+  .desktop-single-row .site-header-inner > .header-product-search {
+    flex-basis: 12rem;
+    width: 12rem;
+    max-width: 12rem;
+  }
+
+  .desktop-single-row .site-header-actions {
+    gap: 6px;
   }
 }
 

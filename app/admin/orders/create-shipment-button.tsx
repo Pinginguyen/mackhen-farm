@@ -36,7 +36,7 @@ export default function CreateShipmentButton({
       const response = await fetch('/api/admin/orders/shipment', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ orderId, carrier }),
+        body: JSON.stringify({ orderId, carrier: carrier ?? 'GHTK' }),
       });
       const result = await response.json() as { shipment?: Shipment; error?: { message?: string } };
       if (!response.ok || !result.shipment) {
@@ -55,7 +55,7 @@ export default function CreateShipmentButton({
   return (
     <div className="admin-shipment-action flex flex-wrap items-center gap-3">
       {!activeTrackingCode && <>
-        <button type="button" className="secondary-action" onClick={() => void createShipment()} disabled={pending}>
+        <button type="button" className="secondary-action" onClick={() => void createShipment()} disabled={pending || (carrier !== null && carrier !== 'GHTK' && carrier !== 'VIETTEL_POST')}>
           <Truck size={16} /> {pending ? 'Đang tạo...' : 'Tạo vận đơn bưu cục'}
         </button>
       </>}

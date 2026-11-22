@@ -58,5 +58,5 @@ export default function SoundEffect() {
     if (!nextMuted) playClickSound();
   }
 
-  return <button className="sound-effect-toggle" type="button" aria-pressed={!muted} aria-label={locale === 'en' ? (muted ? 'Unmute interface sounds' : 'Mute interface sounds') : (muted ? 'Bật âm thanh giao diện' : 'Tắt âm thanh giao diện')} title={locale === 'en' ? (muted ? 'Unmute sounds' : 'Mute sounds') : (muted ? 'Bật âm thanh' : 'Tắt âm thanh')} onClick={toggleSound}>{muted ? <VolumeX size={17} /> : <Volume2 size={17} />}<span>{locale === 'en' ? (muted ? 'Sound off' : 'Sound on') : (muted ? 'Đã tắt âm' : 'Âm thanh')}</span></button>;
+  return <button className="sound-effect-toggle header-sound-toggle" type="button" aria-pressed={!muted} aria-label={locale === 'en' ? (muted ? 'Unmute interface sounds' : 'Mute interface sounds') : (muted ? 'Bật âm thanh giao diện' : 'Tắt âm thanh giao diện')} title={locale === 'en' ? (muted ? 'Unmute sounds' : 'Mute sounds') : (muted ? 'Bật âm thanh' : 'Tắt âm thanh')} onClick={toggleSound}>{muted ? <VolumeX size={17} /> : <Volume2 size={17} />}<span>{locale === 'en' ? (muted ? 'Sound off' : 'Sound on') : (muted ? 'Đã tắt âm' : 'Âm thanh')}</span></button>;
 }
