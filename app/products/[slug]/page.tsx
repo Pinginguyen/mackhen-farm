@@ -21,18 +21,7 @@ import ProductRecommendationShelf from '@/components/ProductRecommendationShelf'
 
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; images: string[]; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
-export const revalidate = 300;
-export const dynamicParams = false;
-
-export async function generateStaticParams(): Promise<{ slug: string }[]> {
-  try {
-    const products = await prisma.product.findMany({ where: { active: true }, select: { slug: true } });
-    if (products.length) return products.map((product) => ({ slug: product.slug }));
-  } catch (error) {
-    console.warn('Product static params unavailable; using built-in product slugs.', error instanceof Error ? error.name : 'UnknownError');
-  }
-  return DEFAULT_PRODUCTS.filter((product) => product.active).map((product) => ({ slug: product.slug }));
-}
+export const dynamic = 'force-dynamic';
 
 function normalizeProductLookup(value: string): string {
   return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
