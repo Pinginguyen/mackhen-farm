@@ -54,7 +54,7 @@ export default function CreateShipmentButton({
   }
 
   return (
-    <div className="admin-shipment-action">
+    <div className="admin-shipment-action flex flex-wrap items-center gap-3">
       {!activeTrackingCode && <>
         <label className="sr-only" htmlFor={`carrier-${orderId}`}>Đơn vị vận chuyển</label>
         <select id={`carrier-${orderId}`} aria-label="Đơn vị vận chuyển để tạo vận đơn" value={selectedCarrier} onChange={(event) => setSelectedCarrier(event.target.value)} disabled={pending}>

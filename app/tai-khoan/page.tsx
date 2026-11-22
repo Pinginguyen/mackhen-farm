@@ -36,10 +36,10 @@ export default async function CustomerAccountPage({ searchParams }: { searchPara
           { customer: { is: { email: user.email } } },
         ],
       },
-      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { titleSnapshot: true, skuSnapshot: true, quantity: true, unitPrice: true, finalPrice: true } } },
+      select: { orderCode: true, createdAt: true, totalAmount: true, orderStatus: true, paymentStatus: true, items: { select: { titleSnapshot: true, skuSnapshot: true, quantity: true, unitPrice: true, finalPrice: true, product: { select: { slug: true } } } } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
 
-  return <main className="page-shell"><AccountDashboard profile={user} pointHistory={pointHistory.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() }))} reviewRewards={reviewRewards.map((reward) => ({ ...reward, createdAt: reward.createdAt.toISOString() }))} orders={orders.map((order) => ({ ...order, items: order.items.map((item) => ({ productName: item.titleSnapshot, productSlug: item.skuSnapshot ?? '', quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice })), createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
+  return <main className="page-shell"><AccountDashboard profile={user} pointHistory={pointHistory.map((entry) => ({ ...entry, createdAt: entry.createdAt.toISOString() }))} reviewRewards={reviewRewards.map((reward) => ({ ...reward, createdAt: reward.createdAt.toISOString() }))} orders={orders.map((order) => ({ ...order, items: order.items.map((item) => ({ productName: item.titleSnapshot, productSlug: item.product.slug, quantity: item.quantity, price: item.unitPrice, finalPrice: item.finalPrice })), createdAt: order.createdAt.toISOString() }))} initialTab={searchParams.tab === 'orders' ? 'orders' : 'profile'} /></main>;
 }

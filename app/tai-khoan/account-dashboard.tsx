@@ -8,21 +8,12 @@ import { formatCurrency } from '@/lib/store-data';
 import ValidatedPhoneInput from '@/components/ValidatedPhoneInput';
 
 type Profile = { name: string; email: string; phone: string | null; address: string | null; loyaltyPoints: number; lifetimePoints: number; membershipTier: string };
-type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; productSlug: string; quantity: number; price: number }[]; localFallback?: boolean };
+type AccountOrder = { orderCode: string; createdAt: string; totalAmount: number; orderStatus: string; items: { productName: string; productSlug: string; quantity: number; price: number }[] };
 type PointHistoryItem = { id: string; points: number; type: 'EARN' | 'SPEND'; description: string; createdAt: string };
 type WalletHistoryItem = { id: string; amount: number; type: 'CREDIT' | 'DEBIT'; description: string; createdAt: string };
 type ReviewReward = { id: string; rewardVoucherCode: string | null; createdAt: string; product: { name: string } };
 
 const statusLabels: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Chờ xác nhận', PAID: 'Đã thanh toán', PROCESSING: 'Đang đóng gói', HANDED_OFF: 'Đã bàn giao 3PL', IN_TRANSIT: 'Đang giao', SHIPPING: 'Đang giao', DELIVERED: 'Đã giao', COMPLETED: 'Đã giao', CANCELLED: 'Đã hủy' };
-
-function mergeOrders(current: AccountOrder[], incoming: AccountOrder[]): AccountOrder[] {
-  const byCode = new Map(current.map((order) => [order.orderCode, order]));
-  for (const order of incoming) {
-    const existing = byCode.get(order.orderCode);
-    if (!existing || existing.localFallback || !order.localFallback) byCode.set(order.orderCode, order);
-  }
-  return [...byCode.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-}
 
 export default function AccountDashboard({ profile, orders, pointHistory, reviewRewards, initialTab }: { profile: Profile; orders: AccountOrder[]; pointHistory: PointHistoryItem[]; reviewRewards: ReviewReward[]; initialTab: 'profile' | 'orders' }) {
   const [tab, setTab] = useState(initialTab);
@@ -41,17 +32,6 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
       savedCodes = [];
     }
 
-    const knownCodes = new Set(orders.map((order) => order.orderCode));
-    const localOrders = savedCodes.filter((code) => !knownCodes.has(code)).map((orderCode): AccountOrder => ({
-      orderCode,
-      createdAt: new Date().toISOString(),
-      totalAmount: 0,
-      orderStatus: 'PENDING',
-      items: [],
-      localFallback: true,
-    }));
-    setOrderList((current) => mergeOrders(mergeOrders(current, orders), localOrders));
-
     const controller = new AbortController();
     void fetch('/api/account/orders', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
@@ -59,7 +39,15 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
         return await response.json() as { items?: AccountOrder[] };
       })
       .then((result) => {
-        if (result?.items) setOrderList((current) => mergeOrders(current, result.items ?? []));
+        if (!result || !Array.isArray(result.items)) return;
+        const serverOrders = result.items;
+        const serverCodes = new Set(serverOrders.map((order) => order.orderCode));
+        setOrderList(serverOrders);
+        try {
+          window.localStorage.setItem('user_orders', JSON.stringify(savedCodes.filter((code) => serverCodes.has(code))));
+        } catch {
+          return;
+        }
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -147,12 +135,12 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
                   <tr key={order.orderCode}>
                     <td>{order.orderCode}</td>
                     <td>{new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
-                    <td>{order.items.length ? order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') : order.localFallback ? 'Đang đồng bộ sản phẩm' : 'Không có sản phẩm'}</td>
+                    <td>{order.items.length ? order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') : 'Không có sản phẩm'}</td>
                     <td>{order.totalAmount > 0 ? formatCurrency(order.totalAmount) : 'Đang đồng bộ'}</td>
-                    <td>{order.localFallback ? 'Đang đồng bộ đơn hàng' : statusLabels[order.orderStatus] ?? order.orderStatus}</td>
+                    <td>{statusLabels[order.orderStatus] ?? order.orderStatus}</td>
                     <td>
                       <Link href={`/tra-cuu?orderCode=${encodeURIComponent(order.orderCode)}`}>Xem chi tiết / Tra cứu</Link>
-                      {!order.localFallback && ['DELIVERED', 'COMPLETED'].includes(order.orderStatus) && order.items[0] && (
+                      {['DELIVERED', 'COMPLETED'].includes(order.orderStatus) && order.items[0] && (
                         <Link className="account-review-link" href={`/products/${encodeURIComponent(order.items[0].productSlug)}?review=1#product-reviews-title`}>Đánh giá</Link>
                       )}
                     </td>
