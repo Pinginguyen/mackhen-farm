@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { MapPin, Stamp, Utensils, Wine } from 'lucide-react';
 import type { PairingGuide, SensoryProfile } from '@/lib/store-data';
 
@@ -13,15 +14,15 @@ export default function ProductEditorialDetails({
   sensoryProfile,
   pairingGuide,
   originRegion,
-  waxSealCode,
+  batchCode,
 }: {
   sensoryProfile?: SensoryProfile | null;
   pairingGuide?: PairingGuide | null;
   originRegion?: string | null;
-  waxSealCode?: string | null;
+  batchCode?: string | null;
 }) {
   const hasPairing = Boolean(pairingGuide?.recommendedDrink?.trim() || pairingGuide?.servingTip?.trim());
-  const hasSeal = Boolean(originRegion?.trim() || waxSealCode?.trim());
+  const hasSeal = Boolean(batchCode?.trim());
 
   return <div className="product-editorial-details">
     {sensoryProfile && <section className="product-info-block product-sensory-panel" aria-labelledby="product-sensory-title">
@@ -45,12 +46,12 @@ export default function ProductEditorialDetails({
       {pairingGuide?.servingTip?.trim() && <p><strong>Mẹo thưởng thức:</strong> {pairingGuide.servingTip}</p>}
     </section>}
 
-    {hasSeal && <aside className="vintage-wax-seal" aria-label="Con dấu niêm phong xuất xứ">
+    {hasSeal && <Link className="vintage-wax-seal" href={`/truy-xuat?batch=${encodeURIComponent(batchCode!.trim())}`} aria-label={`Tra cứu nguồn gốc sản phẩm theo lô ${batchCode!.trim()}`} title="Tra cứu hành trình lô sản xuất">
       <Stamp size={21} strokeWidth={1.5} aria-hidden="true" />
       <small>MÃ NIÊM PHONG</small>
-      <strong>{waxSealCode?.trim() || 'MẮC KHÉN FARM'}</strong>
+      <strong>{batchCode!.trim()}</strong>
       {originRegion?.trim() && <span><MapPin size={11} aria-hidden="true" /> {originRegion}</span>}
       <span>100% NGUYÊN LIỆU UPCYCLED</span>
-    </aside>}
+    </Link>}
   </div>;
 }

@@ -44,8 +44,9 @@ export default function TraceabilityPage() {
   }, []);
 
   useEffect(() => {
-    const qrToken = new URLSearchParams(window.location.search).get('qr');
-    if (qrToken) void searchBatch(qrToken);
+    const searchParams = new URLSearchParams(window.location.search);
+    const identifier = searchParams.get('batch') || searchParams.get('qr');
+    if (identifier) void searchBatch(identifier);
   }, []);
 
   async function searchBatch(batchCode: string) {

@@ -31,6 +31,7 @@ function normalizeProductLookup(value: string): string {
 export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
   const systemSettings = await getSystemSettings();
   let product: Product | null = null;
+  let productBatchCode: string | null = null;
   let inactiveInDatabase = false;
   let reviews: ProductReview[] = [];
   let reviewCount = 0;
@@ -38,12 +39,23 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   try {
     const databaseProduct = await prisma.product.findFirst({
       where: { OR: [{ slug: params.slug }, { id: params.slug }] },
-      include: { variants: true, reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, customerName: true, rating: true, comment: true, images: true, createdAt: true, adminReply: true, adminReplyAt: true, replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
+      include: {
+        variants: true,
+        productionLots: {
+          where: { batchCode: { startsWith: 'BATCH-' }, status: 'ACTIVE', expDate: { gt: new Date() } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { batchCode: true },
+        },
+        reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, customerName: true, rating: true, comment: true, images: true, createdAt: true, adminReply: true, adminReplyAt: true, replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } },
+      },
     });
     if (databaseProduct) {
+      const { productionLots, ...databaseProductFields } = databaseProduct;
+      productBatchCode = productionLots[0]?.batchCode ?? null;
       inactiveInDatabase = !databaseProduct.active;
       product = {
-        ...databaseProduct,
+        ...databaseProductFields,
         highlights: databaseProduct.highlights ?? [],
         nutritionFacts: normalizeNutritionFacts(databaseProduct.nutritionFacts),
         sensoryProfile: normalizeSensoryProfile(databaseProduct.sensoryProfile),
@@ -184,7 +196,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
                 sensoryProfile={product.sensoryProfile}
                 pairingGuide={product.pairingGuide}
                 originRegion={product.originRegion}
-                waxSealCode={product.waxSealCode}
+                batchCode={productBatchCode}
               />
               {product.nutritionFacts?.enabled && <section className="product-info-block nutrition-facts !rounded-2xl !border-stone-200/80 !bg-white !p-5">
                 <h2>Bảng giá trị dinh dưỡng</h2>

@@ -11485,7 +11485,9 @@ body {
 .product-pairing-guide h2 { display: flex; align-items: center; gap: 8px; margin: 0; color: #1B4332; font-family: Georgia, 'Times New Roman', serif; }
 .product-pairing-guide p { margin: 0; color: #57534e; line-height: 1.6; }
 .product-pairing-guide strong { color: #1B4332; }
-.vintage-wax-seal { display: grid; width: 174px; aspect-ratio: 1; place-content: center; gap: 5px; padding: 19px; border: 5px double #d9b866; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #ba4b43, #7d171b 68%, #581014); box-shadow: inset 0 0 0 3px rgb(255 235 174 / 30%), 0 5px 16px rgb(88 16 20 / 22%); color: #f5d992; text-align: center; transform: rotate(-5deg); }
+.vintage-wax-seal { display: grid; width: 174px; aspect-ratio: 1; place-content: center; gap: 5px; padding: 19px; border: 5px double #d9b866; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #ba4b43, #7d171b 68%, #581014); box-shadow: inset 0 0 0 3px rgb(255 235 174 / 30%), 0 5px 16px rgb(88 16 20 / 22%); color: #f5d992; text-align: center; text-decoration: none; transform: rotate(-5deg); transition: transform 160ms ease, box-shadow 160ms ease; }
+.vintage-wax-seal:hover { box-shadow: inset 0 0 0 3px rgb(255 235 174 / 40%), 0 8px 20px rgb(88 16 20 / 30%); transform: rotate(-2deg) scale(1.03); }
+.vintage-wax-seal:focus-visible { outline: 3px solid #1d5e49; outline-offset: 4px; }
 .vintage-wax-seal small { font-size: 0.55rem; font-weight: 800; }
 .vintage-wax-seal strong { font-family: Georgia, 'Times New Roman', serif; font-size: 0.82rem; line-height: 1.2; }
 .vintage-wax-seal span { font-size: 0.55rem; line-height: 1.3; }
