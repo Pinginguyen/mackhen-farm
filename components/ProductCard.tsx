@@ -64,13 +64,15 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           {product.badge?.trim() && !(saleStatus.expired && product.originalPrice != null) && <span className="product-highlight-badge">{product.badge}</span>}
         </div>
         {product.stock > 0 && <button className="product-card-quick-view" type="button" onClick={() => setQuickViewOpen(true)} aria-label={`${locale === 'en' ? 'Quick view' : 'Xem nhanh'} ${productName}`}><Eye size={16} />{locale === 'en' ? 'Quick view' : 'Xem nhanh'}</button>}
-        <div className="artisan-quick-macros" aria-label={locale === 'en' ? 'Product highlights' : 'Điểm nổi bật sản phẩm'}>
-          {proteinAmount && <span>{proteinAmount}g Protein</span>}
-          {product.category !== 'Gia vị Tây Bắc' && <><span>Không Cholesterol</span><span>Upcycled Food</span></>}
-        </div>
-        {product.stock > 0 && <button className="artisan-quick-add" type="button" onClick={() => void addQuickly()} disabled={quickAdding}>
-          <ShoppingBag size={15} aria-hidden="true" /> {quickAdded ? (locale === 'en' ? 'Added' : 'Đã thêm') : quickAdding ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : (locale === 'en' ? 'Quick add to cart' : 'Thêm nhanh vào giỏ')}
-        </button>}
+        {product.stock > 0 && <div className="product-card-hover-overlay">
+          <div className="artisan-quick-macros" aria-label={locale === 'en' ? 'Product highlights' : 'Điểm nổi bật sản phẩm'}>
+            {proteinAmount && <span>{proteinAmount}g Protein</span>}
+            {product.category !== 'Gia vị Tây Bắc' && <><span>Không Cholesterol</span><span>Upcycled Food</span></>}
+          </div>
+          <button className="artisan-quick-add" type="button" onClick={() => void addQuickly()} disabled={quickAdding}>
+            <ShoppingBag size={15} aria-hidden="true" /> {quickAdded ? (locale === 'en' ? 'Added' : 'Đã thêm') : quickAdding ? (locale === 'en' ? 'Adding...' : 'Đang thêm...') : (locale === 'en' ? 'Quick add to cart' : 'Thêm nhanh vào giỏ')}
+          </button>
+        </div>}
       </div>
       <div className="card-body">
         <div className="product-card-header">

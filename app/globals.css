@@ -7251,30 +7251,16 @@ body {
 }
 
 .artisan-quick-macros {
-  position: absolute;
-  z-index: 3;
-  right: 10px;
-  bottom: 58px;
-  left: 10px;
   display: flex;
-  min-height: 34px;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px 9px;
-  padding: 6px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  border-radius: 8px;
-  background: rgba(250, 247, 242, 0.84);
-  color: #142820;
+  color: #fff;
   font-size: 0.61rem;
   font-weight: 700;
-  opacity: 0;
   pointer-events: none;
-  transform: translate3d(0, 8px, 0);
-  transition: opacity 260ms ease, transform 400ms cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(10px);
-  will-change: transform;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .artisan-quick-macros > span + span {
@@ -7294,32 +7280,25 @@ body {
 }
 
 .artisan-quick-add {
-  position: absolute;
-  z-index: 4;
-  right: 10px;
-  bottom: 10px;
-  left: 10px;
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px solid rgba(132, 30, 30, 0.12);
-  border-radius: 8px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
   background: #841E1E;
   color: #fff;
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 750;
-  opacity: 0;
-  pointer-events: none;
-  transform: translate3d(0, 115%, 0);
-  transition: opacity 220ms ease, transform 460ms cubic-bezier(0.16, 1.15, 0.3, 1), background-color 180ms ease;
-  will-change: transform;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 
 .artisan-quick-add:hover {
   background: #6f1717;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 
 .artisan-quick-add:disabled {
@@ -7327,17 +7306,27 @@ body {
   opacity: 0.8;
 }
 
-.artisan-product-card:hover .artisan-quick-add,
-.artisan-product-card:focus-within .artisan-quick-add {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate3d(0, 0, 0);
+.product-card-hover-overlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
 }
 
-.artisan-product-card:hover .artisan-quick-macros,
-.artisan-product-card:focus-within .artisan-quick-macros {
+.product-card-media:hover .product-card-hover-overlay,
+.product-card-media:focus-within .product-card-hover-overlay {
   opacity: 1;
-  transform: translate3d(0, 0, 0);
+  pointer-events: auto;
 }
 
 .artisan-product-card .card-body {
@@ -7360,15 +7349,23 @@ body {
 }
 
 @media (hover: none), (max-width: 767px) {
-  .artisan-quick-macros {
+  .product-card-hover-overlay {
+    position: static;
+    padding: 8px 0 0;
+    background: transparent;
+    backdrop-filter: none;
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    pointer-events: auto;
+  }
+
+  .artisan-quick-macros {
+    display: none;
   }
 
   .artisan-quick-add {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translate3d(0, 0, 0);
+    width: 100%;
+    border-color: rgba(132, 30, 30, 0.12);
+    border-radius: 8px;
   }
 }
 
@@ -7447,8 +7444,9 @@ body {
 
 .product-card-quick-view {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 12px;
+  right: 12px;
+  left: auto;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -7456,17 +7454,17 @@ body {
   gap: 8px;
   min-height: 42px;
   padding: 9px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 8px 20px rgba(28, 25, 23, 0.18);
-  color: #292524;
+  background: rgba(20, 40, 32, 0.76);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  color: #fff;
   cursor: pointer;
   font-size: 0.82rem;
   font-weight: 750;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%);
+  transform: translateY(-3px);
   transition: opacity 160ms ease;
 }
 
@@ -7474,7 +7472,7 @@ body {
   .product-card-media.has-secondary:hover .product-card-image.is-primary { opacity: 0; }
   .product-card-media.has-secondary:hover .product-card-image.is-secondary { opacity: 1; transform: scale(1); }
   .product-card-media:hover .product-card-quick-view,
-  .product-card-quick-view:focus-visible { opacity: 1; pointer-events: auto; }
+  .product-card-quick-view:focus-visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
   .product-card-image-link:hover .product-card-image { transform: scale(1.025); }
 }
 
@@ -18344,12 +18342,6 @@ a.audit-target-chip:hover {
   .admin-lot-qr {
     align-items: flex-start;
     flex-direction: column;
-  }
-}
-
-@media (hover: none), (max-width: 767px) {
-  .home-page > .catalog-section .artisan-quick-add {
-    display: none;
   }
 }
 
