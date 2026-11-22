@@ -94,14 +94,14 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           valueAxis3={product.valueAxis3}
         />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
-        <div className="product-card-purchase mt-auto flex items-center justify-between border-t border-stone-100 pt-3">
-        <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(displayedPrice)}</strong>{displayedOriginalPrice != null && <del className="!text-stone-400">{formatCurrency(displayedOriginalPrice)}</del>}</div>{saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}</div>
+        <div className="product-card-purchase mt-auto flex flex-nowrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
+        <div className="product-card-pricing min-w-0 flex-1"><div className="product-prices flex-nowrap gap-2 whitespace-nowrap"><strong>{formatCurrency(displayedPrice)}</strong>{displayedOriginalPrice != null && <del className="!text-stone-400">{formatCurrency(displayedOriginalPrice)}</del>}</div>{saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}</div>
         <Link
           href={`/products/${product.slug}`}
           aria-disabled={product.stock === 0}
           tabIndex={product.stock === 0 ? -1 : undefined}
           onClick={(event) => { if (product.stock === 0) event.preventDefault(); }}
-          className={`product-card-action${product.stock === 0 ? ' is-out-of-stock' : ''}`}
+          className={`product-card-action flex shrink-0 items-center gap-1 whitespace-nowrap${product.stock === 0 ? ' is-out-of-stock' : ''}`}
         >
           {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <><span>{locale === 'en' ? 'Shop now' : 'Chọn mua'}</span><ArrowRight size={16} aria-hidden="true" /></>}
         </Link>

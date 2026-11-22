@@ -2186,8 +2186,49 @@ textarea {
 }
 
 .site-footer-column .footer-zalo-link {
-  color: #fcd34d !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #f2d18a !important;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.site-footer-column .footer-zalo-link:hover {
+  color: #fff1c7 !important;
+}
+
+.footer-contact-list {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  margin: 2px 0 4px;
+}
+
+.site-footer-column .footer-contact-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.site-footer-column .footer-contact-item > span {
+  color: rgba(246, 240, 227, 0.62);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.site-footer-column .footer-phone-link {
+  color: #fffaf0 !important;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 750;
+  white-space: nowrap;
 }
 
 .site-footer-bottom {
@@ -17521,6 +17562,7 @@ a.audit-target-chip:hover {
 
 .product-card-purchase {
   display: flex;
+  flex-wrap: nowrap;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
@@ -17531,14 +17573,44 @@ a.audit-target-chip:hover {
 }
 
 .product-card-purchase .product-card-pricing {
+  display: flex;
+  flex: 1 1 auto;
   min-width: 0;
+  align-items: center;
   margin-top: 0;
 }
 
+.product-card-purchase .product-prices {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 6px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.product-card-purchase .product-prices strong {
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+}
+
+.product-card-purchase .product-prices del {
+  flex: 0 0 auto;
+  margin-left: 0;
+  font-size: 0.68rem;
+}
+
 .product-card-purchase .product-card-action {
+  flex: 0 0 auto;
   min-height: 44px;
   margin: 0;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 8px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.product-card-purchase .product-card-action > span {
+  white-space: nowrap;
 }
 
 .mobile-search-trigger,
@@ -17957,9 +18029,11 @@ a.audit-target-chip:hover {
 }
 
 .home-page > .catalog-section .product-card-action {
-  min-height: 36px;
-  margin-top: 4px;
-  font-size: 0.85rem;
+  min-height: 44px;
+  margin-top: 0;
+  padding: 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 @media (max-width: 1023px) {

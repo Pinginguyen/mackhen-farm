@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { MessageCircle } from 'lucide-react';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 import type { PublicSystemSettings } from '@/lib/system-settings';
@@ -16,9 +17,14 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
   const address = settings.address || 'Bản Hua Tạt, Xã Vân Hồ, Tỉnh Sơn La';
   const hotline = settings.contactHotline || settings.hotline || '0762.793.244';
   const contactZalo = settings.contactZalo ?? '';
-  const zalo = /^https?:\/\//i.test(contactZalo)
-    ? contactZalo
-    : `https://zalo.me/${contactZalo.replace(/\D/g, '')}`;
+  const zaloRecipient = contactZalo || hotline;
+  const zalo = /^https?:\/\//i.test(zaloRecipient)
+    ? zaloRecipient
+    : `https://zalo.me/${zaloRecipient.replace(/\D/g, '')}`;
+  const hotlineDigits = hotline.replace(/\D/g, '');
+  const formattedHotline = hotlineDigits.length === 10 && hotlineDigits.startsWith('0')
+    ? `${hotlineDigits.slice(0, 4)}.${hotlineDigits.slice(4, 7)}.${hotlineDigits.slice(7)}`
+    : hotline;
   const email = settings.email || 'contact@mackhenfarm.vn';
 
   if (pathname?.startsWith('/admin')) return null;
@@ -34,7 +40,19 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
         <section className="site-footer-column">
           <h2>{text('LIÊN HỆ TRỰC TIẾP')}</h2>
           <p>{text('Nhóm 3')} <span>{text('(Sáng lập & Điều hành dự án)')}</span></p>
-          <p>{text('Hotline / Zalo đặt hàng:')} <a className="footer-zalo-link" href={zalo} target="_blank" rel="noopener noreferrer">{contactZalo || hotline} {text('(Bấm chat Zalo)')}</a></p>
+          <div className="footer-contact-list">
+            <p className="footer-contact-item">
+              <span>{text('Hotline đặt hàng')}</span>
+              <a className="footer-phone-link" href={`tel:${hotline.replace(/[^\d+]/g, '')}`}>{formattedHotline}</a>
+            </p>
+            <p className="footer-contact-item">
+              <span>{text('Tư vấn qua Zalo')}</span>
+              <a className="footer-zalo-link" href={zalo} target="_blank" rel="noopener noreferrer">
+                <MessageCircle size={15} aria-hidden="true" />
+                {text('Nhắn Zalo trực tiếp')}
+              </a>
+            </p>
+          </div>
           <p>Email: <a href={`mailto:${email}`}>{email}</a></p>
           <p>{text('Địa chỉ điều hành: Chung cư M-One, Quận 7, TP. Hồ Chí Minh.')}</p>
           <p>{text('Hỗ trợ kỹ thuật & đổi trả: 8:00 - 22:00 hàng ngày.')}</p>
