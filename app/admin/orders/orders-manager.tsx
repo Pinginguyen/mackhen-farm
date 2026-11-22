@@ -69,6 +69,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
   const [orderList, setOrderList] = useState(orders);
   const [statusTab, setStatusTab] = useState('ALL');
   const [paymentMethod, setPaymentMethod] = useState('ALL');
+  const [selectedCarriers, setSelectedCarriers] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -286,11 +287,11 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
 
   return (
     <div className="admin-orders">
-      <div className="admin-order-tabs" role="tablist" aria-label="Lọc trạng thái đơn hàng">
+      <div className="admin-order-tabs !flex-wrap !gap-2 !overflow-visible" role="tablist" aria-label="Lọc trạng thái đơn hàng">
         {tabs.map((tab) => <button type="button" role="tab" aria-selected={statusTab === tab.id} className={statusTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => { setStatusTab(tab.id); setPage(1); }}>{tab.label}<span>{orderList.filter((order) => orderMatchesTab(order, tab.id)).length}</span></button>)}
       </div>
-      <div className="admin-order-filters">
-        <label className="admin-filter-search"><Search size={17} /><input aria-label="Tìm theo mã đơn, tên hoặc số điện thoại" placeholder="Mã đơn, tên khách hoặc SĐT" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
+      <div className="admin-order-filters items-end">
+        <label className="admin-filter-search"><Search size={17} /><input aria-label="Tìm theo mã đơn, tên hoặc số điện thoại" placeholder="Mã đơn, tên, SĐT..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
         <label className="field">Thanh toán<select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value); setPage(1); }}><option value="ALL">Tất cả</option><option value="VIETQR">VietQR</option><option value="MOMO">MoMo</option><option value="COD">COD</option></select></label>
         <label className="field">Từ ngày<input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} /></label>
         <label className="field">Đến ngày<input type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1); }} /></label>
@@ -359,7 +360,7 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
             <form className="admin-order-toolbar" onSubmit={(event) => save(event, order)}>
               <div className="admin-order-toolbar-controls grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <label className="field">Trạng thái đơn<select name="status" defaultValue="">
-                  <option value="">Giữ nguyên (Không đổi): {orderStatusLabels[order.status] ?? order.status}</option>
+                  <option value="">-- Giữ nguyên --</option>
                   {statusOptions.filter(([value]) => orderStatusValues.has(value)
                     && (getAllowedNextStatuses(order.status).includes(value)
                       || (order.status === 'SHIPPING' && value === 'COMPLETED')))
@@ -370,18 +371,18 @@ export default function OrdersManager({ orders }: { orders: AdminOrder[] }) {
                     >{label}</option>)}
                 </select></label>
                 <label className="field">Trạng thái thanh toán<select name="paymentStatus" defaultValue="">
-                  <option value="">Giữ nguyên: {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}</option>
+                  <option value="">-- Giữ nguyên --</option>
                   <option value="PENDING" disabled={order.paymentStatus === 'REFUNDED'}>Chưa thanh toán</option>
                   <option value="PAID" disabled={order.paymentStatus === 'REFUNDED' || (order.paymentMethod === 'VIETQR' && order.paymentStatus !== 'PAID')}>Đã thanh toán</option>
                   <option value="REFUNDED" disabled={order.paymentStatus !== 'REFUNDED'}>Đã hoàn tiền</option>
                 </select></label>
-                <label className="field">Đơn vị vận chuyển<select name="carrier" defaultValue={order.carrier ?? ''}><option value="">Chưa chọn</option><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
+                <label className="field">Đơn vị vận chuyển<select name="carrier" value={selectedCarriers[order.orderCode] ?? order.carrier ?? 'GHTK'} onChange={(event) => setSelectedCarriers((current) => ({ ...current, [order.orderCode]: event.target.value }))}><option value="GHTK">GHTK</option><option value="SPX">SPX Express</option><option value="VIETTEL_POST">Viettel Post</option></select></label>
                 <label className="field">Mã vận đơn<input name="trackingCode" defaultValue={order.trackingCode ?? ''} placeholder="Nhập mã vận đơn..." /></label>
               </div>
               <div className="admin-order-toolbar-action-row flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
                 <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-3">
                   <Link className="admin-order-print-button border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5" href={`/admin/orders/print/${encodeURIComponent(order.orderCode)}`}><Printer size={16} /> In phiếu</Link>
-                  <CreateShipmentButton orderId={order.id} carrier={order.carrier} trackingCode={order.trackingCode} labelUrl={order.shippingLabelUrl ?? null} onCreated={(shipment) => setOrderList((current) => current.map((item) => item.id === order.id ? { ...item, carrier: shipment.carrier, trackingCode: shipment.trackingCode, shippingStatus: shipment.shippingStatus, shippingLabelUrl: shipment.labelUrl } : item))} />
+                  <CreateShipmentButton orderId={order.id} carrier={selectedCarriers[order.orderCode] ?? order.carrier ?? 'GHTK'} trackingCode={order.trackingCode} labelUrl={order.shippingLabelUrl ?? null} onCreated={(shipment) => setOrderList((current) => current.map((item) => item.id === order.id ? { ...item, carrier: shipment.carrier, trackingCode: shipment.trackingCode, shippingStatus: shipment.shippingStatus, shippingLabelUrl: shipment.labelUrl } : item))} />
                   {order.paymentMethod === 'VIETQR' && order.paymentStatus === 'PENDING' && ['PENDING', 'CONFIRMED'].includes(order.status) && <button type="button" className="admin-order-simulate-button bg-purple-600 hover:bg-purple-700 text-white font-medium px-3.5 py-1.5 rounded-lg text-sm shadow-sm transition active:scale-95" onClick={() => void simulateSepayPayment(order)} disabled={pending === order.orderCode}><Zap size={16} /> {pending === order.orderCode ? 'Đang giả lập...' : 'Giả lập Quét VietQR (Demo)'}</button>}
                 </div>
                 <div className="admin-order-toolbar-actions flex flex-wrap items-center justify-start gap-2">

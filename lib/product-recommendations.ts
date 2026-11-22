@@ -5,6 +5,9 @@ export type RecommendedProduct = {
   slug: string;
   name: string;
   image: string;
+  images: string[];
+  highlights: string[];
+  variants: { id: string }[];
   price: number;
   stock: number;
   reason: 'frequently-bought-together' | 'same-category';
@@ -66,7 +69,7 @@ export async function getProductRecommendations(sourceProductIds: string[], limi
           { category: { in: categories } },
         ],
       },
-      select: { id: true, slug: true, name: true, image: true, price: true, stock: true },
+      select: { id: true, slug: true, name: true, image: true, images: true, highlights: true, variants: { select: { id: true } }, price: true, stock: true },
     });
 
     return products
@@ -74,6 +77,9 @@ export async function getProductRecommendations(sourceProductIds: string[], limi
       .slice(0, limit)
       .map((product) => ({
         ...product,
+        images: product.images ?? [],
+        highlights: product.highlights ?? [],
+        variants: product.variants ?? [],
         reason: pairScores.has(product.id) ? 'frequently-bought-together' : 'same-category',
       }));
   } catch (error) {

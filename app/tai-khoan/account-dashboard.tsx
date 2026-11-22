@@ -24,14 +24,6 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
   const memberTier = profile.membershipTier === 'VVIP' ? 'Gold' : profile.membershipTier === 'VIP' ? 'Silver' : 'Bronze';
 
   useEffect(() => {
-    let savedCodes: string[] = [];
-    try {
-      const saved: unknown = JSON.parse(window.localStorage.getItem('user_orders') ?? '[]');
-      if (Array.isArray(saved)) savedCodes = [...new Set(saved.filter((code): code is string => typeof code === 'string' && /^MKF-\d{6}$/.test(code)))];
-    } catch {
-      savedCodes = [];
-    }
-
     const controller = new AbortController();
     void fetch('/api/account/orders', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
@@ -40,14 +32,7 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
       })
       .then((result) => {
         if (!result || !Array.isArray(result.items)) return;
-        const serverOrders = result.items;
-        const serverCodes = new Set(serverOrders.map((order) => order.orderCode));
-        setOrderList(serverOrders);
-        try {
-          window.localStorage.setItem('user_orders', JSON.stringify(savedCodes.filter((code) => serverCodes.has(code))));
-        } catch {
-          return;
-        }
+        setOrderList(result.items);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -136,7 +121,7 @@ export default function AccountDashboard({ profile, orders, pointHistory, review
                     <td>{order.orderCode}</td>
                     <td>{new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</td>
                     <td>{order.items.length ? order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') : 'Không có sản phẩm'}</td>
-                    <td>{order.totalAmount > 0 ? formatCurrency(order.totalAmount) : 'Đang đồng bộ'}</td>
+                    <td>{formatCurrency(order.totalAmount)}</td>
                     <td>{statusLabels[order.orderStatus] ?? order.orderStatus}</td>
                     <td>
                       <Link href={`/tra-cuu?orderCode=${encodeURIComponent(order.orderCode)}`}>Xem chi tiết / Tra cứu</Link>

@@ -17,7 +17,7 @@ type Review = {
   createdAt: string;
   adminReply: string | null;
   adminReplyAt: string | null;
-  replies: ReviewReply[];
+  replies?: ReviewReply[];
 };
 
 type ReviewReply = { id: string; authorName: string; authorRole: string; content: string; createdAt: string };
@@ -39,7 +39,7 @@ export default function ProductReviewsSection({
 }) {
   const { locale, currency } = useLocaleCurrency();
   const isEN = locale === 'en' || currency === 'SGD';
-  const [reviews, setReviews] = useState(initialReviews);
+  const [reviews, setReviews] = useState<Review[]>(initialReviews.map((review) => ({ ...review, images: review.images ?? [], replies: review.replies ?? [] })));
   const [reviewCount, setReviewCount] = useState(initialReviewCount);
   const [ratingCounts, setRatingCounts] = useState(initialRatingCounts);
   const [formOpen, setFormOpen] = useState(false);
@@ -114,6 +114,8 @@ export default function ProductReviewsSection({
       const nextReview: Review = {
         ...result.review,
         customerName: result.review.customerName || name.trim() || (isEN ? 'Customer' : 'Khách hàng'),
+        images: result.review.images ?? [],
+        replies: result.review.replies ?? [],
         createdAt: result.review.createdAt || new Date().toISOString(),
       };
       setReviews((current) => [nextReview, ...current]);
@@ -147,7 +149,7 @@ export default function ProductReviewsSection({
         setMessage(getErrorMessage(result.error, isEN ? 'Could not post your reply.' : 'Không thể gửi bình luận.'));
         return;
       }
-      setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, replies: [...review.replies, result.reply!] } : review));
+      setReviews((current) => current.map((review) => review.id === reviewId ? { ...review, replies: [...(review.replies ?? []), result.reply!] } : review));
       setThreadReplyOpen(null);
       setMessage(isEN ? 'Your reply has been posted.' : 'Bình luận của bạn đã được thêm.');
     } catch {
@@ -289,7 +291,7 @@ export default function ProductReviewsSection({
                   <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time>
                 </div>
                 <p className="review-comment-text">{review.comment}</p>
-                {!!review.images?.length && <div className="review-customer-images" aria-label={isEN ? 'Customer product photos' : 'Ảnh khách hàng chụp sản phẩm'}>{review.images.map((image) => <a href={image} target="_blank" rel="noreferrer" key={image}><img src={image} alt={isEN ? 'Customer product photo' : 'Ảnh sản phẩm thực tế'} loading="lazy" /></a>)}</div>}
+                {!!(review.images ?? []).length && <div className="review-customer-images" aria-label={isEN ? 'Customer product photos' : 'Ảnh khách hàng chụp sản phẩm'}>{(review.images ?? []).map((image) => <a href={image} target="_blank" rel="noreferrer" key={image}><img src={image} alt={isEN ? 'Customer product photo' : 'Ảnh sản phẩm thực tế'} loading="lazy" /></a>)}</div>}
                 {review.adminReply && <div className="review-merchant-reply">
                   <header><Store size={15} aria-hidden="true" /><strong>{isEN ? 'Reply from Mac Khen Farm' : 'Phản hồi từ Mắc Khén Farm'}</strong><time dateTime={review.adminReplyAt ?? undefined}>{review.adminReplyAt ? new Date(review.adminReplyAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}</time></header>
                   <p>{review.adminReply}</p>
@@ -302,13 +304,13 @@ export default function ProductReviewsSection({
                   <textarea id={`merchant-reply-${review.id}`} rows={3} maxLength={2000} value={adminReplyDraft} onChange={(event) => setAdminReplyDraft(event.target.value)} />
                   <div><button type="submit" disabled={pendingReply === review.id || !adminReplyDraft.trim()}><Send size={14} />{pendingReply === review.id ? (isEN ? 'Saving...' : 'Đang lưu...') : (isEN ? 'Send reply' : 'Gửi phản hồi')}</button>{review.adminReply && <button type="button" className="review-admin-reply-clear" disabled={pendingReply === review.id} onClick={() => void saveAdminReply(review.id, '')}>{isEN ? 'Delete reply' : 'Xóa phản hồi'}</button>}</div>
                 </form>}
-                {!!review.replies.length && <div className="review-thread-replies">
-                  {review.replies.map((reply) => <article className={reply.authorRole === 'ADMIN' ? 'is-admin-reply' : ''} key={reply.id}>
+                {!!(review.replies ?? []).length && <div className="review-thread-replies">
+                  {(review.replies ?? []).map((reply) => <article className={reply.authorRole === 'ADMIN' ? 'is-admin-reply' : ''} key={reply.id}>
                     <header>{reply.authorRole === 'ADMIN' && <Store size={14} aria-hidden="true" />}<strong>{reply.authorRole === 'ADMIN' ? 'Mắc Khén Farm' : reply.authorName}</strong><time dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleString(isEN ? 'en-SG' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}</time></header>
                     <p>{reply.content}</p>
                   </article>)}
                 </div>}
-                <button type="button" className="review-thread-toggle" onClick={() => setThreadReplyOpen(threadReplyOpen === review.id ? null : review.id)}><MessageCircle size={14} />{threadReplyOpen === review.id ? (isEN ? 'Close discussion' : 'Đóng thảo luận') : (isEN ? `Reply (${review.replies.length})` : `Trả lời (${review.replies.length})`)}</button>
+                <button type="button" className="review-thread-toggle" onClick={() => setThreadReplyOpen(threadReplyOpen === review.id ? null : review.id)}><MessageCircle size={14} />{threadReplyOpen === review.id ? (isEN ? 'Close discussion' : 'Đóng thảo luận') : (isEN ? `Reply (${(review.replies ?? []).length})` : `Trả lời (${(review.replies ?? []).length})`)}</button>
                 {threadReplyOpen === review.id && <form className="review-thread-form" onSubmit={(event) => void submitThreadReply(event, review.id)}>
                   <label>{isEN ? 'Display name' : 'Tên hiển thị'}<input name="authorName" maxLength={100} required placeholder={isEN ? 'Your name' : 'Tên của bạn'} /></label>
                   <label>{isEN ? 'Discussion' : 'Thảo luận'}<textarea name="content" rows={3} maxLength={1000} required placeholder={isEN ? 'Ask a question or share with other customers...' : 'Hỏi thêm hoặc chia sẻ với người mua khác...'} /></label>

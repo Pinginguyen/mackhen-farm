@@ -19,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="admin-portal">
-      <aside className="admin-sidebar">
+      <aside className="admin-sidebar sticky top-0 h-screen overflow-y-auto shrink-0">
         <Link className="admin-sidebar-brand" href="/admin/dashboard">
           <span className="brand-badge">M</span>
           <span>Mắc Khén Farm<small>ADMIN PORTAL</small></span>

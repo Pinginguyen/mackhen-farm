@@ -368,8 +368,8 @@ export default function TrackingForm() {
                 <thead><tr><th>{text('Chỉ số môi trường')}</th><th>{text('Ước tính theo đơn')}</th></tr></thead>
                 <tbody>{impactMetrics.map((metric) => (
                   <tr key={metric.label}>
-                    <td>{metric.label}</td>
-                    <td>{formatImpactValue(metric.value, impactLocale)} {metric.unit}</td>
+                    <td className="!pr-6">{metric.label}</td>
+                    <td className="!pl-6">{formatImpactValue(metric.value, impactLocale)} {metric.unit}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -378,7 +378,7 @@ export default function TrackingForm() {
             <p className="tracking-invoice-guarantee">{text('Cam kết đổi mới hoặc hỗ trợ trong 24h theo chính sách Mắc Khén Farm.')}</p>
 
             {delivered && (
-              <WarrantyRequest orderCode={order.orderCode} phone={phone} deliveredAt={order.deliveredAt ?? order.createdAt} existingReason={order.warrantyRequest?.reason} />
+              <WarrantyRequest orderCode={order.orderCode} phone={order.phone ?? phone} deliveredAt={order.deliveredAt ?? order.createdAt} existingReason={order.warrantyRequest?.reason} />
             )}
           </article>
         );

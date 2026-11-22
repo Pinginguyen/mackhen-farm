@@ -38,7 +38,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
   try {
     const databaseProduct = await prisma.product.findFirst({
       where: { OR: [{ slug: params.slug }, { id: params.slug }] },
-      include: { variants: true, reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20, include: { replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
+      include: { variants: true, reviews: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, customerName: true, rating: true, comment: true, images: true, createdAt: true, adminReply: true, adminReplyAt: true, replies: { orderBy: { createdAt: 'asc' }, select: { id: true, authorName: true, authorRole: true, content: true, createdAt: true } } } } },
     });
     if (databaseProduct) {
       inactiveInDatabase = !databaseProduct.active;
@@ -49,7 +49,7 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         sensoryProfile: normalizeSensoryProfile(databaseProduct.sensoryProfile),
         pairingGuide: normalizePairingGuide(databaseProduct.pairingGuide),
         status: databaseProduct.stock > 0 ? 'Còn hàng' : 'Sắp hết',
-        variants: databaseProduct.variants.map((variant) => ({
+        variants: (databaseProduct.variants ?? []).map((variant) => ({
           ...variant,
           label: variant.title,
           stock: variant.inventory,
@@ -61,11 +61,11 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
         customerName: review.customerName,
         rating: review.rating,
         comment: review.comment,
-        images: review.images,
+        images: review.images ?? [],
         createdAt: review.createdAt.toISOString(),
         adminReply: review.adminReply,
         adminReplyAt: review.adminReplyAt?.toISOString() ?? null,
-        replies: review.replies.map((reply) => ({ ...reply, createdAt: reply.createdAt.toISOString() })),
+        replies: (review.replies ?? []).map((reply) => ({ ...reply, createdAt: reply.createdAt.toISOString() })),
       }));
       try {
         const ratingGroups = await prisma.review.groupBy({
@@ -100,21 +100,26 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
     };
   }
 
-  let pairingProducts: { id: string; slug: string; name: string; image: string; price: number; stock: number }[] = DEFAULT_PRODUCTS;
+  let pairingProducts: { id: string; slug: string; name: string; image: string; price: number; stock: number; images: string[]; highlights: string[]; variants: { id: string }[] }[] = DEFAULT_PRODUCTS.map((item) => ({ ...item, images: item.images ?? [], highlights: [], variants: [] }));
   try {
     const livePairingProducts = await prisma.product.findMany({
       where: { active: true, slug: { in: ['mac-khen-chay-toi-gion-cay', 'mac-khen-xe-soi-cay-nong', 'combo-bo-ba-nhau-xanh', 'cham-cheo-uot-chuan-vi-dien-bien', 'hat-mac-khen-rung-sao-kho-son-la'] } },
-      select: { id: true, slug: true, name: true, image: true, price: true, stock: true },
+      select: { id: true, slug: true, name: true, image: true, price: true, stock: true, images: true, highlights: true, variants: { select: { id: true } } },
     });
-    if (livePairingProducts.length) pairingProducts = livePairingProducts;
+    if (livePairingProducts.length) pairingProducts = livePairingProducts.map((item) => ({ ...item, images: item.images ?? [], highlights: item.highlights ?? [], variants: item.variants ?? [] }));
   } catch {
-    pairingProducts = DEFAULT_PRODUCTS;
+    pairingProducts = DEFAULT_PRODUCTS.map((item) => ({ ...item, images: item.images ?? [], highlights: [], variants: [] }));
   }
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';
   const isLongShelfLifeSpice = ['hat-mac-khen-rung-sao-kho-son-la', 'hat-doi-rung-nep-thuong-hang', 'muoi-cham-cheo-hat-doi-rang-kho'].includes(product.slug);
   const effectivePrice = getEffectivePrice(product);
-  const recommendations = await getProductRecommendations([product.id]);
+  const recommendations = (await getProductRecommendations([product.id])).map((item) => ({
+    ...item,
+    images: item.images ?? [],
+    highlights: item.highlights ?? [],
+    variants: item.variants ?? [],
+  }));
   const structuredData = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
