@@ -100,7 +100,7 @@ const emptyDraft: ProductDraft = {
   nutritionFacts: defaultNutritionFacts(true),
 };
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function numericString(value: unknown): string {
@@ -127,6 +127,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
   const [showImageUrl, setShowImageUrl] = useState(false);
   const [onlineImageUrl, setOnlineImageUrl] = useState('');
   const [draggingImage, setDraggingImage] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -139,27 +140,32 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
     });
   }
 
-  function readImageFile(file?: File) {
+  async function readImageFile(file?: File) {
     if (!file) return;
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       setFormError('Vui lòng chọn ảnh JPG, PNG hoặc WEBP.');
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      setFormError('Ảnh tải lên không được vượt quá 5 MB.');
+      setFormError('Ảnh tải lên không được vượt quá 4 MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setDraft((current) => ({ ...current, imageUrl: reader.result as string }));
-        setOnlineImageUrl('');
-        setFormError('');
-      }
-    };
-    reader.onerror = () => setFormError('Không thể đọc ảnh này. Vui lòng thử lại.');
-    reader.readAsDataURL(file);
+    setUploadingImage(true);
+    setFormError('');
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      const response = await fetch('/api/admin/media/upload', { method: 'POST', body: formData });
+      const result = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !result.url) throw new Error(result.error ?? 'Không thể tải ảnh lên.');
+      setDraft((current) => ({ ...current, imageUrl: result.url! }));
+      setOnlineImageUrl('');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   function clearImage() {
@@ -225,6 +231,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (uploadingImage) return;
     setFormError('');
 
     const errors: ProductFieldErrors = {};
@@ -402,7 +409,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
           <section className="admin-product-modal" role="dialog" aria-modal="true" aria-labelledby="admin-product-modal-title">
             <header className="admin-product-modal-header">
               <div><p className="eyebrow">Danh mục sản phẩm</p><h2 id="admin-product-modal-title">{editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}</h2></div>
-              <button type="button" className="admin-return-icon-button" aria-label="Đóng form" onClick={() => setOpen(false)} disabled={saving}><X size={18} /></button>
+              <button type="button" className="admin-return-icon-button" aria-label="Đóng form" onClick={() => setOpen(false)} disabled={saving || uploadingImage}><X size={18} /></button>
             </header>
 
             <form ref={formRef} className="admin-new-product-form" onSubmit={saveProduct} noValidate>
@@ -443,7 +450,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                 className={`field admin-product-full-width admin-image-upload${draggingImage ? ' is-dragging' : ''}`}
                 onDragOver={(event) => { event.preventDefault(); setDraggingImage(true); }}
                 onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDraggingImage(false); }}
-                onDrop={(event) => { event.preventDefault(); setDraggingImage(false); readImageFile(event.dataTransfer.files[0]); }}
+                  onDrop={(event) => { event.preventDefault(); setDraggingImage(false); void readImageFile(event.dataTransfer.files[0]); }}
               >
                 <span>Ảnh sản phẩm</span>
                 <input
@@ -452,7 +459,8 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                   type="file"
                   accept={ACCEPTED_IMAGE_TYPES.join(',')}
                   aria-label="Chọn ảnh sản phẩm"
-                  onChange={(event) => { readImageFile(event.target.files?.[0]); event.target.value = ''; }}
+                  onChange={(event) => { void readImageFile(event.target.files?.[0]); event.target.value = ''; }}
+                  disabled={uploadingImage}
                 />
                 {draft.imageUrl ? (
                   <div className="admin-image-preview-row">
@@ -462,10 +470,10 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
                     </button>
                   </div>
                 ) : (
-                  <button className="admin-image-dropzone" type="button" onClick={() => imageInputRef.current?.click()}>
+                  <button className="admin-image-dropzone" type="button" onClick={() => imageInputRef.current?.click()} disabled={uploadingImage}>
                     <span className="admin-image-upload-icon"><ImagePlus size={22} /><Upload size={15} /></span>
-                    <strong>Bấm để chọn ảnh từ máy tính hoặc kéo thả ảnh vào đây</strong>
-                    <small>Định dạng JPG, PNG, WEBP · Tối đa 5 MB</small>
+                    <strong>{uploadingImage ? 'Đang tải ảnh lên...' : 'Bấm để chọn ảnh từ máy tính hoặc kéo thả ảnh vào đây'}</strong>
+                    <small>Định dạng JPG, PNG, WEBP · Tối đa 4 MB</small>
                   </button>
                 )}
                 <button className="admin-image-url-toggle" type="button" onClick={() => setShowImageUrl((visible) => !visible)}>
@@ -571,8 +579,8 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
               <label className="field admin-product-full-width">Mô tả ngắn<textarea data-field="description" aria-invalid={Boolean(fieldErrors.description)} aria-describedby={fieldErrors.description ? 'product-description-error' : undefined} className={fieldErrors.description ? 'border-red-500 ring-1 ring-red-500' : undefined} rows={3} maxLength={2000} value={draft.description} onChange={(event) => { setDraft({ ...draft, description: event.target.value }); clearFieldError('description'); }} />{fieldErrors.description && <small id="product-description-error" className="admin-product-field-error">{fieldErrors.description}</small>}</label>
               {formError && <p className="admin-return-alert admin-product-full-width" role="alert">{formError}</p>}
               <footer className="admin-product-modal-actions admin-product-full-width">
-                <button className="secondary-action" type="button" onClick={() => setOpen(false)} disabled={saving}>Hủy</button>
-                <button className="primary-action" type="submit" disabled={saving}>{saving ? 'Đang lưu...' : editingProduct ? 'Lưu thay đổi' : 'Lưu sản phẩm'}</button>
+                <button className="secondary-action" type="button" onClick={() => setOpen(false)} disabled={saving || uploadingImage}>Hủy</button>
+                <button className="primary-action" type="submit" disabled={saving || uploadingImage}>{uploadingImage ? 'Đang tải ảnh...' : saving ? 'Đang lưu...' : editingProduct ? 'Lưu thay đổi' : 'Lưu sản phẩm'}</button>
               </footer>
             </form>
           </section>

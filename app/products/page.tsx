@@ -4,8 +4,7 @@ import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile } from '@/lib/store-data';
 import Image from 'next/image';
 
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+export const revalidate = 120;
 
 export default async function ProductsPage() {
   let products: CatalogProduct[];

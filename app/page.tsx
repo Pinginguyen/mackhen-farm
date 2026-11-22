@@ -21,8 +21,7 @@ const homeRevealGroups = [
   { selector: '.home-page .comparison-table', highlight: true },
 ];
 
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+export const revalidate = 120;
 
 export default async function HomePage() {
   const [heroImageUrl, heroImageMobileUrl, promoBannerUrl, storyImageUrl, beforeAfterOriginalUrl, beforeAfterResultUrl, contentSettings] = await Promise.all([
