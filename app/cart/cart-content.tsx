@@ -80,7 +80,7 @@ function CartItemRow({
         <h3 className="truncate font-semibold text-gray-900">{productName}</h3>
         {item.variantLabel && <div>{item.variantLabel}</div>}
         <div className="cart-item-meta">
-          <span>{formatCurrency(unitPrice)} / {isEN ? 'item' : 'đơn'}</span>
+          <span>{formatCurrency(unitPrice)} / {isEN ? 'item' : 'sản phẩm'}</span>
           <span className={`product-status ${maxQuantity > 0 ? 'in-stock' : 'out-of-stock'}`}>{maxQuantity > 0 ? (isEN ? 'In Stock' : 'Còn hàng') : (isEN ? 'Out of Stock' : 'Hết hàng')}</span>
         </div>
       </div>
@@ -194,7 +194,7 @@ export default function CartContent({ initialItems, freeShippingThreshold, recom
   }
 
   return (
-    <div className="checkout-layout cart-content-layout">
+    <div className="checkout-layout cart-content-layout pb-16">
       <div ref={cartListRef} className="w-full max-w-none">
         {items.length > 0 && <section className={`free-shipping-progress cart-free-shipping${freeShipping ? ' is-free' : ''}${freeShippingApplied ? ' is-goal-reached' : ''}`} aria-live="polite"><div className="cart-free-shipping-message"><Truck size={18} strokeWidth={1.8} aria-hidden="true" /><p>{freeShipping ? (isEN ? 'Congratulations! You unlocked FREE SHIPPING!' : 'Chúc mừng! Đơn hàng của bạn được miễn phí vận chuyển.') : (isEN ? `Add ${formatCurrency(remaining)} more to get free nationwide shipping.` : `Mua thêm ${remaining.toLocaleString('vi-VN')}đ để được miễn phí vận chuyển.`)}</p></div><div className="free-shipping-track" role="progressbar" aria-label={isEN ? 'Free shipping progress' : 'Tiến trình đạt miễn phí vận chuyển'} aria-valuemin={0} aria-valuemax={freeShippingThreshold} aria-valuenow={Math.min(subtotal, freeShippingThreshold)}><span className="free-shipping-fill" style={{ width: '100%', transform: `scaleX(${progress / 100})` }} /></div><small>{formatCurrency(Math.min(subtotal, freeShippingThreshold))} / {formatCurrency(freeShippingThreshold)}</small></section>}
         {upsellProduct && <CartUpsell product={upsellProduct} onAdded={() => router.refresh()} />}

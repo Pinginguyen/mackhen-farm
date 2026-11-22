@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma } = vi.hoisted(() => {
+const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, itemDelete, itemDeleteMany, itemFindMany, transaction, prisma, reportPrismaConnectivityIssue } = vi.hoisted(() => {
   const mocks = {
     productFindFirst: vi.fn(),
     cartUpsert: vi.fn(),
+    cartUpdateMany: vi.fn(),
     itemFindFirst: vi.fn(),
     itemUpdate: vi.fn(),
     itemCreate: vi.fn(),
@@ -12,18 +13,19 @@ const { productFindFirst, cartUpsert, itemFindFirst, itemUpdate, itemCreate, ite
     itemFindMany: vi.fn(),
   };
   const tx = {
-    cart: { upsert: mocks.cartUpsert },
+    cart: { upsert: mocks.cartUpsert, updateMany: mocks.cartUpdateMany },
     cartItem: { findFirst: mocks.itemFindFirst, update: mocks.itemUpdate, create: mocks.itemCreate, delete: mocks.itemDelete, deleteMany: mocks.itemDeleteMany },
   };
   const client = {
     $transaction: vi.fn((callback: (value: typeof tx) => Promise<unknown>) => callback(tx)),
+    cart: { updateMany: mocks.cartUpdateMany },
     product: { findFirst: mocks.productFindFirst },
     cartItem: { findMany: mocks.itemFindMany, deleteMany: mocks.itemDeleteMany },
   };
-  return { ...mocks, transaction: tx, prisma: client };
+  return { ...mocks, transaction: tx, prisma: client, reportPrismaConnectivityIssue: vi.fn() };
 });
 
-vi.mock('@/lib/prisma', () => ({ prisma }));
+vi.mock('@/lib/prisma', () => ({ prisma, reportPrismaConnectivityIssue }));
 
 import { DELETE, PATCH, POST } from './route';
 
@@ -56,7 +58,7 @@ describe('PATCH /api/cart/items', () => {
     itemCreate.mockReset().mockResolvedValue({ id: 'quick-item', quantity: 2, unitPrice: 100 });
     itemDelete.mockReset().mockResolvedValue({ id: 'item-1' });
     itemDeleteMany.mockReset().mockResolvedValue({ count: 0 });
-    itemFindMany.mockReset().mockResolvedValue([{ quantity: 2, unitPrice: 180, product: { slug: 'mac-khen' } }]);
+    itemFindMany.mockReset().mockResolvedValue([{ quantity: 2, unitPrice: 180, product: { slug: 'mac-khen', price: 100, originalPrice: null, flashSaleEndsAt: null }, variant: { price: 180, originalPrice: null } }]);
   });
 
   it('updates the selected variant and recalculates cart totals', async () => {
@@ -126,8 +128,22 @@ describe('POST /api/cart/items regular cart', () => {
     const result = await response.json() as { item: { quantity: number }; cartCount: number };
 
     expect(response.status).toBe(200);
-    expect(itemUpdate).toHaveBeenCalledWith({ where: { id: 'existing-item' }, data: { quantity: 4 } });
+    expect(itemUpdate).toHaveBeenCalledWith({ where: { id: 'existing-item' }, data: { quantity: 4, unitPrice: 100 } });
     expect(result).toMatchObject({ item: { quantity: 4 }, cartCount: 4 });
+  });
+
+  it('uses the first variant when quick-add omits a variant id', async () => {
+    itemFindFirst.mockResolvedValueOnce(null);
+    itemCreate.mockResolvedValueOnce({ id: 'new-item', productId: 'product-1', productVariantId: 'variant-small', quantity: 1 });
+    const response = await POST(request({ productId: 'product-1', quantity: 1 }, 'POST'));
+
+    expect(response.status).toBe(200);
+    expect(itemFindFirst).toHaveBeenCalledWith({
+      where: { cartId: 'cart-1', productId: 'product-1', productVariantId: 'variant-small' },
+    });
+    expect(itemCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ productId: 'product-1', productVariantId: 'variant-small', quantity: 1 }),
+    });
   });
 
   it('rejects an accumulated quantity above the selected variant stock', async () => {
@@ -146,7 +162,7 @@ describe('POST /api/cart/items regular cart', () => {
 describe('DELETE /api/cart/items', () => {
   beforeEach(() => {
     itemDeleteMany.mockReset().mockResolvedValue({ count: 1 });
-    itemFindMany.mockReset().mockResolvedValue([{ quantity: 2, unitPrice: 65000, product: { slug: 'mac-khen' } }]);
+    itemFindMany.mockReset().mockResolvedValue([{ quantity: 2, unitPrice: 65000, product: { slug: 'mac-khen', price: 65000, originalPrice: null, flashSaleEndsAt: null }, variant: null }]);
   });
 
   it('deletes only the item belonging to the cart and returns new totals', async () => {

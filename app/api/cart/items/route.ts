@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   });
   if (!product) return NextResponse.json({ error: { code: 'PRODUCT_NOT_FOUND', message: 'Không tìm thấy sản phẩm' } }, { status: 404 });
 
-  const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : undefined;
+  const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : product.variants[0];
   if (body.variantId && !variant) return NextResponse.json({ error: { code: 'VARIANT_NOT_FOUND', message: 'Không tìm thấy phân loại' } }, { status: 404 });
   const unitPrice = getEffectivePrice({ price: variant?.price ?? product.price, originalPrice: variant?.originalPrice ?? product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt });
   const availableStock = variant?.inventory ?? product.stock;
