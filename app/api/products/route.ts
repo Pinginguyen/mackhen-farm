@@ -493,6 +493,11 @@ export async function PATCH(request: Request) {
       include: { variants: true },
     });
     revalidatePath('/', 'layout');
+    revalidatePath('/');
+    revalidatePath('/products');
+    revalidatePath('/san-pham');
+    revalidatePath(`/products/${product.slug}`);
+    revalidatePath(`/san-pham/${product.slug}`);
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
       action: previous.price !== product.price || previous.flashSaleEndsAt?.getTime() !== product.flashSaleEndsAt?.getTime() ? 'UPDATE_PRICE' : previous.stock !== product.stock ? 'ADJUST_STOCK' : 'UPDATE_PRODUCT',
