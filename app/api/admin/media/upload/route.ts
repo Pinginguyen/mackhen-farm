@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { put } from '@vercel/blob';
+import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 import { requireAdmin } from '@/lib/admin-auth';
@@ -61,6 +62,8 @@ export async function POST(request: Request) {
       access: 'public',
       contentType: image.contentType,
     });
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/media');
     return NextResponse.json({ url: blob.url }, { status: 201 });
   } catch (error) {
     console.error('Admin media upload failed:', error);

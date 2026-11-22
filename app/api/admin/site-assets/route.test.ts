@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { assetFindMany, assetFindUnique, assetUpdate, requireAdmin, ensureSiteAssets, revalidateTag, writeAuditLog, prisma } = vi.hoisted(() => {
+const { assetFindMany, assetFindUnique, assetUpdate, requireAdmin, ensureSiteAssets, revalidatePath, revalidateTag, writeAuditLog, prisma } = vi.hoisted(() => {
   const assetFindMany = vi.fn();
   const assetFindUnique = vi.fn();
   const assetUpdate = vi.fn();
   const requireAdmin = vi.fn();
   const ensureSiteAssets = vi.fn();
+  const revalidatePath = vi.fn();
   const revalidateTag = vi.fn();
   const writeAuditLog = vi.fn();
   return {
@@ -14,6 +15,7 @@ const { assetFindMany, assetFindUnique, assetUpdate, requireAdmin, ensureSiteAss
     assetUpdate,
     requireAdmin,
     ensureSiteAssets,
+    revalidatePath,
     revalidateTag,
     writeAuditLog,
     prisma: { siteAsset: { findMany: assetFindMany, findUnique: assetFindUnique, update: assetUpdate } },
@@ -25,7 +27,7 @@ vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/site-assets', () => ({ ensureSiteAssets }));
 vi.mock('@/lib/auth', () => ({ getRequestSession: () => ({ email: 'admin@example.com' }) }));
 vi.mock('@/lib/audit-log', () => ({ writeAuditLog }));
-vi.mock('next/cache', () => ({ revalidateTag }));
+vi.mock('next/cache', () => ({ revalidatePath, revalidateTag }));
 
 import { GET, PATCH } from './route';
 
@@ -44,6 +46,7 @@ describe('/api/admin/site-assets', () => {
     assetUpdate.mockReset().mockResolvedValue({ key: 'HERO_BANNER_MAIN', imageUrl: 'https://blob.example/hero.jpg', altText: 'Hero' });
     requireAdmin.mockReset().mockResolvedValue(null);
     ensureSiteAssets.mockReset().mockResolvedValue(undefined);
+    revalidatePath.mockReset();
     revalidateTag.mockReset();
     writeAuditLog.mockReset().mockResolvedValue(undefined);
   });
@@ -86,6 +89,8 @@ describe('/api/admin/site-assets', () => {
       data: { imageUrl: 'https://blob.example/hero.jpg', altText: 'Hero' },
     });
     expect(revalidateTag).toHaveBeenCalledWith('site-asset:HERO_BANNER_MAIN');
+    expect(revalidatePath).toHaveBeenNthCalledWith(1, '/', 'layout');
+    expect(revalidatePath).toHaveBeenNthCalledWith(2, '/admin/media');
     expect(writeAuditLog).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({ action: 'UPDATE_SITE_ASSET' }));
   });
 });

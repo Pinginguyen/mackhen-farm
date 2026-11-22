@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { put, requireAdmin } = vi.hoisted(() => ({ put: vi.fn(), requireAdmin: vi.fn() }));
+const { put, requireAdmin, revalidatePath } = vi.hoisted(() => ({ put: vi.fn(), requireAdmin: vi.fn(), revalidatePath: vi.fn() }));
 
 vi.mock('@vercel/blob', () => ({ put }));
 vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
+vi.mock('next/cache', () => ({ revalidatePath }));
 
 import { POST } from './route';
 
@@ -19,6 +20,7 @@ describe('/api/admin/media/upload', () => {
   beforeEach(() => {
     requireAdmin.mockReset().mockResolvedValue(null);
     put.mockReset().mockResolvedValue({ url: 'https://blob.example/site-assets/hero.png' });
+    revalidatePath.mockReset();
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-token');
   });
 
@@ -53,6 +55,8 @@ describe('/api/admin/media/upload', () => {
 
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ url: 'https://blob.example/site-assets/hero.png' });
+    expect(revalidatePath).toHaveBeenNthCalledWith(1, '/', 'layout');
+    expect(revalidatePath).toHaveBeenNthCalledWith(2, '/admin/media');
     expect(put).toHaveBeenCalledWith(expect.stringMatching(/^site-assets\/.+\.png$/), expect.any(File), {
       access: 'public',
       contentType: 'image/png',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
@@ -68,6 +68,8 @@ export async function PATCH(request: Request) {
       },
     });
     revalidateTag(`site-asset:${data.key}`);
+    revalidatePath('/', 'layout');
+    revalidatePath('/admin/media');
     await writeAuditLog(request, {
       adminEmail: getRequestSession(request)?.email ?? 'unknown-admin',
       action: 'UPDATE_SITE_ASSET',
