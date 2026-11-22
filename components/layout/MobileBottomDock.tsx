@@ -48,7 +48,7 @@ export default function MobileBottomDock() {
   ];
 
   return (
-    <nav className="mobile-bottom-dock" aria-label={isEN ? 'Quick navigation' : 'Điều hướng nhanh'}>
+    <nav className="mobile-bottom-dock pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]" aria-label={isEN ? 'Quick navigation' : 'Điều hướng nhanh'}>
       {links.slice(0, 2).map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-label={label} aria-current={pathname === href ? 'page' : undefined}><Icon size={20} /><span>{label}</span></Link>)}
       <button type="button" aria-label={`${isEN ? 'Cart' : 'Giỏ hàng'}${count ? `, ${count}` : ''}`} onClick={() => window.dispatchEvent(new Event('mackhen:cart-drawer-open'))}>
         <span className="mobile-dock-cart-icon"><ShoppingBag size={20} />{count > 0 && <i key={count}>{count > 99 ? '99+' : count}</i>}</span><span>{isEN ? 'Cart' : 'Giỏ hàng'}</span>

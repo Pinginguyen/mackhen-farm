@@ -47,7 +47,8 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
   return (
     <div className="sticky top-0 z-50 flex flex-col gap-0">
       {announcement.enabled && announcement.text.trim() && <div className="flex h-8 shrink-0 items-center justify-center overflow-hidden bg-[#1B4332] px-4 text-center text-xs font-medium text-[#FAF7F2]"><span className="truncate">{announcement.text}</span></div>}
-      <header className="topbar site-header desktop-single-row !relative left-0 right-0 w-full z-50 !bg-[#FAF7F2] !border-b !border-stone-200 shadow-sm transition-all duration-300 !py-2">
+      <header className="topbar site-header desktop-single-row !relative left-0 right-0 w-full z-50 !bg-[#FAF7F2] !border-b !border-stone-200 shadow-sm transition-all duration-300 !p-0">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 site-header-inner">
       <Link className="brand-wrap" href="/">
         {activeLogoUrl ? <img className="brand-logo-image" src={activeLogoUrl} alt="Mắc Khén Farm" /> : <span className="brand-badge">M</span>}
         <span>
@@ -95,6 +96,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
           </>
         )}
       </div>
+        </div>
       </header>
     </div>
   );

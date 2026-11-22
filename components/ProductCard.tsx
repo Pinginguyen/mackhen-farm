@@ -53,9 +53,9 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
   }
 
   return (
-    <article className={`product-card artisan-product-card group${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
+    <article className={`product-card artisan-product-card group flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md${product.stock === 0 ? ' is-out-of-stock' : ''}`} style={{ animationDelay: `${index * 35}ms` }}>
       <div className={`image-box product-card-media${secondImage ? ' has-secondary' : ''}`}>
-        <Link className="product-card-image-link aspect-video" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
+        <Link className="product-card-image-link aspect-[16/10] w-full overflow-hidden bg-stone-100" href={`/products/${product.slug}`} aria-label={`${t('products')}: ${productName}`}>
           <Image className="product-card-image is-primary" src={product.image} alt={productName} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" priority={index < 2} unoptimized={imageIsUnoptimized(product.image)} />
           {secondImage && <Image className="product-card-image is-secondary" src={secondImage} alt={`${productName}, alternate view`} width={800} height={600} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" unoptimized={imageIsUnoptimized(secondImage)} />}
         </Link>
@@ -77,7 +77,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           <div className="meta-row"><span>{product.category} • {product.unit ?? 'Khối lượng chưa cập nhật'}</span></div>
           <ProductRating rating={product.rating} showValue={false} size="sm" />
         </div>
-        <h4 className="product-name"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
+        <h4 className="product-name h-[2.85rem] line-clamp-2 text-sm font-bold leading-snug text-stone-900 sm:text-base"><Link href={`/products/${product.slug}`}>{productName}</Link></h4>
         {product.stock > 0 && product.stock <= 5 && <p className="product-low-stock">🔥 {locale === 'en' ? `Only ${product.stock} left in stock` : `Chỉ còn lại ${product.stock} sản phẩm trong kho!`}</p>}
         <TasteSensoryMeter
           compact
@@ -92,6 +92,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
           valueAxis3={product.valueAxis3}
         />
         <p className="product-card-description text-xs text-stone-500 line-clamp-2 leading-relaxed">{product.description}</p>
+        <div className="product-card-purchase mt-auto flex items-center justify-between border-t border-stone-100 pt-3">
         <div className="product-card-pricing"><div className="product-prices"><strong>{formatCurrency(displayedPrice)}</strong>{displayedOriginalPrice != null && <del className="!text-stone-400">{formatCurrency(displayedOriginalPrice)}</del>}</div>{saleStatus.remainingSeconds != null && saleStatus.active && <FlashSaleCountdown seconds={saleStatus.remainingSeconds} locale={locale} />}</div>
         <Link
           href={`/products/${product.slug}`}
@@ -102,6 +103,7 @@ export default function ProductCard({ product, index }: { product: CatalogProduc
         >
           {product.stock === 0 ? (locale === 'en' ? 'Out of stock' : 'Tạm hết hàng') : <><span>{locale === 'en' ? 'Shop now' : 'Chọn mua'}</span><ArrowRight size={16} aria-hidden="true" /></>}
         </Link>
+        </div>
       </div>
       {quickViewOpen && <ProductQuickView product={product} onClose={() => setQuickViewOpen(false)} />}
     </article>

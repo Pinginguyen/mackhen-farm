@@ -1,0 +1,1281 @@
+# TÀI LIỆU TRÍCH XUẤT LUỒNG THỰC TẾ (CODE-BASED FLOW EXTRACTION)
+Dùng để đối chiếu và vẽ chuẩn Activity / Sequence Diagram.
+
+
+=== LUỒNG TỪ FILE: Thêm vào giỏ hàng (app/api/cart/items/route.ts) ===
+import { NextResponse } from 'next/server';
+
+import { prisma } from '@/lib/prisma';
+import { withDatabase } from '@/lib/api-database';
+import { calculateShipping } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
+import { getEffectivePrice } from '@/lib/pricing';
+
+export async function POST(request: Request) {
+  let body: { productId?: string; variantId?: string; quantity?: number; buyNow?: boolean };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
+  }
+
+  if (!body.productId || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thiếu thông tin sản phẩm' } }, { status: 400 });
+  }
+  const quantity = body.quantity;
+
+  return withDatabase(async () => {
+  const settings = await getSystemSettings();
+  const product = await prisma.product.findFirst({
+    where: { active: true, OR: [{ id: body.productId }, { slug: body.productId }] },
+    include: { variants: true },
+  });
+  if (!product) return NextResponse.json({ error: { code: 'PRODUCT_NOT_FOUND', message: 'Không tìm thấy sản phẩm' } }, { status: 404 });
+
+  const variant = body.variantId ? product.variants.find((item) => item.id === body.variantId) : undefined;
+  if (body.variantId && !variant) return NextResponse.json({ error: { code: 'VARIANT_NOT_FOUND', message: 'Không tìm thấy phân loại' } }, { status: 404 });
+  const unitPrice = getEffectivePrice({ price: variant?.price ?? product.price, originalPrice: variant?.originalPrice ?? product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt });
+  const availableStock = variant?.inventory ?? product.stock;
+  if (quantity > availableStock) return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: 'Số lượng vượt quá tồn kho' } }, { status: 409 });
+
+  const buyNow = body.buyNow === true;
+  const cookieName = buyNow ? 'bohoch_buy_now' : 'bohoch_cart';
+  const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`))?.[1];
+  const id = cartId ? decodeURIComponent(cartId) : crypto.randomUUID();
+  const outcome = await prisma.$transaction(async (transaction) => {
+    await transaction.cart.upsert({
+      where: { id },
+      create: { id },
+      update: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null },
+    });
+    if (buyNow) await transaction.cartItem.deleteMany({ where: { cartId: id } });
+    const existing = await transaction.cartItem.findFirst({
+      where: { cartId: id, productId: product.id, productVariantId: variant?.id ?? null },
+    });
+    const nextQuantity = Number(existing?.quantity ?? 0) + Number(quantity);
+    if (nextQuantity > availableStock) return { error: 'INSUFFICIENT_STOCK' as const };
+    if (existing) {
+      return { item: await transaction.cartItem.update({ where: { id: existing.id }, data: { quantity: nextQuantity, unitPrice } }) };
+    }
+    return {
+      item: await transaction.cartItem.create({
+        data: {
+          cartId: id,
+          productId: product.id,
+          productVariantId: variant?.id,
+          productName: product.name,
+          quantity: nextQuantity,
+          unitPrice,
+        },
+      }),
+    };
+  });
+  if ('error' in outcome) return NextResponse.json({ error: { code: outcome.error, message: 'Tổng số lượng vượt quá tồn kho' } }, { status: 409 });
+  const item = outcome.item;
+  const cartItems = await prisma.cartItem.findMany({ where: { cartId: id }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+  const total = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity * getEffectivePrice({ price: cartItem.variant?.price ?? cartItem.product.price, originalPrice: cartItem.variant?.originalPrice ?? cartItem.product.originalPrice, flashSaleEndsAt: cartItem.product.flashSaleEndsAt }), 0);
+  const shipping = calculateShipping(total, cartItems.map((cartItem) => cartItem.product.slug), settings.freeShippingThreshold);
+  const cartCount = cartItems.reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+  const response = NextResponse.json({
+    item: { id: item.id, productId: item.productId, variantId: item.productVariantId, quantity: item.quantity },
+    totals: { subtotal: total, shipping, total: total + shipping },
+    cartCount: buyNow ? undefined : cartCount,
+  });
+  if (!cartId) response.cookies.set(cookieName, id, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 30 });
+  return response;
+  });
+}
+
+export async function PATCH(request: Request) {
+  let body: { itemId?: string; variantId?: string | null; quantity?: number };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
+  }
+
+  if (!body.itemId || !('variantId' in body) || !Number.isInteger(body.quantity) || !body.quantity || body.quantity < 1) {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thông tin cập nhật giỏ hàng không hợp lệ' } }, { status: 400 });
+  }
+
+  const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];
+  if (!cartId) return NextResponse.json({ error: { code: 'CART_NOT_FOUND', message: 'Không tìm thấy giỏ hàng' } }, { status: 404 });
+  const decodedCartId = decodeURIComponent(cartId);
+
+  return withDatabase(async () => {
+    const settings = await getSystemSettings();
+    const result = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.cartItem.findFirst({
+        where: { id: body.itemId, cartId: decodedCartId },
+        include: { product: { include: { variants: true } } },
+      });
+      if (!current) return { error: 'CART_ITEM_NOT_FOUND', status: 404 as const, message: 'Không tìm thấy sản phẩm trong giỏ hàng' };
+
+      const variant = body.variantId
+        ? current.product.variants.find((item) => item.id === body.variantId)
+        : undefined;
+      if (body.variantId && !variant) return { error: 'VARIANT_NOT_FOUND', status: 404 as const, message: 'Không tìm thấy phân loại' };
+
+      const quantity = body.quantity as number;
+      const availableStock = variant?.inventory ?? current.product.stock;
+      if (quantity > availableStock) return { error: 'INSUFFICIENT_STOCK', status: 409 as const, message: 'Số lượng vượt quá tồn kho' };
+      const unitPrice = getEffectivePrice({ price: variant?.price ?? current.product.price, originalPrice: variant?.originalPrice ?? current.product.originalPrice, flashSaleEndsAt: current.product.flashSaleEndsAt });
+
+      const variantId = variant?.id ?? null;
+      const duplicate = await transaction.cartItem.findFirst({
+        where: { cartId: decodedCartId, productId: current.productId, productVariantId: variantId, id: { not: current.id } },
+      });
+      if (duplicate) {
+        if (duplicate.quantity + quantity > availableStock) {
+          return { error: 'INSUFFICIENT_STOCK', status: 409 as const, message: 'Tổng số lượng phân loại vượt quá tồn kho' };
+        }
+        const item = await transaction.cartItem.update({
+          where: { id: duplicate.id },
+          data: { quantity: duplicate.quantity + quantity, unitPrice },
+        });
+        await transaction.cartItem.delete({ where: { id: current.id } });
+        await transaction.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
+        return { item };
+      }
+
+      const item = await transaction.cartItem.update({
+        where: { id: current.id },
+        data: {
+          productVariantId: variantId,
+          productName: current.product.name,
+          quantity,
+          unitPrice,
+        },
+      });
+      await transaction.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
+      return { item };
+    });
+
+    if ('error' in result) {
+      return NextResponse.json({ error: { code: result.error, message: result.message } }, { status: result.status });
+    }
+
+    const cartItems = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+    const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
+    const shipping = calculateShipping(subtotal, cartItems.map((item) => item.product.slug), settings.freeShippingThreshold);
+    const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    return NextResponse.json({ item: result.item, totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
+  });
+}
+
+export async function DELETE(request: Request) {
+  let body: { itemId?: string };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Yêu cầu không hợp lệ' } }, { status: 400 });
+  }
+  if (!body.itemId || typeof body.itemId !== 'string') {
+    return NextResponse.json({ error: { code: 'INVALID_CART_ITEM', message: 'Thiếu sản phẩm cần xóa' } }, { status: 400 });
+  }
+  const cartId = request.headers.get('cookie')?.match(/(?:^|;\s*)bohoch_cart=([^;]+)/)?.[1];
+  if (!cartId) return NextResponse.json({ error: { code: 'CART_NOT_FOUND', message: 'Không tìm thấy giỏ hàng' } }, { status: 404 });
+  const decodedCartId = decodeURIComponent(cartId);
+
+  return withDatabase(async () => {
+    const settings = await getSystemSettings();
+    const deleted = await prisma.cartItem.deleteMany({ where: { id: body.itemId, cartId: decodedCartId } });
+    if (!deleted.count) return NextResponse.json({ error: { code: 'CART_ITEM_NOT_FOUND', message: 'Không tìm thấy sản phẩm trong giỏ hàng' } }, { status: 404 });
+    await prisma.cart.updateMany({ where: { id: decodedCartId }, data: { checkoutCompletedAt: null, abandonmentEmailClaimedAt: null, abandonmentEmailSentAt: null, abandonmentVoucherCode: null } });
+
+    const items = await prisma.cartItem.findMany({ where: { cartId: decodedCartId }, include: { product: { select: { slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { price: true, originalPrice: true } } } });
+    const subtotal = items.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
+    const shipping = calculateShipping(subtotal, items.map((item) => item.product.slug), settings.freeShippingThreshold);
+    const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    return NextResponse.json({ totals: { subtotal, shipping, total: subtotal + shipping }, cartCount });
+  });
+}
+
+
+=== LUỒNG TỪ FILE: Tạo đơn hàng & Phân bổ FEFO (app/api/orders/route.ts) ===
+import { createHash, randomInt } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
+import { NextResponse } from 'next/server';
+
+import { prisma } from '@/lib/prisma';
+import { withDatabase } from '@/lib/api-database';
+import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth';
+import { calculateShipping, parseShippingWeightGrams } from '@/lib/shipping';
+import { getSystemSettings } from '@/lib/system-settings';
+import { calculateManagedVoucherDiscountAmount, getManagedVoucherValidationError } from '@/lib/vouchers';
+import { writeAuditLog } from '@/lib/audit-log';
+import { normalizeAffiliateCode } from '@/lib/affiliate-attribution';
+import { calculatePercentageAmount } from '@/lib/money';
+import { createCheckoutFingerprint } from '@/lib/checkout-idempotency';
+import { allocateStockFEFO } from '@/lib/services/inventory-ledger';
+import { calculateRealtimeShippingRate } from '@/lib/services/shipping-carrier';
+import { getClientIpHash, isSelfReferral } from '@/lib/affiliate-fraud';
+import { normalizeCustomerReferralCode } from '@/lib/referral';
+import { debitWalletForOrder } from '@/lib/wallet';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
+import { getEffectivePrice } from '@/lib/pricing';
+
+type CheckoutItemSnapshot = {
+  id?: string;
+  productId?: string;
+  productSlug?: string;
+  variantId?: string | null;
+  quantity: number;
+  price?: number;
+};
+type DirectBuyNowItem = CheckoutItemSnapshot & { productId: string; variantId: string | null };
+type ProductWithVariants = Prisma.ProductGetPayload<{ include: { variants: true } }>;
+type ResolvedBuyNowItem = {
+  id: string;
+  productId: string;
+  productVariantId: string | null;
+  quantity: number;
+  unitPrice: number;
+  productName: string;
+  product: ProductWithVariants;
+  variant: ProductWithVariants['variants'][number] | null;
+};
+
+type CheckoutBody = {
+  customerName?: string;
+  phone?: string;
+  address?: string;
+  discountCode?: string;
+  customer?: { name?: string; email?: string; phone?: string };
+  delivery?: { address?: string; province?: unknown; district?: unknown };
+  paymentMethod?: string;
+  note?: string;
+  voucherCode?: string;
+  affiliateCode?: unknown;
+  referralCode?: unknown;
+  buyNow?: boolean;
+  useLoyaltyPoints?: unknown;
+  useWalletBalance?: unknown;
+  items?: unknown;
+  price?: unknown;
+  totalAmount?: unknown;
+  idempotencyKey?: unknown;
+};
+
+type CreatedOrder = {
+  id: string;
+  orderCode: string;
+  numericCode: number;
+  orderStatus: string;
+  totalAmount: number;
+  walletAmountSpent: number;
+  paymentMethod: 'COD' | 'VIETQR' | 'MOMO' | 'WALLET';
+  duplicate?: boolean;
+};
+type CheckoutRejection = { rejected: 'PRICE_MISMATCH' | 'INVALID_VOUCHER' | 'VOUCHER_NOT_ELIGIBLE' | 'VOUCHER_FIRST_ORDER_ONLY' | 'VOUCHER_PHONE_USED' | 'INVALID_QUANTITY' | 'LOYALTY_LOGIN_REQUIRED' | 'INVALID_REFERRAL_CODE'; message?: string };
+
+type PricedCheckoutItem = { quantity: number; unitPrice: number };
+type ShippingCartItem = {
+  id: string;
+  productId: string;
+  productVariantId: string | null;
+  quantity: number;
+  product: { weight: number | null; price: number; originalPrice: number | null; flashSaleEndsAt: Date | null };
+  variant: { weight: string; price: number; originalPrice: number | null } | null;
+};
+
+function createShippingCartFingerprint(items: ShippingCartItem[]): string {
+  return items.map((item) => [
+    item.id,
+    item.productId,
+    item.productVariantId ?? '',
+    item.quantity,
+    item.product.weight ?? '',
+    item.variant?.weight ?? '',
+    item.product.price,
+    item.product.originalPrice ?? '',
+    item.product.flashSaleEndsAt?.getTime() ?? '',
+    item.variant?.price ?? '',
+    item.variant?.originalPrice ?? '',
+  ].join(':')).sort().join('|');
+}
+
+function allocateItemDiscount(items: PricedCheckoutItem[], discount: number, subtotal: number): number[] {
+  const itemDiscount = Math.min(Math.max(0, discount), subtotal);
+  if (!itemDiscount || !subtotal) return items.map(() => 0);
+
+  const allocations = items.map((item, index) => {
+    const lineTotal = item.quantity * item.unitPrice;
+    const exactShare = itemDiscount * lineTotal / subtotal;
+    const baseAmount = Math.floor(exactShare);
+    return { index, amount: baseAmount, remainder: exactShare - baseAmount };
+  });
+  let remaining = itemDiscount - allocations.reduce((sum, allocation) => sum + allocation.amount, 0);
+  const remainderOrder = [...allocations].sort((left, right) => right.remainder - left.remainder || left.index - right.index);
+  for (const allocation of remainderOrder) {
+    if (remaining <= 0) break;
+    allocations[allocation.index].amount += 1;
+    remaining -= 1;
+  }
+  return allocations.map((allocation) => allocation.amount);
+}
+
+const CHECKOUT_RATE_LIMIT = 3;
+const CHECKOUT_RATE_WINDOW_MS = 10_000;
+const checkoutRequestsByIp = new Map<string, number[]>();
+
+function isCheckoutRateLimited(request: Request): boolean {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim();
+  if (!ip) return false;
+
+  const now = Date.now();
+  const windowStart = now - CHECKOUT_RATE_WINDOW_MS;
+  for (const [trackedIp, timestamps] of checkoutRequestsByIp) {
+    const recent = timestamps.filter((timestamp) => timestamp > windowStart);
+    if (recent.length) checkoutRequestsByIp.set(trackedIp, recent);
+    else checkoutRequestsByIp.delete(trackedIp);
+  }
+
+  const recentRequests = checkoutRequestsByIp.get(ip) ?? [];
+  if (recentRequests.length >= CHECKOUT_RATE_LIMIT) return true;
+  recentRequests.push(now);
+  checkoutRequestsByIp.set(ip, recentRequests);
+  return false;
+}
+
+function normalizeVietnamesePhone(value: string): string | null {
+  const compact = value.trim().replace(/[\s().-]/g, '');
+  const national = compact.replace(/^\+?84/, '0');
+  return /^0[35789]\d{8}$/.test(national) ? national : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCheckoutItemSnapshot(value: unknown): value is CheckoutItemSnapshot {
+  if (!isRecord(value) || !Number.isSafeInteger(value.quantity) || Number(value.quantity) < 1 || Number(value.quantity) > 20) return false;
+  if (typeof value.id === 'string' && value.id.length > 0) return true;
+  return typeof value.productId === 'string'
+    && typeof value.productSlug === 'string'
+    && (typeof value.variantId === 'string' || value.variantId === null);
+}
+
+function isDirectBuyNowItem(value: unknown): value is DirectBuyNowItem {
+  return isRecord(value)
+    && typeof value.productId === 'string'
+    && value.productId.length > 0
+    && (value.variantId === undefined || value.variantId === null || (typeof value.variantId === 'string' && value.variantId.length > 0))
+    && Number.isSafeInteger(value.quantity)
+    && Number(value.quantity) >= 1
+    && Number(value.quantity) <= 20;
+}
+
+function resolveDirectBuyNowItems(
+  submitted: DirectBuyNowItem[],
+  products: ProductWithVariants[],
+): ResolvedBuyNowItem[] | null {
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const resolved: ResolvedBuyNowItem[] = [];
+
+  for (const [index, item] of submitted.entries()) {
+    const product = productsById.get(item.productId);
+    const variantId = item.variantId ?? null;
+    const variant = variantId ? product?.variants.find((candidate) => candidate.id === variantId) ?? null : null;
+    if (!product?.active || (variantId && !variant)) return null;
+    resolved.push({
+      id: `buy-now:${product.id}:${variant?.id ?? 'base'}:${index}`,
+      productId: product.id,
+      productVariantId: variant?.id ?? null,
+      quantity: item.quantity,
+      unitPrice: getEffectivePrice({ price: variant?.price ?? product.price, originalPrice: variant?.originalPrice ?? product.originalPrice, flashSaleEndsAt: product.flashSaleEndsAt }),
+      productName: product.name,
+      product,
+      variant,
+    });
+  }
+  return resolved;
+}
+
+function sameCartContents(
+  submitted: unknown,
+  current: Array<{ id: string; productId: string; productSlug: string; variantId: string | null; quantity: number; price: number }>,
+): boolean {
+  if (submitted === undefined) return true;
+  if (!Array.isArray(submitted) || submitted.length !== current.length || !submitted.every(isCheckoutItemSnapshot)) return false;
+  const matchedIds = new Set<string>();
+
+  return submitted.every((item) => {
+    const matched = typeof item.id === 'string'
+      ? current.find((currentItem) => currentItem.id === item.id)
+      : current.find((currentItem) => currentItem.productId === item.productId && currentItem.variantId === item.variantId);
+    if (!matched || matched.quantity !== item.quantity || (item.price !== undefined && item.price !== matched.price) || matchedIds.has(matched.id)) return false;
+    matchedIds.add(matched.id);
+    return true;
+  });
+}
+
+function buildPaymentRedirect(method: 'COD' | 'VIETQR' | 'MOMO' | 'WALLET', orderCode: string, amount: number): string {
+  if (method === 'COD' || method === 'WALLET' || amount <= 0) return `/cam-on?orderCode=${encodeURIComponent(orderCode)}`;
+  if (method === 'MOMO') return `/tra-cuu?orderCode=${encodeURIComponent(orderCode)}`;
+  return `/checkout/vietqr/${encodeURIComponent(orderCode)}?amount=${amount}`;
+}
+
+function setPaymentVerificationCookie(response: NextResponse, paymentMethod: string, orderCode: string, phone: string) {
+  if (paymentMethod !== 'VIETQR') return;
+  response.cookies.set(`mkf_payment_${orderCode}`, phone, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: `/api/orders/${orderCode}`,
+    maxAge: 15 * 60,
+  });
+}
+
+export async function POST(request: Request) {
+  if (isCheckoutRateLimited(request)) {
+    return NextResponse.json({ error: { code: 'RATE_LIMITED', message: 'Quá nhiều yêu cầu đặt hàng. Vui lòng thử lại sau.' } }, { status: 429 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
+  }
+  if (!isRecord(payload)) return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Yêu cầu không hợp lệ.' } }, { status: 400 });
+  const body = payload as CheckoutBody;
+  const affiliateCode = body.affiliateCode === undefined || body.affiliateCode === null || body.affiliateCode === ''
+    ? null
+    : normalizeAffiliateCode(body.affiliateCode);
+  if (body.affiliateCode !== undefined && body.affiliateCode !== null && body.affiliateCode !== '' && !affiliateCode) {
+    return NextResponse.json({ error: { code: 'INVALID_AFFILIATE_CODE', message: 'Mã giới thiệu không hợp lệ.' } }, { status: 400 });
+  }
+  const referralCode = body.referralCode === undefined || body.referralCode === null || body.referralCode === ''
+    ? null
+    : normalizeCustomerReferralCode(body.referralCode);
+  if (body.referralCode !== undefined && body.referralCode !== null && body.referralCode !== '' && !referralCode) {
+    return NextResponse.json({ error: { code: 'INVALID_REFERRAL_CODE', message: 'Mã giới thiệu bạn bè không hợp lệ.' } }, { status: 400 });
+  }
+  if (body.items === null || (Array.isArray(body.items) && body.items.length === 0)) {
+    return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Đơn hàng không có sản phẩm.' } }, { status: 400 });
+  }
+  const submittedIdempotencyKey = request.headers.get('idempotency-key')
+    ?? (typeof body.idempotencyKey === 'string' ? body.idempotencyKey : '');
+  const idempotencyKey = submittedIdempotencyKey.trim();
+  if (idempotencyKey && (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey))) {
+    return NextResponse.json({ error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Mã yêu cầu đặt hàng không hợp lệ.' } }, { status: 400 });
+  }
+
+  const submittedName = body.customer?.name ?? body.customerName;
+  const submittedPhone = body.customer?.phone ?? body.phone;
+  const submittedAddress = body.delivery?.address ?? body.address;
+  const name = typeof submittedName === 'string' ? submittedName.trim() : '';
+  const phoneInput = typeof submittedPhone === 'string' ? submittedPhone.trim() : '';
+  const phone = phoneInput ? normalizeVietnamesePhone(phoneInput) : null;
+  const address = typeof submittedAddress === 'string' ? submittedAddress.trim() : '';
+  const province = typeof body.delivery?.province === 'string' ? body.delivery.province.trim() : '';
+  const district = typeof body.delivery?.district === 'string' ? body.delivery.district.trim() : '';
+  const paymentMethod = typeof body.paymentMethod === 'string' ? body.paymentMethod.toUpperCase() : '';
+  if (!name || name.length > 120 || !phone || !address || address.length > 500 || !['COD', 'VIETQR'].includes(paymentMethod)
+    || (body.useLoyaltyPoints !== undefined && typeof body.useLoyaltyPoints !== 'boolean')
+    || (body.useWalletBalance !== undefined && typeof body.useWalletBalance !== 'boolean')
+    || Boolean(province) !== Boolean(district) || province.length > 100 || district.length > 100) {
+    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Vui lòng nhập họ tên, số điện thoại Việt Nam hợp lệ, địa chỉ và phương thức thanh toán.' } }, { status: 400 });
+  }
+  const submittedVoucherCode = body.voucherCode ?? body.discountCode;
+  const voucherCode = typeof submittedVoucherCode === 'string' ? submittedVoucherCode.trim().toUpperCase() : '';
+  const isCompensationVoucher = /^MKF50-[A-F0-9]{8}$/.test(voucherCode);
+  const isManagedVoucher = Boolean(voucherCode) && !isCompensationVoucher;
+  if (voucherCode && !/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(voucherCode) && !isCompensationVoucher) {
+    return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá không tồn tại hoặc đã hết hạn.' } }, { status: 400 });
+  }
+  const cartCookieName = body.buyNow === true ? 'bohoch_buy_now' : 'bohoch_cart';
+  const cartId = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${cartCookieName}=([^;]+)`))?.[1];
+  const rawDirectBuyNowItems = body.buyNow === true && Array.isArray(body.items) ? body.items : null;
+  if (rawDirectBuyNowItems && !rawDirectBuyNowItems.every(isDirectBuyNowItem)) {
+    return NextResponse.json({ error: { code: 'INVALID_ORDER', message: 'Danh sách sản phẩm Mua ngay không hợp lệ.' } }, { status: 400 });
+  }
+  const directBuyNowItems = rawDirectBuyNowItems as DirectBuyNowItem[] | null;
+  const sessionToken = request.headers.get('cookie')?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1];
+  const session = verifySessionToken(sessionToken ? decodeURIComponent(sessionToken) : undefined);
+  if (body.useLoyaltyPoints === true && !session) {
+    return NextResponse.json({ error: { code: 'LOYALTY_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập để sử dụng điểm thưởng.' } }, { status: 401 });
+  }
+  if (body.useWalletBalance === true && !session) {
+    return NextResponse.json({ error: { code: 'WALLET_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập để sử dụng số dư ví nội bộ.' } }, { status: 401 });
+  }
+  const buyerIpHash = getClientIpHash(request);
+  if (isManagedVoucher && !session) {
+    return NextResponse.json({ error: { code: 'VOUCHER_LOGIN_REQUIRED', message: 'Vui lòng đăng nhập hoặc tạo tài khoản để sử dụng mã giảm giá này.' } }, { status: 401 });
+  }
+
+  return withDatabase(async () => {
+    const settings = await getSystemSettings();
+    let checkoutFingerprint: string | null = null;
+    if (idempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { idempotencyKey },
+        select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
+      });
+      if (existingOrder) {
+        if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
+        const response = NextResponse.json({
+          success: true,
+          orderId: existingOrder.id,
+          orderCode: existingOrder.orderCode,
+          numericCode: existingOrder.numericCode,
+          status: existingOrder.orderStatus.toLowerCase(),
+          total: existingOrder.totalAmount,
+          totalAmount: existingOrder.totalAmount,
+          paymentMethod: existingOrder.paymentMethod,
+          duplicate: true,
+          redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount - existingOrder.walletAmountSpent),
+        }, { status: 200 });
+        setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
+        if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+        return response;
+      }
+    }
+    if (!cartId && !directBuyNowItems) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
+
+    let realtimeShippingFee: number | null = null;
+    let shippingCartState: string | null = null;
+    if (province && district) {
+      const shippingCartItems = directBuyNowItems
+        ? resolveDirectBuyNowItems(directBuyNowItems, await prisma.product.findMany({
+          where: { id: { in: [...new Set(directBuyNowItems.map((item) => item.productId))] } },
+          include: { variants: true },
+        }))
+        : (await prisma.cart.findUnique({
+          where: { id: decodeURIComponent(cartId!) },
+          include: { items: { include: { product: { select: { weight: true, slug: true, price: true, originalPrice: true, flashSaleEndsAt: true } }, variant: { select: { weight: true, price: true, originalPrice: true } } } } },
+        }))?.items ?? null;
+      if (!shippingCartItems?.length) return NextResponse.json({ error: { code: directBuyNowItems ? 'PRICE_MISMATCH' : 'EMPTY_CART', message: directBuyNowItems ? 'Sản phẩm Mua ngay không còn khả dụng.' : 'Giỏ hàng đang trống.' } }, { status: directBuyNowItems ? 409 : 400 });
+      shippingCartState = createShippingCartFingerprint(shippingCartItems);
+      const shippingSubtotal = shippingCartItems.reduce((sum, item) => sum + item.quantity * getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }), 0);
+      const standardShipping = calculateShipping(shippingSubtotal, shippingCartItems.map((item) => item.product.slug), settings.freeShippingThreshold);
+      if (standardShipping === 0) {
+        realtimeShippingFee = 0;
+      } else {
+        const weightGrams = shippingCartItems.reduce((sum, item) => sum + parseShippingWeightGrams(item.product.weight, item.variant?.weight) * item.quantity, 0);
+        try {
+          const rate = await calculateRealtimeShippingRate({ province, district, weightGrams });
+          realtimeShippingFee = rate.fee;
+        } catch {
+          return NextResponse.json({ error: { code: 'SHIPPING_RATE_UNAVAILABLE', message: 'Không thể xác nhận phí vận chuyển. Vui lòng thử lại.' } }, { status: 502 });
+        }
+      }
+    }
+
+    let order: CreatedOrder | null | CheckoutRejection;
+    try {
+      order = await prisma.$transaction(async (transaction) => {
+        const cartItems = directBuyNowItems
+          ? resolveDirectBuyNowItems(directBuyNowItems, await transaction.product.findMany({
+            where: { id: { in: [...new Set(directBuyNowItems.map((item) => item.productId))] } },
+            include: { variants: true },
+          }))
+          : (await transaction.cart.findUnique({
+            where: { id: decodeURIComponent(cartId!) },
+            include: { items: { include: { product: true, variant: true } } },
+          }))?.items ?? null;
+        if (!cartItems?.length) return directBuyNowItems ? { rejected: 'PRICE_MISMATCH' as const } : null;
+        if (cartItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 20)) {
+          return { rejected: 'INVALID_QUANTITY' as const };
+        }
+
+        const currentItems = cartItems.map((item) => ({
+          id: item.id,
+          productId: item.productId,
+          productSlug: item.product.slug,
+          variantId: item.productVariantId,
+          quantity: item.quantity,
+          price: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
+        }));
+        if (shippingCartState && createShippingCartFingerprint(cartItems) !== shippingCartState) {
+          return { rejected: 'PRICE_MISMATCH' as const };
+        }
+        const subtotal = currentItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
+        const shipping = realtimeShippingFee ?? calculateShipping(subtotal, currentItems.map((item) => item.productSlug), settings.freeShippingThreshold);
+        const managedVoucher = isManagedVoucher ? await transaction.voucher.findUnique({
+          where: { code: voucherCode },
+          select: { id: true, code: true, discountType: true, value: true, maxDiscount: true, minSpend: true, expiresAt: true, isActive: true, usageLimit: true, freeShipping: true, firstOrderOnly: true },
+        }) : null;
+        if (isManagedVoucher && !managedVoucher) return { rejected: 'INVALID_VOUCHER' as const };
+        const voucherValidationError = managedVoucher ? getManagedVoucherValidationError(managedVoucher, subtotal) : null;
+
+        let compensationVoucherId: string | null = null;
+        let compensationVoucherInvalid = false;
+        let discount = 0;
+        if (managedVoucher) {
+          discount = calculateManagedVoucherDiscountAmount(managedVoucher, subtotal, shipping);
+        } else if (isCompensationVoucher) {
+          const voucher = await transaction.compensationVoucher.findUnique({ where: { code: voucherCode } });
+          if (!voucher) return { rejected: 'INVALID_VOUCHER' as const };
+          compensationVoucherId = voucher.id;
+          compensationVoucherInvalid = voucher.customerPhone !== phone || Boolean(voucher.redeemedAt) || voucher.expiresAt <= new Date();
+          discount = calculatePercentageAmount(subtotal, voucher.discountPercent);
+        }
+        let loyaltyPointsSpent = 0;
+        if (body.useLoyaltyPoints === true && session) {
+          const loyaltyAccount = await transaction.user.findUnique({ where: { id: session.userId }, select: { loyaltyPoints: true } });
+          if (!loyaltyAccount) return { rejected: 'LOYALTY_LOGIN_REQUIRED' as const };
+          loyaltyPointsSpent = Math.min(
+            loyaltyAccount.loyaltyPoints,
+            Math.floor(Math.max(0, subtotal + shipping - discount) / 100),
+          );
+          discount += loyaltyPointsSpent * 100;
+        }
+        const totalAmount = subtotal + shipping - discount;
+        let walletAmountSpent = 0;
+        if (body.useWalletBalance === true && session) {
+          const wallet = await transaction.wallet.findUnique({ where: { userId: session.userId }, select: { balance: true } });
+          walletAmountSpent = Math.min(wallet?.balance ?? 0, totalAmount);
+        }
+        const amountDue = totalAmount - walletAmountSpent;
+
+        const submittedItemsMatch = directBuyNowItems
+          ? directBuyNowItems.length === currentItems.length && directBuyNowItems.every((item, index) => {
+            const current = currentItems[index];
+            return item.productId === current.productId
+              && (item.variantId ?? null) === current.variantId
+              && item.quantity === current.quantity;
+          })
+          : sameCartContents(body.items, currentItems);
+        if (!submittedItemsMatch) {
+          console.warn('Checkout quantity or cart state mismatch rejected.');
+          return { rejected: 'PRICE_MISMATCH' as const };
+        }
+
+        checkoutFingerprint = createCheckoutFingerprint(session?.userId ?? `guest:${phone}`, currentItems, totalAmount);
+        const fingerprintDuplicate = await transaction.order.findFirst({
+          where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
+        });
+        if (fingerprintDuplicate) return { ...fingerprintDuplicate, duplicate: true };
+
+        if (managedVoucher && voucherValidationError) {
+          return { rejected: 'VOUCHER_NOT_ELIGIBLE' as const, message: voucherValidationError };
+        }
+        if (compensationVoucherInvalid) return { rejected: 'INVALID_VOUCHER' as const };
+
+        if (managedVoucher?.firstOrderOnly && session) {
+          const priorOrders = await transaction.order.count({ where: { userId: session.userId, orderStatus: { not: 'CANCELLED' } } });
+          if (priorOrders > 0) return { rejected: 'VOUCHER_FIRST_ORDER_ONLY' as const };
+          const phoneUsed = await transaction.order.findFirst({
+            where: { phone, orderStatus: { not: 'CANCELLED' }, OR: [{ paymentStatus: 'PAID' }, { orderStatus: { in: ['DELIVERED', 'COMPLETED'] } }] },
+            select: { id: true },
+          });
+          if (phoneUsed) return { rejected: 'VOUCHER_PHONE_USED' as const };
+        }
+
+        const recentOrders = idempotencyKey ? [] : await transaction.order.findMany({
+          where: { phone, createdAt: { gte: new Date(Date.now() - 3_000) } },
+          include: { items: { select: { productId: true, productVariantId: true, quantity: true, unitPrice: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        const duplicate = recentOrders.find((recentOrder) => {
+          if (recentOrder.customerName !== name || recentOrder.address !== address || recentOrder.paymentMethod !== paymentMethod || recentOrder.discountAmount !== discount) return false;
+          const previous = recentOrder.items.map((item) => ({
+            key: `${item.productId}:${item.productVariantId ?? ''}`,
+            quantity: item.quantity,
+            price: item.unitPrice,
+          })).sort((left, right) => left.key.localeCompare(right.key));
+          const current = currentItems.map((item) => ({ key: `${item.productId}:${item.variantId ?? ''}`, quantity: item.quantity, price: item.price }))
+            .sort((left, right) => left.key.localeCompare(right.key));
+          return previous.length === current.length && previous.every((item, index) =>
+            item.key === current[index].key && item.quantity === current[index].quantity && item.price === current[index].price);
+        });
+        if (duplicate) return { ...duplicate, duplicate: true };
+
+        if (compensationVoucherId) {
+          const claimedVoucher = await transaction.compensationVoucher.updateMany({
+            where: { id: compensationVoucherId, customerPhone: phone, redeemedAt: null, expiresAt: { gt: new Date() } },
+            data: { redeemedAt: new Date() },
+          });
+          if (!claimedVoucher.count) return { rejected: 'INVALID_VOUCHER' as const };
+        }
+        if (managedVoucher) {
+          const now = new Date();
+          const claimedVoucher = await transaction.voucher.updateMany({
+            where: { id: managedVoucher.id, isActive: true, ...(managedVoucher.expiresAt ? { expiresAt: { gt: now } } : {}), ...(managedVoucher.usageLimit != null ? { usedCount: { lt: managedVoucher.usageLimit } } : {}) },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (!claimedVoucher.count) throw new Error('VOUCHER_CLAIM_RACE');
+          if (managedVoucher.usageLimit != null) {
+            const updatedVoucher = await transaction.voucher.findUnique({ where: { id: managedVoucher.id }, select: { usedCount: true, usageLimit: true } });
+            if (updatedVoucher?.usageLimit != null && updatedVoucher.usedCount >= updatedVoucher.usageLimit) {
+              await transaction.voucher.updateMany({ where: { id: managedVoucher.id, isActive: true }, data: { isActive: false } });
+            }
+          }
+        }
+
+        for (const item of cartItems) {
+          const productStock = await transaction.product.updateMany({ where: { id: item.productId, stock: { gte: item.quantity } }, data: { stock: { decrement: item.quantity } } });
+          if (!productStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+          if (item.variant) {
+            const variantStock = await transaction.productVariant.updateMany({ where: { id: item.variant.id, inventory: { gte: item.quantity } }, data: { inventory: { decrement: item.quantity } } });
+            if (!variantStock.count) throw new Error(`INSUFFICIENT_STOCK:${item.product.name}`);
+          }
+        }
+
+        const email = typeof body.customer?.email === 'string' ? body.customer.email.trim().toLowerCase() : '';
+        const customer = email
+          ? await transaction.customer.upsert({ where: { email }, create: { name, email, phone, address }, update: { name, phone, address } })
+          : await transaction.customer.create({ data: { name, phone, address } });
+        const affiliate = affiliateCode
+          ? await transaction.affiliate.findUnique({ where: { affiliateCode }, select: { userId: true, affiliateCode: true, commissionRate: true, active: true, user: { select: { phone: true, signupIpHash: true } } } })
+          : null;
+        const attributedAffiliate = affiliate?.active && !isSelfReferral({
+          buyerUserId: session?.userId ?? null,
+          buyerPhone: phone,
+          buyerIpHash,
+          affiliateUserId: affiliate.userId,
+          affiliatePhone: affiliate.user?.phone ?? null,
+          affiliateIpHash: affiliate.user?.signupIpHash ?? null,
+        }) ? affiliate : null;
+        const referrer = referralCode ? await transaction.user.findUnique({
+          where: { referralCode },
+          select: { id: true, role: true, phone: true, signupIpHash: true },
+        }) : null;
+        const attributedReferrer = referrer?.role === 'CUSTOMER' && !isSelfReferral({
+          buyerUserId: session?.userId ?? null,
+          buyerPhone: phone,
+          buyerIpHash,
+          affiliateUserId: referrer.id,
+          affiliatePhone: referrer.phone,
+          affiliateIpHash: referrer.signupIpHash,
+        }) ? referrer : null;
+        if (referralCode && !attributedReferrer) return { rejected: 'INVALID_REFERRAL_CODE' as const };
+        const numericCode = randomInt(100000, 1000000);
+        const orderCode = `MKF-${String(numericCode).padStart(6, '0')}`;
+
+        const order = await transaction.order.create({
+          data: {
+            orderCode,
+            numericCode,
+            userId: session?.userId,
+            referredByUserId: attributedReferrer?.id ?? null,
+            customerId: customer.id,
+            customerName: name,
+            phone,
+            address,
+            paymentMethod: amountDue === 0 ? 'WALLET' : paymentMethod as 'COD' | 'VIETQR',
+            paymentStatus: amountDue === 0 ? 'PAID' : 'PENDING',
+            orderStatus: amountDue === 0 ? 'PAID' : 'PENDING',
+            subtotal,
+            shippingFee: shipping,
+            discountAmount: discount,
+            loyaltyPointsSpent,
+            walletAmountSpent,
+            voucherCode: voucherCode || null,
+            affiliateCode: attributedAffiliate?.affiliateCode ?? null,
+            affiliateCommissionRate: attributedAffiliate?.commissionRate ?? null,
+            affiliateCommissionStatus: attributedAffiliate ? 'PENDING' : null,
+            totalAmount,
+            idempotencyKey: idempotencyKey || undefined,
+            checkoutFingerprint,
+            grossAmount: subtotal,
+            netAmount: totalAmount,
+            reconciled: amountDue === 0,
+            holdExpiresAt: amountDue === 0 ? null : new Date(Date.now() + 15 * 60 * 1000),
+            lotCode: null,
+            note: typeof body.note === 'string' ? body.note.trim() || null : null,
+          },
+        });
+        if (walletAmountSpent > 0 && session) {
+          const debited = await debitWalletForOrder(transaction, { userId: session.userId, orderId: order.id, amount: walletAmountSpent });
+          if (!debited) throw new Error('WALLET_BALANCE_CHANGED');
+        }
+        if (loyaltyPointsSpent > 0 && session) {
+          const pointsClaim = await transaction.user.updateMany({
+            where: { id: session.userId, loyaltyPoints: { gte: loyaltyPointsSpent } },
+            data: { loyaltyPoints: { decrement: loyaltyPointsSpent } },
+          });
+          if (pointsClaim.count !== 1) throw new Error('LOYALTY_BALANCE_CHANGED');
+          await transaction.pointHistory.create({
+            data: {
+              userId: session.userId,
+              orderId: order.id,
+              points: loyaltyPointsSpent,
+              type: 'SPEND',
+              description: `Đổi điểm giảm ${loyaltyPointsSpent * 100}đ cho đơn hàng ${order.orderCode}`,
+              idempotencyKey: `order:${order.id}:spend`,
+            },
+          });
+        }
+        const pricedItems = cartItems.map((item) => ({
+          item,
+          unitPrice: getEffectivePrice({ price: item.variant?.price ?? item.product.price, originalPrice: item.variant?.originalPrice ?? item.product.originalPrice, flashSaleEndsAt: item.product.flashSaleEndsAt }),
+        }));
+        const itemDiscounts = allocateItemDiscount(
+          pricedItems.map(({ item, unitPrice }) => ({ quantity: item.quantity, unitPrice })),
+          managedVoucher?.freeShipping ? 0 : discount,
+          subtotal,
+        );
+        let firstBatchCode: string | null = null;
+        for (let itemIndex = 0; itemIndex < pricedItems.length; itemIndex += 1) {
+          const { item, unitPrice } = pricedItems[itemIndex];
+          const allocations = await allocateStockFEFO(transaction, item.productVariantId, item.quantity, {
+            productId: item.productId,
+            productName: item.product.name,
+            orderId: order.id,
+            cartItemId: item.id,
+            stockBackedFallback: true,
+            destinationProvince: province,
+            destinationDistrict: district,
+          });
+          const lineTotal = item.quantity * unitPrice;
+          const lineDiscounts = allocateItemDiscount(
+            allocations.map((allocation) => ({ quantity: allocation.quantity, unitPrice })),
+            itemDiscounts[itemIndex],
+            lineTotal,
+          );
+          const orderItems = allocations.map((allocation, allocationIndex) => ({
+            orderId: order.id,
+            productId: item.productId,
+            productVariantId: item.productVariantId,
+            productName: item.product.name,
+            variantLabel: item.variant?.title,
+            titleSnapshot: item.product.name,
+            variantNameSnapshot: item.variant?.title ?? '',
+            skuSnapshot: item.variant?.sku ?? item.product.slug,
+            quantity: allocation.quantity,
+            unitPrice,
+            discountAllocated: lineDiscounts[allocationIndex],
+            finalPrice: allocation.quantity * unitPrice - lineDiscounts[allocationIndex],
+            lineTotal: allocation.quantity * unitPrice,
+            lotId: allocation.lotId,
+            lotCode: allocation.batchCode,
+          }));
+          await transaction.orderItem.createMany({ data: orderItems });
+          firstBatchCode ??= allocations[0]?.batchCode ?? null;
+        }
+        if (firstBatchCode) await transaction.order.update({ where: { id: order.id }, data: { lotCode: firstBatchCode } });
+        return order;
+      }, { isolationLevel: 'Serializable', timeout: 8_000 });
+    } catch (error) {
+      const prismaErrorCode = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+      if (checkoutFingerprint && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
+        const fingerprintDuplicate = await prisma.order.findFirst({
+          where: { checkoutFingerprint, createdAt: { gte: new Date(Date.now() - 15_000) } },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
+        });
+        if (fingerprintDuplicate && normalizeVietnamesePhone(fingerprintDuplicate.phone) === phone) {
+          const response = NextResponse.json({
+            success: true,
+            orderId: fingerprintDuplicate.id,
+            orderCode: fingerprintDuplicate.orderCode,
+            numericCode: fingerprintDuplicate.numericCode,
+            status: fingerprintDuplicate.orderStatus.toLowerCase(),
+            total: fingerprintDuplicate.totalAmount,
+            totalAmount: fingerprintDuplicate.totalAmount,
+            paymentMethod: fingerprintDuplicate.paymentMethod,
+            duplicate: true,
+            redirectUrl: buildPaymentRedirect(fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.totalAmount - fingerprintDuplicate.walletAmountSpent),
+          }, { status: 200 });
+          setPaymentVerificationCookie(response, fingerprintDuplicate.paymentMethod, fingerprintDuplicate.orderCode, fingerprintDuplicate.phone);
+          if (body.buyNow === true && fingerprintDuplicate.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+          return response;
+        }
+      }
+      if (idempotencyKey && ['P2002', 'P2034'].includes(prismaErrorCode ?? '')) {
+        const existingOrder = await prisma.order.findUnique({
+          where: { idempotencyKey },
+          select: { id: true, orderCode: true, numericCode: true, orderStatus: true, totalAmount: true, walletAmountSpent: true, paymentMethod: true, phone: true },
+        });
+        if (existingOrder) {
+          if (normalizeVietnamesePhone(existingOrder.phone) !== phone) return NextResponse.json({ error: { code: 'ORDER_NOT_FOUND', message: 'Không tìm thấy đơn hàng phù hợp.' } }, { status: 404 });
+          const response = NextResponse.json({
+            success: true,
+            orderId: existingOrder.id,
+            orderCode: existingOrder.orderCode,
+            numericCode: existingOrder.numericCode,
+            status: existingOrder.orderStatus.toLowerCase(),
+            total: existingOrder.totalAmount,
+            totalAmount: existingOrder.totalAmount,
+            paymentMethod: existingOrder.paymentMethod,
+            duplicate: true,
+            redirectUrl: buildPaymentRedirect(existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.totalAmount - existingOrder.walletAmountSpent),
+          }, { status: 200 });
+          setPaymentVerificationCookie(response, existingOrder.paymentMethod, existingOrder.orderCode, existingOrder.phone);
+          if (body.buyNow === true && existingOrder.paymentMethod === 'COD') response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+          return response;
+        }
+      }
+      if (prismaErrorCode === 'P2034') {
+        return NextResponse.json({ error: { code: 'CHECKOUT_CONCURRENT_REQUEST', message: 'Yêu cầu đặt hàng đang được xử lý đồng thời. Vui lòng thử lại.' } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
+        const productName = error.message.slice('INSUFFICIENT_STOCK:'.length);
+        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Sản phẩm ${productName} hiện không đủ số lượng trong kho.` } }, { status: 400 });
+      }
+      if (error instanceof Error && error.message === 'LOYALTY_BALANCE_CHANGED') {
+        return NextResponse.json({ error: { code: 'LOYALTY_BALANCE_CHANGED', message: 'Số điểm vừa thay đổi. Vui lòng tải lại trang thanh toán.' } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message === 'WALLET_BALANCE_CHANGED') {
+        return NextResponse.json({ error: { code: 'WALLET_BALANCE_CHANGED', message: 'Số dư ví vừa thay đổi. Vui lòng tải lại trang thanh toán.' } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK_LOT:')) {
+        const productName = error.message.slice('INSUFFICIENT_STOCK_LOT:'.length);
+        return NextResponse.json({ error: { code: 'INSUFFICIENT_STOCK', message: `Các lô còn hạn của ${productName} không đủ số lượng. Vui lòng liên hệ cửa hàng.` } }, { status: 409 });
+      }
+      if (error instanceof Error && error.message === 'VOUCHER_CLAIM_RACE') {
+        return NextResponse.json({ error: { code: 'INVALID_VOUCHER', message: 'Mã giảm giá vừa được sử dụng hết. Vui lòng chọn mã khác.' } }, { status: 409 });
+      }
+      const databaseUnavailable = error instanceof Error && (
+        error.name.startsWith('PrismaClient')
+        || ['P1001', 'P1002', 'P1008', 'P1017', 'P2024'].includes((error as Error & { code?: string }).code ?? '')
+      );
+      if (!databaseUnavailable) throw error;
+
+      const prismaCode = (error as Error & { code?: string }).code;
+      const schemaMismatch = prismaCode === 'P2021' || prismaCode === 'P2022';
+      const transactionExpired = prismaCode === 'P2028';
+      console.error('Checkout persistence failed; no unverified order was created.', {
+        name: error.name,
+        code: prismaCode,
+        message: error.message,
+      });
+      return NextResponse.json({
+        error: {
+          code: schemaMismatch ? 'DATABASE_SCHEMA_OUT_OF_DATE' : transactionExpired ? 'CHECKOUT_TRANSACTION_TIMEOUT' : 'CHECKOUT_TEMPORARILY_UNAVAILABLE',
+          message: error.message || 'Lỗi xử lý đơn hàng',
+        },
+      }, { status: 503, headers: { 'retry-after': '30' } });
+    }
+
+    if (order && 'rejected' in order) {
+      if (order.rejected === 'INVALID_REFERRAL_CODE') {
+        return NextResponse.json({ error: { code: order.rejected, message: 'Mã giới thiệu không hợp lệ hoặc không thể tự giới thiệu.' } }, { status: 400 });
+      }
+      if (order.rejected === 'PRICE_MISMATCH') {
+        await writeAuditLog(request, {
+          adminEmail: 'system:checkout',
+          action: 'REJECT_PRICE_MISMATCH',
+          targetEntity: 'Order',
+          targetId: idempotencyKey || `checkout-${Date.now()}`,
+          newValue: { reason: 'submitted cart state or line price differs from server data' },
+        });
+      }
+      const invalidVoucher = order.rejected !== 'PRICE_MISMATCH';
+      if (order.rejected === 'LOYALTY_LOGIN_REQUIRED') {
+        return NextResponse.json({ error: { code: order.rejected, message: 'Vui lòng đăng nhập để sử dụng điểm thưởng.' } }, { status: 401 });
+      }
+      const voucherErrorMessage = order.rejected === 'VOUCHER_FIRST_ORDER_ONLY'
+        ? 'Mã giảm giá này chỉ áp dụng cho đơn hàng đầu tiên của thành viên mới.'
+        : order.rejected === 'VOUCHER_PHONE_USED'
+          ? 'Số điện thoại này đã có đơn hàng thành công và không đủ điều kiện dùng mã thành viên mới.'
+          : order.rejected === 'VOUCHER_NOT_ELIGIBLE'
+            ? order.message ?? 'Mã giảm giá không đủ điều kiện cho đơn hàng này.'
+            : 'Mã voucher bồi thường đã hết hạn, đã sử dụng hoặc không thuộc số điện thoại đặt hàng.';
+      return NextResponse.json({
+        error: {
+          code: order.rejected,
+          message: order.rejected === 'INVALID_QUANTITY'
+            ? 'Mỗi sản phẩm chỉ được đặt từ 1 đến 20 đơn vị trong một đơn hàng.'
+            : invalidVoucher
+            ? voucherErrorMessage
+            : 'Giỏ hàng hoặc số lượng đã thay đổi. Vui lòng kiểm tra lại giỏ hàng rồi thử lại.',
+        },
+      }, { status: order.rejected === 'PRICE_MISMATCH' ? 409 : invalidVoucher && ['VOUCHER_FIRST_ORDER_ONLY', 'VOUCHER_PHONE_USED'].includes(order.rejected) ? 403 : 400 });
+    }
+    if (!order) return NextResponse.json({ error: { code: 'EMPTY_CART', message: 'Giỏ hàng đang trống.' } }, { status: 400 });
+    const postCommitTasks: Promise<unknown>[] = [];
+    if (cartId && (order.paymentMethod === 'COD' || order.paymentMethod === 'WALLET')) postCommitTasks.push(
+      prisma.cartItem.deleteMany({ where: { cartId: decodeURIComponent(cartId) } }).catch((error) => {
+        console.error('Order was created but cart cleanup failed.', error instanceof Error ? error.name : 'UnknownError');
+      }),
+    );
+    if (session?.userId) {
+      postCommitTasks.push(prisma.user.update({ where: { id: session.userId }, data: { name, phone, address } }).catch((error) => {
+        console.error('Order was created but profile update failed.', error instanceof Error ? error.name : 'UnknownError');
+      }));
+    }
+    await Promise.all(postCommitTasks);
+    void sendOrderConfirmationIfNeeded(order.id).catch((error) => {
+      console.error('Order confirmation email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+    });
+    const response = NextResponse.json({
+      success: true,
+      orderId: order.id,
+      orderCode: order.orderCode,
+      numericCode: order.numericCode,
+      status: order.orderStatus.toLowerCase(),
+      total: order.totalAmount,
+      totalAmount: order.totalAmount,
+      paymentMethod: order.paymentMethod,
+      redirectUrl: buildPaymentRedirect(order.paymentMethod, order.orderCode, order.totalAmount - order.walletAmountSpent),
+      ...(order.duplicate ? { duplicate: true } : {}),
+    }, { status: order.duplicate ? 200 : 201 });
+    setPaymentVerificationCookie(response, paymentMethod, order.orderCode, phone);
+    if (body.buyNow === true && ['COD', 'WALLET'].includes(order.paymentMethod)) response.cookies.set('bohoch_buy_now', '', { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 0 });
+    return response;
+  }, 'Lỗi đặt hàng:');
+}
+
+
+
+=== LUỒNG TỪ FILE: Webhook SePay đối soát (app/api/payment/sepay/webhook/route.ts) ===
+import { createHash } from 'node:crypto';
+import { NextResponse } from 'next/server';
+
+import { prisma } from '@/lib/prisma';
+import { notifyPaidOrder } from '@/lib/services/telegram-notifier';
+import { sendOrderConfirmationIfNeeded } from '@/lib/order-email-notifications';
+
+export const dynamic = 'force-dynamic';
+
+type SepayPayload = {
+  id?: unknown;
+  transactionId?: unknown;
+  content?: unknown;
+  description?: unknown;
+  transferAmount?: unknown;
+  referenceCode?: unknown;
+};
+
+function getTransactionId(payload: SepayPayload): string | null {
+  for (const value of [payload.transactionId, payload.id, payload.referenceCode]) {
+    if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 120);
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
+  }
+  return null;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error
+    && (error as { code?: unknown }).code === 'P2002';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getOrderCode(payload: SepayPayload): string | null {
+  for (const value of [payload.content, payload.description]) {
+    if (typeof value !== 'string') continue;
+    const match = value.match(/\bMKF-?(\d+)\b/i);
+    if (match) return `MKF-${match[1]}`.toUpperCase();
+  }
+  return null;
+}
+
+function getTransferAmount(value: unknown): number | null {
+  const amount = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN;
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+}
+
+export async function POST(request: Request) {
+  const expected = process.env.SEPAY_WEBHOOK_SECRET;
+  const supplied = request.headers.get('authorization')?.replace(/^Apikey\s+/i, '');
+  if (!expected || supplied !== expected) {
+    return NextResponse.json({ success: false, message: 'Unauthorized webhook' }, { status: 401 });
+  }
+
+  try {
+    const body: unknown = await request.json();
+    if (!isRecord(body)) return NextResponse.json({ success: true });
+
+    const payload = body as SepayPayload;
+    const orderCode = getOrderCode(payload);
+    const transferAmount = getTransferAmount(payload.transferAmount);
+    const transactionId = getTransactionId(payload);
+    const content = [payload.content, payload.description].find((value): value is string => typeof value === 'string')?.slice(0, 1000) ?? '';
+    const referenceCode = typeof payload.referenceCode === 'string'
+      ? payload.referenceCode.trim().slice(0, 120)
+      : '';
+    if (transferAmount === null) return NextResponse.json({ success: true });
+    const idempotencyKey = transactionId
+      ? `sepay:${transactionId}`
+      : `sepay:payload:${createHash('sha256').update(JSON.stringify(body)).digest('hex')}`;
+
+    const order = orderCode ? await prisma.order.findUnique({
+      where: { orderCode },
+      select: {
+        id: true,
+        orderCode: true,
+        numericCode: true,
+        totalAmount: true,
+        walletAmountSpent: true,
+        phone: true,
+        address: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        orderStatus: true,
+      },
+    }) : null;
+    const eligibleOrder = order && ['VIETQR', 'MOMO'].includes(order.paymentMethod) ? order : null;
+    const amountDue = eligibleOrder ? eligibleOrder.totalAmount - (eligibleOrder.walletAmountSpent ?? 0) : 0;
+    const exactMatch = Boolean(eligibleOrder && transferAmount === amountDue);
+    const mismatchReason = !orderCode
+      ? 'Không tìm thấy mã đơn trong nội dung chuyển khoản.'
+      : !order
+        ? `Không tìm thấy đơn ${orderCode}.`
+        : !eligibleOrder
+          ? 'Đơn hàng không sử dụng phương thức thanh toán trực tuyến.'
+          : transferAmount < amountDue
+            ? `Thiếu ${amountDue - transferAmount}đ so với số tiền còn phải thanh toán.`
+            : transferAmount > amountDue
+              ? `Thừa ${transferAmount - amountDue}đ so với số tiền còn phải thanh toán.`
+              : null;
+    const transferStatus = exactMatch ? 'MATCHED' as const : eligibleOrder ? 'MISMATCH' as const : 'UNMATCHED' as const;
+
+    try {
+      await prisma.$transaction(async (transaction) => {
+        const insertedTransfer = await transaction.bankTransfer.createMany({
+          data: [{
+            transactionId,
+            idempotencyKey,
+            orderCode,
+            amount: transferAmount,
+            content,
+            status: transferStatus,
+            mismatchReason,
+            orderId: eligibleOrder?.id ?? null,
+          }],
+          skipDuplicates: true,
+        });
+        if (insertedTransfer.count !== 1 || !eligibleOrder) return;
+
+        if (!exactMatch) {
+          await transaction.order.update({
+            where: { id: eligibleOrder.id },
+            data: { reconciliationStatus: 'MISMATCH', reconciliationNote: mismatchReason, reconciled: false },
+          });
+          return;
+        }
+
+        if (eligibleOrder.paymentStatus !== 'PAID') {
+          await transaction.order.update({
+            where: { id: eligibleOrder.id },
+            data: {
+              paymentStatus: 'PAID',
+              orderStatus: ['CANCELLED', 'DELIVERED'].includes(eligibleOrder.orderStatus) ? eligibleOrder.orderStatus : 'PAID',
+              holdExpiresAt: null,
+              sepayTransactionId: transactionId,
+              reconciliationStatus: 'MATCHED',
+              reconciliationNote: null,
+              reconciled: true,
+            },
+          });
+        } else {
+          await transaction.order.update({ where: { id: eligibleOrder.id }, data: { reconciliationStatus: 'MATCHED', reconciliationNote: null, reconciled: true } });
+        }
+
+        const payment = await transaction.payment.findFirst({
+          where: { orderId: eligibleOrder.id },
+          orderBy: { createdAt: 'desc' },
+        });
+        const paymentData = {
+          status: 'PAID' as const,
+          amount: transferAmount,
+          ...(referenceCode || transactionId ? { externalId: referenceCode || transactionId } : {}),
+        };
+        if (payment) {
+          await transaction.payment.update({ where: { id: payment.id }, data: paymentData });
+        } else {
+          await transaction.payment.create({
+            data: {
+              orderId: eligibleOrder.id,
+              orderCode: eligibleOrder.numericCode,
+              ...paymentData,
+            },
+          });
+        }
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return NextResponse.json({ success: true });
+      throw error;
+    }
+    if (exactMatch && eligibleOrder && eligibleOrder.paymentStatus !== 'PAID') {
+      await notifyPaidOrder({ orderCode: eligibleOrder.orderCode, totalAmount: eligibleOrder.totalAmount, phone: eligibleOrder.phone, address: eligibleOrder.address });
+      void sendOrderConfirmationIfNeeded(eligibleOrder.id).catch((error) => {
+        console.error('Payment receipt email delivery failed.', error instanceof Error ? error.name : 'UnknownError');
+      });
+    }
+  } catch (error) {
+    console.error('SePay payment webhook failed:', error instanceof Error ? error.name : 'UnknownError');
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+=== LUỒNG TỪ FILE: Poller trạng thái VietQR (app/checkout/vietqr/[orderCode]/payment-status-poller.tsx) ===
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { CheckCircle2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { celebratePayment } from '@/lib/payment-celebration';
+import { useLocaleCurrency } from '@/lib/i18n-context';
+
+export default function PaymentStatusPoller({ orderCode, orderId, canPoll, initiallyPaid = false, children }: { orderCode: string; orderId: string; canPoll: boolean; initiallyPaid?: boolean; children: ReactNode }) {
+  const { locale, currency } = useLocaleCurrency();
+  const isEN = locale === 'en' || currency === 'SGD';
+  const router = useRouter();
+  const [paid, setPaid] = useState(initiallyPaid);
+
+  useEffect(() => {
+    if (!paid) return;
+    let active = true;
+    void fetch(`/api/orders/${encodeURIComponent(orderCode)}/clear-cart`, { method: 'POST' }).then(() => {
+      try {
+        window.localStorage.removeItem('bohoch_cart_quantities');
+        window.sessionStorage.removeItem('buy_now_item');
+        window.dispatchEvent(new CustomEvent('bohoch:cart-updated', { detail: { count: 0 } }));
+      } catch {
+        // Storage can be disabled; the server-side cart clear still runs.
+      }
+    }).catch(() => undefined).finally(() => {
+      if (!active) return;
+      celebratePayment(orderCode);
+      router.push(`/order-success?orderCode=${encodeURIComponent(orderCode)}`);
+    });
+    return () => { active = false; };
+  }, [orderCode, paid, router]);
+
+  useEffect(() => {
+    if (paid || !canPoll) return;
+
+    let active = true;
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderCode)}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({}),
+          cache: 'no-store',
+        });
+        if (!response.ok) return;
+        const result = await response.json() as { status?: string; paymentStatus?: string };
+        if (active && (['PAID', 'SUCCESS'].includes(result.status ?? '') || ['PAID', 'SUCCESS'].includes(result.paymentStatus ?? ''))) setPaid(true);
+      } catch {
+        return;
+      }
+    };
+
+    void checkStatus();
+    const interval = window.setInterval(() => { void checkStatus(); }, 2000);
+    const timeout = window.setTimeout(() => {
+      active = false;
+      window.clearInterval(interval);
+    }, 15 * 60 * 1000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [orderCode, orderId, canPoll, paid, router]);
+
+  return (
+    <div className="payment-qr-layout" data-payment-paid={paid ? 'true' : undefined}>
+      {paid && <div className="payment-success-overlay" role="status" aria-live="assertive">
+        <CheckCircle2 size={78} strokeWidth={1.7} aria-hidden="true" />
+        <h2>{isEN ? 'PAYMENT RECEIVED SUCCESSFULLY!' : 'ĐÃ NHẬN THANH TOÁN THÀNH CÔNG!'}</h2>
+        <p>{isEN ? `Order ${orderCode} is being confirmed.` : `Đơn hàng ${orderCode} đang được xác nhận.`}</p>
+        <span>{isEN ? 'Redirecting to your order confirmation...' : 'Đang chuyển đến xác nhận đơn hàng...'}</span>
+      </div>}
+      {!paid && children}
+    </div>
+  );
+}

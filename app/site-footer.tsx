@@ -25,6 +25,7 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
 
   return (
     <footer className="site-footer">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="site-footer-inner">
         <section className="site-footer-column">
           <Link className="footer-brand" href="/">{footerLogoUrl ? <img className="footer-brand-image" src={footerLogoUrl} alt="Mắc Khén Farm" /> : 'MẮC KHÉN FARM'}</Link>
@@ -79,7 +80,10 @@ export default function SiteFooter({ settings, footerLogoUrl, bctBadgeUrl }: { s
           </a>
         </section>
       </div>
-      <div className="site-footer-bottom">{text('© 2026 Mắc Khén Farm. Dự án bài tập lớn Thương mại điện tử - ĐH Giao thông Vận tải (UTH).')}</div>
+      </div>
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="site-footer-bottom">{text('© 2026 Mắc Khén Farm. Dự án bài tập lớn Thương mại điện tử - ĐH Giao thông Vận tải (UTH).')}</div>
+      </div>
     </footer>
   );
 }

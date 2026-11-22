@@ -53,12 +53,13 @@ export default async function HomePage() {
     bestSellers = DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
   }
   return (
-    <main className="page-shell home-page">
+    <main className="home-page">
       <ScrollReveal groups={homeRevealGroups} />
       <HomeHeroReveal />
       <ForbiddenNotice />
 
       <section className="hero">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 home-container">
         <div className="hero-copy">
           <div className="home-gourmet-label">
             <span aria-hidden="true">✦</span>
@@ -87,9 +88,11 @@ export default async function HomePage() {
             <LocalizedHeroImage imageUrl={heroImageUrl} mobileImageUrl={heroImageMobileUrl} />
           </div>
         </div>
+        </div>
       </section>
 
       <section className="catalog-section">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="section-heading home-section-heading catalog-heading">
           <div>
             <h2 className="catalog-section-title"><LocalizedText text="SẢN PHẨM NỔI BẬT & COMBO" /></h2>
@@ -98,9 +101,11 @@ export default async function HomePage() {
         </div>
 
         <ProductCatalogFilter products={bestSellers} showFilters={false} />
+        </div>
       </section>
 
       <section className="home-promo-banner-wrap">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="home-promo-banner">
           <img className="w-full h-full rounded-2xl object-cover object-center" src={promoBannerUrl} alt="Combo sản phẩm Mắc Khén Farm" />
           <span className="home-promo-banner-copy">
@@ -112,13 +117,21 @@ export default async function HomePage() {
             </Link>
           </span>
         </div>
+        </div>
       </section>
 
-      <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
+      </div>
 
-      <BeforeAfterSlider originalImageUrl={beforeAfterOriginalUrl} resultImageUrl={beforeAfterResultUrl} />
+      <section>
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <BeforeAfterSlider originalImageUrl={beforeAfterOriginalUrl} resultImageUrl={beforeAfterResultUrl} />
+        </div>
+      </section>
 
       <section className="comparison-section">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="section-heading home-section-heading"><div><p className="eyebrow"><LocalizedText text="So sánh lựa chọn" /></p><h2><LocalizedText text="Đậm vị thực vật, chi phí tối ưu" /></h2></div></div>
         <div className="table-card comparison-table">
           <table>
@@ -132,11 +145,17 @@ export default async function HomePage() {
             </tbody>
           </table>
         </div>
+          </div>
       </section>
 
-      <HomeTransparencyTabs featureImageUrls={['/products/soy-pulp.svg', '/products/combo.jpg', '/products/hat-mac-khen.jpg']} />
+        <section>
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <HomeTransparencyTabs featureImageUrls={['/products/soy-pulp.svg', '/products/combo.jpg', '/products/hat-mac-khen.jpg']} />
+          </div>
+        </section>
 
       <section className="story-block">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div>
           <p className="eyebrow"><LocalizedText text="Vì sao lựa chọn Mắc Khén Farm?" /></p>
           <h2><LocalizedText text="Tận dụng trọn nguyên liệu, giữ trọn vị ngon." /></h2>
@@ -152,6 +171,7 @@ export default async function HomePage() {
               <LocalizedText text={item} />
             </div>
           ))}
+        </div>
         </div>
       </section>
     </main>
