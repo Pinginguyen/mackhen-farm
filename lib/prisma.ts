@@ -24,6 +24,7 @@ if (connectionString) {
 }
 if (datasourceUrl) {
   if (datasourceUrl.hostname.endsWith('.neon.tech')) {
+    datasourceUrl.searchParams.set('connect_timeout', '5');
     const neonEndpoint = datasourceUrl.hostname.match(/^(ep-[^.]+)(\..+)$/);
     if (neonEndpoint && !neonEndpoint[1].endsWith('-pooler')) {
       datasourceUrl.hostname = `${neonEndpoint[1]}-pooler${neonEndpoint[2]}`;

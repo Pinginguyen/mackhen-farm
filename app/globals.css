@@ -7146,6 +7146,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
+  transform: translateZ(0);
 }
 
 .hero3d-skeleton {
@@ -13513,6 +13514,7 @@ body {
 [data-scroll-reveal='pending'] {
   opacity: 0;
   transform: translate3d(0, 20px, 0);
+  will-change: transform, opacity;
 }
 
 [data-scroll-reveal='visible'] {
