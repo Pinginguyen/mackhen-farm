@@ -125,7 +125,7 @@ export default function TraceabilityPage() {
                 <div><dt>{text('Số lượng nhập')}</dt><dd>{batch.receivedQty.toLocaleString('vi-VN')}</dd></div>
                 {batch.packaging && <div><dt>{text('Quy cách')}</dt><dd>{text(batch.packaging)}</dd></div>}
                 {batch.ingredients && <div><dt>{text('Thành phần')}</dt><dd>{text(batch.ingredients)}</dd></div>}
-                {batch.receivingNote && <div><dt>{text('Ghi chú lô')}</dt><dd>{batch.receivingNote}</dd></div>}
+                {batch.receivingNote && <div><dt>{text('Hành trình chuỗi cung ứng')}</dt><dd className="whitespace-pre-line">{text(batch.receivingNote)}</dd></div>}
               </dl>
               {batch.status !== 'EXPIRED' && <WarrantyActivation qrToken={batch.qrToken} />}
               {batch.testReportUrl && <a className="secondary-action" href={batch.testReportUrl} target="_blank" rel="noreferrer">{text('Xem phiếu kiểm nghiệm của lô')}</a>}

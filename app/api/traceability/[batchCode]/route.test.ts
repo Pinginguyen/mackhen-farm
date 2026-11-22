@@ -46,6 +46,29 @@ describe('GET /api/traceability/[batchCode]', () => {
     expect(lotFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { batchCode: 'LOT-MKF-2026-001' } }));
   });
 
+  it('accepts and looks up the BATCH-CRAFT format', async () => {
+    lotFindUnique.mockResolvedValueOnce({
+      batchCode: 'BATCH-CRAFT-2026',
+      qrToken: '49c449a3-674b-4ce8-84cf-c6ff3cb2f137',
+      mfgDate: new Date('2026-10-12T00:00:00.000Z'),
+      expDate: new Date('2027-10-12T00:00:00.000Z'),
+      receivedQty: 120,
+      availableQty: 120,
+      status: 'ACTIVE',
+      testReportUrl: null,
+      receivingNote: 'Supplier and processing record',
+      product: { name: 'Khô Bò Thực Vật Mắc Khén Xé Sợi Cay Nồng', slug: 'mac-khen-xe-soi-cay-nong', unit: 'Túi 150g', ingredients: 'Bã đậu nành upcycled', originRegion: 'Sơn La, Tây Bắc' },
+      variant: { title: 'Túi 150g', weight: '150g' },
+    });
+
+    const response = await GET(new Request('https://mackhen.example/api/traceability/batch-craft-2026'), {
+      params: { batchCode: 'batch-craft-2026' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(lotFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { batchCode: 'BATCH-CRAFT-2026' } }));
+  });
+
   it('returns a not-found response for an unknown batch', async () => {
     lotFindUnique.mockResolvedValueOnce(null);
     const response = await GET(new Request('https://mackhen.example/api/traceability/LOT-MKF-2026-404'), {

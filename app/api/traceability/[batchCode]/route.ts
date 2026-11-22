@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(_request: Request, { params }: { params: { batchCode: string } }) {
   const identifier = params.batchCode?.trim() ?? '';
   const batchCode = identifier.toUpperCase();
-  const isBatchCode = /^LOT-[A-Z0-9-]{4,60}$/.test(batchCode);
+    const isBatchCode = /^(?:LOT|BATCH)-[A-Z0-9-]{4,60}$/.test(batchCode);
   const isQrToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
   if (!isBatchCode && !isQrToken) {
     return NextResponse.json(
