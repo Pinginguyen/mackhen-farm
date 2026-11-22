@@ -66,7 +66,7 @@ export default function LiveProductSearch() {
   const showResults = open && query.trim().length >= 2;
 
   return (
-    <div className="live-product-search max-w-[200px] lg:max-w-[240px] !h-9 !min-h-0 !rounded-xl !border-stone-200/70 !bg-white/90 px-3 shadow-xs" ref={rootRef}>
+    <div className="live-product-search header-product-search !h-9 !min-h-0 !rounded-xl !border-stone-200/70 !bg-white/90 px-3 shadow-xs" ref={rootRef}>
       <Search size={17} aria-hidden="true" />
       <input className="placeholder:text-stone-400" aria-label={text('Tìm sản phẩm')} placeholder={text('Tìm chẳm chéo, mắc khén...')} value={query} onFocus={() => setOpen(true)} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }} />
       {query && <button type="button" aria-label={text('Xóa tìm kiếm')} onClick={() => { setQuery(''); setOpen(true); }}><X size={15} /></button>}

@@ -64,7 +64,7 @@ export default function HeaderContent({ user, logoUrl }: { user: { name: string;
         <Link href="/tra-cuu">{t('trackOrder')}</Link>
       </nav>
       <LiveProductSearch />
-      <div className="site-header-actions !gap-2.5">
+      <div className="site-header-actions !gap-3">
         <Link className="mobile-search-trigger" href="/products" aria-label={translateContent('Tìm sản phẩm', locale)}><Search size={19} /></Link>
         <CartLink />
         <SoundEffect />

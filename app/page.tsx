@@ -84,8 +84,8 @@ export default async function HomePage() {
             <span><LocalizedText text={contentSettings.heroScarcityBadge} /></span>
           </div>
         </div>
-        <div className="hero-media">
-          <div className="photo-card home-hero-photo">
+        <div className="hero-media min-w-0">
+          <div className="photo-card home-hero-photo w-full overflow-hidden rounded-3xl">
             <LocalizedHeroImage imageUrl={heroImageUrl} mobileImageUrl={heroImageMobileUrl} />
           </div>
         </div>
