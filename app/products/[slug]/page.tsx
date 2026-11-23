@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { normalizeNutritionFacts, normalizePairingGuide, normalizeSensoryProfile, type Product } from '@/lib/store-data';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import AddToCart from './add-to-cart';
 import ProductImageGallery from './product-image-gallery';
 import ProductRating from '@/components/ProductRating';
@@ -22,11 +21,6 @@ import ProductRecommendationShelf from '@/components/ProductRecommendationShelf'
 type ProductReview = { id: string; customerName: string; rating: number; comment: string; images: string[]; createdAt: string; adminReply: string | null; adminReplyAt: string | null; replies: { id: string; authorName: string; authorRole: string; content: string; createdAt: string }[] };
 
 export const dynamic = 'force-dynamic';
-
-function normalizeProductLookup(value: string): string {
-  return value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
 
 export default async function ProductDetailPage({ params }: { params: { slug: string } }) {
   const systemSettings = await getSystemSettings();
@@ -97,30 +91,20 @@ export default async function ProductDetailPage({ params }: { params: { slug: st
     }
   } catch (error) {
     console.error('[CRITICAL_DB_ERROR] Chi tiết lỗi tại file này:', error instanceof Error ? error.message : error);
-    console.warn('Không kết nối được DB, dùng dữ liệu chi tiết sản phẩm mặc định');
   }
 
   if (inactiveInDatabase) notFound();
-  if (!product) {
-    const lookup = normalizeProductLookup(params.slug);
-    const fallback = DEFAULT_PRODUCTS.find((item) => item.slug === params.slug || item.id === params.slug || normalizeProductLookup(item.name) === lookup);
-    if (!fallback) notFound();
-    product = {
-      ...fallback,
-      status: fallback.stock > 0 ? 'Còn hàng' : 'Sắp hết',
-      variants: [],
-    };
-  }
+  if (!product) notFound();
 
-  let pairingProducts: { id: string; slug: string; name: string; image: string; price: number; stock: number; images: string[]; highlights: string[]; variants: { id: string }[] }[] = DEFAULT_PRODUCTS.map((item) => ({ ...item, images: item.images ?? [], highlights: [], variants: [] }));
+  let pairingProducts: { id: string; slug: string; name: string; image: string; price: number; stock: number; images: string[]; highlights: string[]; variants: { id: string }[] }[] = [];
   try {
     const livePairingProducts = await prisma.product.findMany({
       where: { active: true, slug: { in: ['mac-khen-chay-toi-gion-cay', 'mac-khen-xe-soi-cay-nong', 'combo-bo-ba-nhau-xanh', 'cham-cheo-uot-chuan-vi-dien-bien', 'hat-mac-khen-rung-sao-kho-son-la'] } },
       select: { id: true, slug: true, name: true, image: true, price: true, stock: true, images: true, highlights: true, variants: { select: { id: true } } },
     });
-    if (livePairingProducts.length) pairingProducts = livePairingProducts.map((item) => ({ ...item, images: item.images ?? [], highlights: item.highlights ?? [], variants: item.variants ?? [] }));
+    pairingProducts = livePairingProducts.map((item) => ({ ...item, images: item.images ?? [], highlights: item.highlights ?? [], variants: item.variants ?? [] }));
   } catch {
-    pairingProducts = DEFAULT_PRODUCTS.map((item) => ({ ...item, images: item.images ?? [], highlights: [], variants: [] }));
+    pairingProducts = [];
   }
 
   const isSeasoning = product.category === 'Gia vị Tây Bắc';

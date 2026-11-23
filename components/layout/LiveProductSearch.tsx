@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { useLocaleCurrency } from '@/lib/i18n-context';
 import { translateContent } from '@/lib/translations';
 
@@ -52,10 +51,7 @@ export default function LiveProductSearch() {
         const search = normalize(query.trim());
         setProducts(result.items.filter((product) => normalize(`${product.name} ${product.category}`).includes(search)).slice(0, 4));
       } catch {
-        if (!controller.signal.aborted) {
-          const search = normalize(query.trim());
-          setProducts(DEFAULT_PRODUCTS.filter((product) => normalize(`${product.name} ${product.category}`).includes(search)).slice(0, 4));
-        }
+        if (!controller.signal.aborted) setProducts([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

@@ -11,7 +11,6 @@ import LocalizedHeroImage from '@/components/LocalizedHeroImage';
 import HomeHeroReveal from '@/components/HomeHeroReveal';
 import BeforeAfterSlider from '@/components/home/BeforeAfterSlider';
 import FlavorPairingGuide from '@/components/product/FlavorPairingGuide';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { getSiteAsset } from '@/lib/site-assets';
 import PromoVoucherCode from '@/components/home/PromoVoucherCode';
 import { getCoreContentSettings } from '@/lib/system-settings';
@@ -41,16 +40,10 @@ export default async function HomePage() {
       prisma.product.findMany({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
       prisma.product.findMany({ where: { active: true }, take: 4, orderBy: { createdAt: 'desc' } }),
     ]);
-    products = databaseProducts.length
-      ? databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }))
-      : DEFAULT_PRODUCTS;
-    bestSellers = databaseBestSellers.length
-      ? databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }))
-      : DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
+    products = databaseProducts.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }));
+    bestSellers = databaseBestSellers.map((product) => ({ ...product, nutritionFacts: normalizeNutritionFacts(product.nutritionFacts), sensoryProfile: normalizeSensoryProfile(product.sensoryProfile), pairingGuide: normalizePairingGuide(product.pairingGuide) }));
   } catch (error) {
     console.error('[HOME_PRODUCTS_DB_ERROR]', error instanceof Error ? error.message : error);
-    products = DEFAULT_PRODUCTS;
-    bestSellers = DEFAULT_PRODUCTS.filter((product) => product.active).slice(0, 4);
   }
   return (
     <main className="home-page">
@@ -121,7 +114,7 @@ export default async function HomePage() {
       </section>
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <FlavorPairingGuide products={products.length ? products : DEFAULT_PRODUCTS} />
+        <FlavorPairingGuide products={products} />
       </div>
 
       <section>

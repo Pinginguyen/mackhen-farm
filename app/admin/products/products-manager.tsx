@@ -316,7 +316,7 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
         setProducts((current) => current.map((product) => product.id === result.product!.id ? result.product! : product));
         setNotice(`Đã cập nhật sản phẩm “${result.product.name}”.`);
       } else {
-        setProducts((current) => [result.product!, ...current.filter((product) => !product.id.startsWith('fallback-'))]);
+        setProducts((current) => [result.product!, ...current]);
         setNotice(`Đã thêm sản phẩm “${result.product.name}”.`);
       }
       setDraft(emptyDraft);
@@ -379,26 +379,19 @@ export default function ProductsManager({ initialProducts }: { initialProducts: 
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => {
-              const isFallback = product.id.startsWith('fallback-');
-              return (
+            {products.map((product) => (
                 <tr key={product.id}>
                   <td><div className="admin-product-name"><img src={product.image} alt="" /><span><strong>{product.name}</strong><small>{product.unit}</small></span></div></td>
                   <td>{product.category}</td>
-                  {isFallback ? (
-                    <td className="admin-product-fallback-note" colSpan={3}>Mẫu hiển thị · chưa được lưu trong cơ sở dữ liệu</td>
-                  ) : (
-                    <StockControl key={`${product.id}:${product.price}:${product.stock}:${product.active}`} productId={product.id} currentPrice={product.price} currentStock={product.stock} active={product.active ?? true} variantCount={product.variants?.length ?? 0} />
-                  )}
-                  <td>{!isFallback && <div className="admin-product-row-actions">
+                  <StockControl key={`${product.id}:${product.price}:${product.stock}:${product.active}`} productId={product.id} currentPrice={product.price} currentStock={product.stock} active={product.active ?? true} variantCount={product.variants?.length ?? 0} />
+                  <td><div className="admin-product-row-actions">
                     <button className="admin-return-icon-button" type="button" title="Chỉnh sửa sản phẩm" aria-label={`Chỉnh sửa ${product.name}`} onClick={() => startEditingProduct(product)}><Pencil size={16} /></button>
                     <button className="admin-product-delete-button" type="button" title="Xóa sản phẩm" aria-label={`Xóa sản phẩm ${product.name}`} onClick={() => void handleDeleteProduct(product.id, product.name)} disabled={deletingProductId !== null}>
                       {deletingProductId === product.id ? <span className="admin-delete-spinner" aria-hidden="true" /> : <Trash2 size={16} />}
                     </button>
-                  </div>}</td>
+                  </div></td>
                 </tr>
-              );
-            })}
+            ))}
             {!products.length && <tr><td colSpan={5}>Chưa có sản phẩm trong danh mục.</td></tr>}
           </tbody>
         </table>

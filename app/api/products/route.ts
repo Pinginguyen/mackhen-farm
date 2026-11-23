@@ -7,7 +7,6 @@ import { withDatabase } from '@/lib/api-database';
 import { requireAdmin } from '@/lib/admin-auth';
 import { getRequestSession } from '@/lib/auth';
 import { writeAuditLog } from '@/lib/audit-log';
-import { DEFAULT_PRODUCTS } from '@/lib/default-products';
 import { Prisma } from '@prisma/client';
 
 export const revalidate = 60;
@@ -24,10 +23,7 @@ const getCachedActiveProducts = unstable_cache(
 
 export function GET() {
   return withDatabase(async () => {
-    const databaseProducts = await getCachedActiveProducts();
-    const products = databaseProducts.length
-      ? databaseProducts
-      : DEFAULT_PRODUCTS.map((product) => ({ ...product, variants: [] }));
+    const products = await getCachedActiveProducts();
     const categories = [...new Set(products.map((product) => product.category))];
 
     return NextResponse.json({
@@ -521,7 +517,7 @@ export async function DELETE(request: Request) {
   }
 
   return withDatabase(async () => {
-    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, name: true, price: true, stock: true, active: true } });
+    const previous = await prisma.product.findUnique({ where: { id: productId }, select: { id: true, slug: true, name: true, price: true, stock: true, active: true } });
     if (!previous?.active) return NextResponse.json({ success: false, message: 'Không tìm thấy sản phẩm cần xóa.' }, { status: 404 });
     const result = await prisma.product.updateMany({
       where: { id: productId, active: true },
@@ -539,6 +535,13 @@ export async function DELETE(request: Request) {
       newValue: { ...previous, active: false },
     });
     revalidateTag('products');
+    revalidatePath('/', 'layout');
+    revalidatePath('/');
+    revalidatePath('/products');
+    revalidatePath('/san-pham');
+    revalidatePath(`/products/${previous.slug}`);
+    revalidatePath(`/san-pham/${previous.slug}`);
+    revalidatePath('/admin/products');
     return NextResponse.json({ success: true, message: 'Đã xóa sản phẩm thành công.' });
   }, 'Admin product deletion failed');
 }

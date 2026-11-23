@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { productFindMany, productFindUnique, productFindFirst, productCreate, productUpdate, productUpdateMany, auditLogCreate, requireAdmin } = vi.hoisted(() => ({
+const { productFindMany, productFindUnique, productFindFirst, productCreate, productUpdate, productUpdateMany, auditLogCreate, requireAdmin, revalidatePath, revalidateTag } = vi.hoisted(() => ({
   productFindMany: vi.fn(),
   productFindUnique: vi.fn(),
   productFindFirst: vi.fn(),
@@ -9,6 +9,8 @@ const { productFindMany, productFindUnique, productFindFirst, productCreate, pro
   productUpdateMany: vi.fn(),
   auditLogCreate: vi.fn(),
   requireAdmin: vi.fn(),
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: { product: { findMany: productFindMany, findUnique: productFindUnique, findFirst: productFindFirst, create: productCreate, update: productUpdate, updateMany: productUpdateMany }, auditLog: { create: auditLogCreate } } }));
@@ -16,8 +18,8 @@ vi.mock('@/lib/admin-auth', () => ({ requireAdmin }));
 vi.mock('@/lib/api-database', () => ({ withDatabase: (operation: () => Promise<Response>) => operation() }));
 vi.mock('next/cache', () => ({
   unstable_cache: (callback: () => unknown) => callback,
-  revalidatePath: vi.fn(),
-  revalidateTag: vi.fn(),
+  revalidatePath,
+  revalidateTag,
 }));
 
 import { DELETE, GET, PATCH, POST } from './route';
@@ -61,20 +63,17 @@ describe('/api/products', () => {
     productUpdateMany.mockReset();
     auditLogCreate.mockReset().mockResolvedValue({ id: 'audit-1' });
     requireAdmin.mockReset().mockResolvedValue(null);
+    revalidatePath.mockReset();
+    revalidateTag.mockReset();
   });
 
-  it('returns the complete default catalog when the database catalog is empty', async () => {
+  it('returns no products when the database catalog is empty', async () => {
     const response = await GET();
     const result = await response.json() as { items: { id: string; slug: string; ingredients: string }[]; pagination: { total: number } };
 
     expect(response.status).toBe(200);
-    expect(result.items).toHaveLength(8);
-    expect(result.pagination.total).toBe(8);
-    expect(result.items[0].slug).toBe('mac-khen-xe-soi-cay-nong');
-    expect(result.items.some((product) => product.slug === 'cham-cheo-uot-chuan-vi-dien-bien')).toBe(true);
-    expect(result.items.find((product) => product.slug === 'mac-khen-xe-soi-cay-nong')?.ingredients).toContain('Bã đậu nành upcycled');
-    expect(result.items.find((product) => product.slug === 'cham-cheo-uot-chuan-vi-dien-bien')?.ingredients).toContain('Ớt tươi Điện Biên');
-    expect(result.items.find((product) => product.slug === 'hat-mac-khen-rung-sao-kho-son-la')?.ingredients).toContain('sàng lọc sạch cuống');
+    expect(result.items).toEqual([]);
+    expect(result.pagination.total).toBe(0);
   });
 
   it('returns active products from the database when available', async () => {
@@ -112,6 +111,7 @@ describe('/api/products', () => {
   });
 
   it('soft-deletes an active product for an admin', async () => {
+    productFindUnique.mockResolvedValueOnce({ id: 'product-1', slug: 'db-product', name: 'DB product', price: 89000, stock: 10, active: true });
     productUpdateMany.mockResolvedValue({ count: 1 });
     const response = await DELETE(new Request('https://mackhen.example/api/products?id=product-1', { method: 'DELETE' }));
 
@@ -121,6 +121,12 @@ describe('/api/products', () => {
       where: { id: 'product-1', active: true },
       data: { active: false },
     });
+    expect(revalidateTag).toHaveBeenCalledWith('products');
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
+    expect(revalidatePath).toHaveBeenCalledWith('/');
+    expect(revalidatePath).toHaveBeenCalledWith('/products');
+    expect(revalidatePath).toHaveBeenCalledWith('/products/db-product');
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/products');
   });
 
   it('rejects a delete request without a product id', async () => {
